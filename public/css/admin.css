@@ -1,0 +1,142 @@
+/* =========================================================
+   ShopKori Admin Panel Styles
+   ========================================================= */
+:root {
+  --admin-navy: #1e3a5f;
+  --admin-navy-dark: #16283f;
+  --admin-gold: #d4a537;
+  --admin-bg: #f4f6f9;
+}
+
+* { box-sizing: border-box; }
+body { font-family: 'Poppins', sans-serif; background: var(--admin-bg); margin: 0; }
+
+.admin-wrapper { display: flex; min-height: 100vh; }
+
+/* ---------- Sidebar ---------- */
+.admin-sidebar {
+  width: 250px;
+  background: var(--admin-navy-dark);
+  color: #dbe3ec;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+}
+.admin-brand {
+  padding: 22px 20px;
+  font-weight: 700;
+  font-size: 18px;
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.admin-brand i { color: var(--admin-gold); margin-right: 6px; }
+.admin-brand span { display: block; font-size: 11px; font-weight: 400; color: #9fb0c3; margin-top: 4px; }
+
+.admin-nav { display: flex; flex-direction: column; padding: 14px 0; }
+.admin-nav a {
+  color: #cdd7e3;
+  text-decoration: none;
+  padding: 11px 22px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-left: 3px solid transparent;
+}
+.admin-nav a i { font-size: 16px; width: 18px; }
+.admin-nav a:hover { background: rgba(255,255,255,0.05); color: #fff; }
+.admin-nav a.active { background: rgba(212,165,55,0.12); border-left-color: var(--admin-gold); color: var(--admin-gold); font-weight: 600; }
+.admin-nav hr { border-color: rgba(255,255,255,0.08); margin: 10px 20px; }
+
+/* ---------- Main content ---------- */
+.admin-content { flex: 1; min-width: 0; }
+.admin-topbar {
+  background: #fff;
+  padding: 16px 26px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.admin-topbar h1 { font-size: 20px; font-weight: 700; color: var(--admin-navy); margin: 0; }
+.admin-topbar-user { font-size: 14px; color: #555; }
+.sidebar-toggle { background: none; border: none; font-size: 22px; }
+
+.admin-main { padding: 26px; }
+
+.admin-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 22px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  margin-bottom: 0;
+}
+.admin-card h5 { font-weight: 700; color: var(--admin-navy); margin-bottom: 16px; }
+
+/* ---------- Stat cards ---------- */
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 16px;
+}
+@media (max-width: 1200px) { .stat-cards { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px) { .stat-cards { grid-template-columns: repeat(2, 1fr); } }
+
+.stat-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.stat-icon {
+  width: 46px; height: 46px;
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 20px;
+  flex-shrink: 0;
+}
+.stat-value { display: block; font-size: 18px; font-weight: 700; color: #222; }
+.stat-label { display: block; font-size: 12px; color: #888; }
+
+/* ---------- Buttons ---------- */
+.btn-brand { background: var(--admin-navy); color: #fff; border: none; font-weight: 600; }
+.btn-brand:hover { background: var(--admin-navy-dark); color: #fff; }
+.text-brand { color: var(--admin-navy); }
+
+/* ---------- Table thumbs / badges ---------- */
+.admin-thumb { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; }
+.status-badge.status-pending { background: #f0ad4e; }
+.status-badge.status-processing { background: #5bc0de; }
+.status-badge.status-shipped { background: #337ab7; }
+.status-badge.status-delivered { background: #2e9e5b; }
+.status-badge.status-cancelled { background: #d9534f; }
+
+/* ---------- Login page ---------- */
+.admin-login-body {
+  background: linear-gradient(135deg, var(--admin-navy) 0%, var(--admin-navy-dark) 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-login-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+}
+
+@media (max-width: 991px) {
+  .admin-sidebar { position: fixed; left: -250px; z-index: 1000; transition: 0.3s; }
+  .admin-sidebar.open { left: 0; }
+}

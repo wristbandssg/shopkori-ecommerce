@@ -1,0 +1,43 @@
+<%- include('partials/admin-header') %>
+
+<div class="admin-card">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <form method="get" class="d-flex gap-2">
+      <input type="text" name="q" class="form-control" placeholder="প্রোডাক্ট নাম/SKU খুঁজুন" value="<%= q %>">
+      <button class="btn btn-outline-secondary"><i class="bi bi-search"></i></button>
+    </form>
+    <a href="/admin/products/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> নতুন প্রোডাক্ট</a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>ছবি</th><th>নাম</th><th>ক্যাটাগরি</th><th>মূল্য</th><th>স্টক</th><th>স্ট্যাটাস</th><th>একশন</th></tr></thead>
+      <tbody>
+        <% products.forEach(function (p) { %>
+          <tr>
+            <td><img src="<%= productImageUrl(p.image) %>" class="admin-thumb"></td>
+            <td><%= p.name %><br><small class="text-muted">SKU: <%= p.sku %></small></td>
+            <td><%= p.category ? p.category.name : '-' %></td>
+            <td>
+              <% if (p.salePrice) { %>
+                <span class="text-decoration-line-through text-muted"><%= currency(p.price) %></span><br>
+                <span class="fw-bold"><%= currency(p.salePrice) %></span>
+              <% } else { %>
+                <%= currency(p.price) %>
+              <% } %>
+            </td>
+            <td><% if (p.stock <= 5) { %><span class="text-danger fw-bold"><%= p.stock %></span><% } else { %><%= p.stock %><% } %></td>
+            <td><span class="badge bg-<%= p.status ? 'success' : 'secondary' %>"><%= p.status ? 'Active' : 'Hidden' %></span></td>
+            <td class="text-nowrap">
+              <a href="/admin/products/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+              <a href="/admin/products/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('আপনি কি নিশ্চিত এই প্রোডাক্টটি ডিলিট করতে চান?')"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!products.length) { %><tr><td colspan="7" class="text-center text-muted">কোনো প্রোডাক্ট পাওয়া যায়নি।</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

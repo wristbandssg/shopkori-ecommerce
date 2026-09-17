@@ -1,0 +1,20 @@
+<%- include('partials/header') %>
+<div class="container py-5">
+  <div class="auth-box mx-auto">
+    <h3 class="mb-4 text-center">নতুন অ্যাকাউন্ট তৈরি করুন</h3>
+    <% if (errors.length) { %>
+      <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+    <% } %>
+    <form method="post" action="/register">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+      <div class="mb-3"><label class="form-label">পুরো নাম</label><input type="text" name="name" class="form-control" required value="<%= formData.name || '' %>"></div>
+      <div class="mb-3"><label class="form-label">ইমেইল</label><input type="email" name="email" class="form-control" required value="<%= formData.email || '' %>"></div>
+      <div class="mb-3"><label class="form-label">মোবাইল</label><input type="text" name="phone" class="form-control" value="<%= formData.phone || '' %>"></div>
+      <div class="mb-3"><label class="form-label">পাসওয়ার্ড</label><input type="password" name="password" class="form-control" required></div>
+      <div class="mb-3"><label class="form-label">পাসওয়ার্ড কনফার্ম</label><input type="password" name="confirmPassword" class="form-control" required></div>
+      <button type="submit" class="btn btn-buy-now w-100">রেজিস্টার করুন</button>
+    </form>
+    <p class="text-center mt-3">ইতিমধ্যে অ্যাকাউন্ট আছে? <a href="/login">লগইন করুন</a></p>
+  </div>
+</div>
+<%- include('partials/footer') %>

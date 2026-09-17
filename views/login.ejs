@@ -1,0 +1,18 @@
+<%- include('partials/header') %>
+<div class="container py-5">
+  <div class="auth-box mx-auto">
+    <h3 class="mb-4 text-center">লগইন করুন</h3>
+    <% if (errors.length) { %>
+      <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+    <% } %>
+    <form method="post" action="/login">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+      <input type="hidden" name="redirect" value="<%= redirectTo %>">
+      <div class="mb-3"><label class="form-label">ইমেইল</label><input type="email" name="email" class="form-control" required value="<%= formData.email || '' %>"></div>
+      <div class="mb-3"><label class="form-label">পাসওয়ার্ড</label><input type="password" name="password" class="form-control" required></div>
+      <button type="submit" class="btn btn-buy-now w-100">লগইন</button>
+    </form>
+    <p class="text-center mt-3">নতুন এখানে? <a href="/register">রেজিস্টার করুন</a></p>
+  </div>
+</div>
+<%- include('partials/footer') %>

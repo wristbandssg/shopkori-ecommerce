@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
+  <rect width="400" height="400" fill="#f4f6f9"/>
+  <g fill="#c9d2dc">
+    <circle cx="200" cy="160" r="55"/>
+    <path d="M100 320 L160 220 L200 270 L250 200 L320 320 Z"/>
+  </g>
+  <text x="200" y="365" font-family="sans-serif" font-size="16" fill="#9aa5b1" text-anchor="middle">No Image</text>
+</svg>

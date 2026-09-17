@@ -1,0 +1,61 @@
+<%- include('partials/header') %>
+
+<div class="container py-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">হোম</a></li>
+      <li class="breadcrumb-item active"><%= pageTitle %></li>
+    </ol>
+  </nav>
+
+  <div class="row">
+    <div class="col-lg-3 mb-4">
+      <div class="filter-box">
+        <h6>ক্যাটাগরি</h6>
+        <ul class="filter-cat-list">
+          <li><a href="/category" class="<%= !category ? 'active' : '' %>">সকল প্রোডাক্ট</a></li>
+          <% allCategories.forEach(function (c) { %>
+            <li><a href="/category/<%= c.slug %>" class="<%= (category && String(category._id) === String(c._id)) ? 'active' : '' %>"><%= c.name %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-lg-9">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h4 class="mb-0"><%= pageTitle %> <small class="text-muted">(<%= total %> টি প্রোডাক্ট)</small></h4>
+        <form method="get" class="d-flex align-items-center gap-2">
+          <label class="mb-0 small">সাজান:</label>
+          <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>নতুন</option>
+            <option value="price_asc" <%= sort === 'price_asc' ? 'selected' : '' %>>মূল্য: কম থেকে বেশি</option>
+            <option value="price_desc" <%= sort === 'price_desc' ? 'selected' : '' %>>মূল্য: বেশি থেকে কম</option>
+            <option value="popular" <%= sort === 'popular' ? 'selected' : '' %>>জনপ্রিয়তা</option>
+          </select>
+        </form>
+      </div>
+
+      <% if (!products.length) { %>
+        <div class="alert alert-info">এই মুহূর্তে কোনো প্রোডাক্ট পাওয়া যায়নি।</div>
+      <% } else { %>
+        <div class="product-grid">
+          <% products.forEach(function (p) { %><%- include('partials/product-card', { p }) %><% }); %>
+        </div>
+
+        <% if (totalPages > 1) { %>
+          <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+              <% for (let i = 1; i <= totalPages; i++) { %>
+                <li class="page-item <%= i === page ? 'active' : '' %>">
+                  <a class="page-link" href="<%= category ? `/category/${category.slug}` : '/category' %>?sort=<%= sort %>&page=<%= i %>"><%= i %></a>
+                </li>
+              <% } %>
+            </ul>
+          </nav>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,88 @@
+<%- include('partials/header') %>
+
+<!-- Hero banner -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-slide">
+      <div class="hero-text">
+        <span class="hero-badge">সেম ডে ডেলিভারি</span>
+        <h1>গিফট, গ্রোসারি &amp; প্রয়োজনীয় সবকিছু<br>এক ঠিকানায়</h1>
+        <p>ঢাকা শহরে সেম ডে ডেলিভারি, সারা বাংলাদেশে ২৪-৪৮ ঘন্টায় হোম ডেলিভারি।</p>
+        <a href="/category/birthday-gifts" class="btn btn-hero">এখনই কিনুন <i class="bi bi-arrow-right"></i></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Category strip -->
+<section class="section">
+  <div class="container">
+    <div class="section-heading">
+      <h2>টপ ক্যাটাগরি</h2>
+      <a href="/category">সব দেখুন <i class="bi bi-chevron-right"></i></a>
+    </div>
+    <div class="category-grid">
+      <% categories.forEach(function (cat) { %>
+        <a href="/category/<%= cat.slug %>" class="category-tile">
+          <div class="category-tile-img">
+            <img src="<%= categoryImageUrl(cat.image) %>" alt="<%= cat.name %>" onerror="this.src='/images/category-placeholder.svg'">
+          </div>
+          <span><%= cat.name %></span>
+        </a>
+      <% }); %>
+    </div>
+  </div>
+</section>
+
+<% if (flashSale.length) { %>
+<!-- Flash sale -->
+<section class="section flash-sale-section">
+  <div class="container">
+    <div class="section-heading">
+      <h2><i class="bi bi-lightning-charge-fill text-warning"></i> ফ্ল্যাশ সেল</h2>
+      <span class="countdown-badge">সীমিত সময়ের অফার!</span>
+    </div>
+    <div class="product-grid">
+      <% flashSale.forEach(function (p) { %><%- include('partials/product-card', { p }) %><% }); %>
+    </div>
+  </div>
+</section>
+<% } %>
+
+<!-- Featured products -->
+<section class="section">
+  <div class="container">
+    <div class="section-heading">
+      <h2>জনপ্রিয় প্রোডাক্ট</h2>
+    </div>
+    <div class="product-grid">
+      <% featured.forEach(function (p) { %><%- include('partials/product-card', { p }) %><% }); %>
+    </div>
+  </div>
+</section>
+
+<!-- New arrivals -->
+<section class="section bg-light-section">
+  <div class="container">
+    <div class="section-heading">
+      <h2>নতুন সংযোজন</h2>
+    </div>
+    <div class="product-grid">
+      <% newArrivals.forEach(function (p) { %><%- include('partials/product-card', { p }) %><% }); %>
+    </div>
+  </div>
+</section>
+
+<!-- Trust badges -->
+<section class="section">
+  <div class="container">
+    <div class="trust-row">
+      <div class="trust-item"><i class="bi bi-truck"></i><div><strong>সেম ডে ডেলিভারি</strong><span>ঢাকার মধ্যে</span></div></div>
+      <div class="trust-item"><i class="bi bi-shield-check"></i><div><strong>নিরাপদ পেমেন্ট</strong><span>COD, bKash, কার্ড</span></div></div>
+      <div class="trust-item"><i class="bi bi-arrow-repeat"></i><div><strong>ইজি রিটার্ন</strong><span>৭ দিনের মধ্যে</span></div></div>
+      <div class="trust-item"><i class="bi bi-headset"></i><div><strong>২৪/৭ সাপোর্ট</strong><span>সব সময় পাশে আছি</span></div></div>
+    </div>
+  </div>
+</section>
+
+<%- include('partials/footer') %>

@@ -1,0 +1,56 @@
+<footer class="site-footer">
+  <div class="container">
+    <div class="row gy-4">
+      <div class="col-md-3">
+        <h5 class="footer-brand"><i class="bi bi-gift-fill"></i> <%= settings.site_name %></h5>
+        <p><%= settings.site_tagline %></p>
+        <div class="social-icons">
+          <a href="#"><i class="bi bi-facebook"></i></a>
+          <a href="#"><i class="bi bi-instagram"></i></a>
+          <a href="#"><i class="bi bi-youtube"></i></a>
+          <a href="#"><i class="bi bi-twitter-x"></i></a>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <h6>কুইক লিংক</h6>
+        <ul class="footer-links">
+          <li><a href="/">হোম</a></li>
+          <li><a href="/about">আমাদের সম্পর্কে</a></li>
+          <li><a href="/contact">যোগাযোগ</a></li>
+          <li><a href="/track-order">অর্ডার ট্র্যাক করুন</a></li>
+        </ul>
+      </div>
+      <div class="col-md-3">
+        <h6>পলিসি</h6>
+        <ul class="footer-links">
+          <li><a href="/policy/terms">শর্তাবলী</a></li>
+          <li><a href="/policy/privacy">প্রাইভেসি পলিসি</a></li>
+          <li><a href="/policy/refund">রিফান্ড পলিসি</a></li>
+          <li><a href="/policy/shipping">শিপিং পলিসি</a></li>
+        </ul>
+      </div>
+      <div class="col-md-3">
+        <h6>যোগাযোগ করুন</h6>
+        <ul class="footer-links">
+          <li><i class="bi bi-geo-alt"></i> <%= settings.address %></li>
+          <li><i class="bi bi-telephone"></i> <%= settings.phone %></li>
+          <li><i class="bi bi-envelope"></i> <%= settings.email %></li>
+        </ul>
+      </div>
+    </div>
+    <hr class="footer-divider">
+    <div class="d-flex flex-wrap justify-content-between align-items-center py-3">
+      <span>&copy; <%= new Date().getFullYear() %> <%= settings.site_name %>. সর্বস্বত্ব সংরক্ষিত।</span>
+      <span class="payment-badges">
+        <i class="bi bi-cash-coin" title="Cash on Delivery"></i>
+        <i class="bi bi-phone" title="bKash"></i>
+        <i class="bi bi-credit-card" title="Card / SSLCommerz"></i>
+      </span>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/js/main.js"></script>
+</body>
+</html>

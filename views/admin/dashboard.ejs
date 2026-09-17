@@ -1,0 +1,91 @@
+<%- include('partials/admin-header') %>
+
+<div class="stat-cards">
+  <div class="stat-card">
+    <div class="stat-icon bg-primary"><i class="bi bi-cash-stack"></i></div>
+    <div><span class="stat-value"><%= currency(totalSales) %></span><span class="stat-label">মোট সেলস</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon bg-success"><i class="bi bi-bag-check"></i></div>
+    <div><span class="stat-value"><%= totalOrders %></span><span class="stat-label">মোট অর্ডার</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon bg-warning"><i class="bi bi-hourglass-split"></i></div>
+    <div><span class="stat-value"><%= pendingOrders %></span><span class="stat-label">পেন্ডিং অর্ডার</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon bg-info"><i class="bi bi-people"></i></div>
+    <div><span class="stat-value"><%= totalCustomers %></span><span class="stat-label">কাস্টমার</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon bg-secondary"><i class="bi bi-box-seam"></i></div>
+    <div><span class="stat-value"><%= totalProducts %></span><span class="stat-label">প্রোডাক্ট</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon bg-danger"><i class="bi bi-exclamation-triangle"></i></div>
+    <div><span class="stat-value"><%= lowStock %></span><span class="stat-label">লো স্টক</span></div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <h5>বিক্রয় ট্রেন্ড (গত ৭ দিন)</h5>
+      <canvas id="salesChart" height="110"></canvas>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="admin-card">
+      <h5>দ্রুত লিংক</h5>
+      <div class="d-grid gap-2">
+        <a href="/admin/products/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> নতুন প্রোডাক্ট যোগ করুন</a>
+        <a href="/admin/orders" class="btn btn-outline-secondary"><i class="bi bi-bag"></i> অর্ডার দেখুন</a>
+        <a href="/admin/reports" class="btn btn-outline-secondary"><i class="bi bi-graph-up"></i> বিস্তারিত রিপোর্ট</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card mt-4">
+  <h5>সাম্প্রতিক অর্ডার</h5>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>অর্ডার#</th><th>কাস্টমার</th><th>তারিখ</th><th>মোট</th><th>পেমেন্ট</th><th>স্ট্যাটাস</th><th></th></tr></thead>
+      <tbody>
+        <% recentOrders.forEach(function (o) { %>
+          <tr>
+            <td>#<%= o.orderNumber %></td>
+            <td><%= o.customerName %></td>
+            <td><%= new Date(o.createdAt).toLocaleDateString('bn-BD', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
+            <td><%= currency(o.total) %></td>
+            <td><span class="badge bg-<%= o.paymentStatus === 'paid' ? 'success' : 'secondary' %>"><%= o.paymentStatus %></span></td>
+            <td><span class="badge status-badge status-<%= o.status %>"><%= o.status %></span></td>
+            <td><a href="/admin/orders/<%= o._id %>" class="btn btn-sm btn-outline-primary">দেখুন</a></td>
+          </tr>
+        <% }); %>
+        <% if (!recentOrders.length) { %><tr><td colspan="7" class="text-center text-muted">কোনো অর্ডার নেই।</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+new Chart(document.getElementById('salesChart'), {
+  type: 'line',
+  data: {
+    labels: <%- JSON.stringify(chartLabels) %>,
+    datasets: [{
+      label: 'সেলস (<%= settings.currency_symbol %>)',
+      data: <%- JSON.stringify(chartData) %>,
+      borderColor: '#1e3a5f',
+      backgroundColor: 'rgba(30,58,95,0.1)',
+      tension: 0.35,
+      fill: true,
+      pointRadius: 4,
+    }]
+  },
+  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+});
+</script>
+
+<%- include('partials/admin-footer') %>

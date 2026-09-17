@@ -1,0 +1,19 @@
+<%- include('partials/admin-header') %>
+
+<div class="admin-card" style="max-width:700px">
+  <form method="post" action="/admin/settings">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+    <div class="mb-3"><label class="form-label">সাইটের নাম</label><input type="text" name="site_name" class="form-control" value="<%= settingsData.site_name %>"></div>
+    <div class="mb-3"><label class="form-label">ট্যাগলাইন</label><input type="text" name="site_tagline" class="form-control" value="<%= settingsData.site_tagline %>"></div>
+    <div class="mb-3"><label class="form-label">কারেন্সি সিম্বল</label><input type="text" name="currency_symbol" class="form-control" value="<%= settingsData.currency_symbol %>"></div>
+    <div class="mb-3"><label class="form-label">ফ্ল্যাট ডেলিভারি চার্জ (৳)</label><input type="number" step="0.01" name="flat_shipping_fee" class="form-control" value="<%= settingsData.flat_shipping_fee %>"></div>
+    <div class="mb-3"><label class="form-label">bKash নম্বর</label><input type="text" name="bkash_number" class="form-control" value="<%= settingsData.bkash_number %>"></div>
+    <div class="mb-3"><label class="form-label">ফোন নম্বর</label><input type="text" name="phone" class="form-control" value="<%= settingsData.phone %>"></div>
+    <div class="mb-3"><label class="form-label">ইমেইল</label><input type="email" name="email" class="form-control" value="<%= settingsData.email %>"></div>
+    <div class="mb-3"><label class="form-label">ঠিকানা</label><textarea name="address" class="form-control"><%= settingsData.address %></textarea></div>
+    <p class="text-muted small">নোট: SSLCommerz store ID/password এবং ডাটাবেস কানেকশন পরিবর্তন করতে প্রজেক্ট রুটের <code>.env</code> ফাইল এডিট করুন (তারপর সার্ভার রিস্টার্ট করুন)।</p>
+    <button type="submit" class="btn btn-brand">সংরক্ষণ করুন</button>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

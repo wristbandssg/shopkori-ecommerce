@@ -1,0 +1,61 @@
+<%- include('partials/header') %>
+
+<div class="container py-4">
+  <h2 class="mb-4"><i class="bi bi-cart3"></i> শপিং কার্ট</h2>
+
+  <% if (!items.length) { %>
+    <div class="empty-cart text-center py-5">
+      <i class="bi bi-cart-x display-1 text-muted"></i>
+      <p class="mt-3">আপনার কার্ট খালি আছে।</p>
+      <a href="/" class="btn btn-primary">শপিং করুন</a>
+    </div>
+  <% } else { %>
+    <form method="post" action="/cart" id="cartForm">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+      <div class="table-responsive">
+        <table class="table align-middle cart-table">
+          <thead>
+            <tr>
+              <th>প্রোডাক্ট</th>
+              <th>মূল্য</th>
+              <th>পরিমাণ</th>
+              <th>সাবটোটাল</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% items.forEach(function (item) { const p = item.product; %>
+              <tr>
+                <td class="cart-product-cell">
+                  <img src="<%= productImageUrl(p.image) %>" alt="<%= p.name %>">
+                  <a href="/product/<%= p.slug %>"><%= p.name %></a>
+                </td>
+                <td><%= currency(item.price) %></td>
+                <td><input type="number" name="qty[<%= p._id %>]" value="<%= item.qty %>" min="1" max="<%= p.stock %>" class="form-control cart-qty-input"></td>
+                <td><%= currency(item.lineTotal) %></td>
+                <td>
+                  <button type="submit" name="removeId" value="<%= p._id %>" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="row justify-content-end">
+        <div class="col-md-4">
+          <div class="cart-summary-box">
+            <div class="d-flex justify-content-between"><span>সাবটোটাল</span><span><%= currency(subtotal) %></span></div>
+            <div class="d-flex justify-content-between"><span>ডেলিভারি চার্জ</span><span><%= currency(shippingFee) %></span></div>
+            <hr>
+            <div class="d-flex justify-content-between fw-bold fs-5"><span>মোট</span><span><%= currency(grandTotal) %></span></div>
+            <button type="submit" name="updateQty" value="1" class="btn btn-outline-secondary w-100 mt-3">কার্ট আপডেট করুন</button>
+            <a href="/checkout" class="btn btn-buy-now w-100 mt-2">চেকআউট করুন <i class="bi bi-arrow-right"></i></a>
+          </div>
+        </div>
+      </div>
+    </form>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

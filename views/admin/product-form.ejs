@@ -1,0 +1,90 @@
+<%
+  const d = product || {};
+  const selectedCategoryId = d.categoryId || (d.category ? String(d.category._id || d.category) : '');
+  const isEdit = !!(product && product._id);
+  const formAction = isEdit ? `/admin/products/${product._id}/edit` : '/admin/products/new';
+%>
+<%- include('partials/admin-header') %>
+
+<div class="admin-card">
+  <% if (errors.length) { %>
+    <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+  <% } %>
+
+  <form method="post" action="<%= formAction %>" enctype="multipart/form-data">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+    <div class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label">প্রোডাক্টের নাম *</label>
+        <input type="text" name="name" class="form-control" required value="<%= d.name || '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">SKU</label>
+        <input type="text" name="sku" class="form-control" value="<%= d.sku || '' %>">
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">ক্যাটাগরি</label>
+        <select name="categoryId" class="form-select">
+          <option value="">-- নির্বাচন করুন --</option>
+          <% categories.forEach(function (c) { %>
+            <option value="<%= c._id %>" <%= selectedCategoryId === String(c._id) ? 'selected' : '' %>><%= c.name %></option>
+          <% }); %>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">প্রোডাক্ট ছবি</label>
+        <input type="file" name="image" class="form-control" accept="image/*">
+        <% if (d.image) { %><img src="<%= productImageUrl(d.image) %>" class="admin-thumb mt-2"><% } %>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">মূল্য (৳) *</label>
+        <input type="number" step="0.01" name="price" class="form-control" required value="<%= d.price || '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">সেল প্রাইস (৳)</label>
+        <input type="number" step="0.01" name="salePrice" class="form-control" value="<%= d.salePrice || '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">স্টক পরিমাণ</label>
+        <input type="number" name="stock" class="form-control" value="<%= d.stock !== undefined ? d.stock : 0 %>">
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">সংক্ষিপ্ত বিবরণ</label>
+        <input type="text" name="shortDescription" class="form-control" value="<%= d.shortDescription || '' %>">
+      </div>
+      <div class="col-12">
+        <label class="form-label">বিস্তারিত বিবরণ</label>
+        <textarea name="description" class="form-control" rows="5"><%= d.description || '' %></textarea>
+      </div>
+
+      <div class="col-md-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="isFeatured" id="isFeatured" <%= d.isFeatured ? 'checked' : '' %>>
+          <label class="form-check-label" for="isFeatured">ফিচারড প্রোডাক্ট</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="isFlashSale" id="isFlash" <%= d.isFlashSale ? 'checked' : '' %>>
+          <label class="form-check-label" for="isFlash">ফ্ল্যাশ সেলে দেখান</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="status" id="isActive" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
+          <label class="form-check-label" for="isActive">Active (স্টোরে দেখান)</label>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> সংরক্ষণ করুন</button>
+      <a href="/admin/products" class="btn btn-outline-secondary">বাতিল</a>
+    </div>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

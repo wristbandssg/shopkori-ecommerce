@@ -1,0 +1,32 @@
+<%
+  const hasSale = p.salePrice && p.salePrice < p.price;
+  const discount = hasSale ? Math.round(((p.price - p.salePrice) / p.price) * 100) : 0;
+  const rating = p.rating || 4.5;
+%>
+<div class="product-card">
+  <a href="/product/<%= p.slug %>" class="product-card-img">
+    <img src="<%= productImageUrl(p.image) %>" alt="<%= p.name %>" loading="lazy" onerror="this.src='/images/product-placeholder.svg'">
+    <% if (hasSale) { %><span class="badge-discount">-<%= discount %>%</span><% } %>
+    <% if (p.isFlashSale) { %><span class="badge-flash"><i class="bi bi-lightning-fill"></i></span><% } %>
+  </a>
+  <div class="product-card-body">
+    <a href="/product/<%= p.slug %>" class="product-title"><%= p.name %></a>
+    <div class="product-rating">
+      <% for (let i = 1; i <= 5; i++) { %>
+        <% if (i <= Math.round(rating)) { %><i class="bi bi-star-fill"></i><% } else { %><i class="bi bi-star"></i><% } %>
+      <% } %>
+      <span class="rating-num">(<%= rating.toFixed(1) %>)</span>
+    </div>
+    <div class="product-price">
+      <% if (hasSale) { %>
+        <span class="price-now"><%= currency(p.salePrice) %></span>
+        <span class="price-old"><%= currency(p.price) %></span>
+      <% } else { %>
+        <span class="price-now"><%= currency(p.price) %></span>
+      <% } %>
+    </div>
+    <button class="btn btn-add-cart w-100" data-add-cart data-id="<%= p._id %>">
+      <i class="bi bi-cart-plus"></i> কার্টে যোগ করুন
+    </button>
+  </div>
+</div>

@@ -1,0 +1,47 @@
+<%
+  const statusSteps = { pending: 1, processing: 2, shipped: 3, delivered: 4, cancelled: 0 };
+%>
+<%- include('partials/header') %>
+<div class="container py-5">
+  <h2 class="text-center mb-4">অর্ডার ট্র্যাক করুন</h2>
+  <form method="get" class="track-order-form mx-auto mb-5">
+    <input type="text" name="order" placeholder="অর্ডার নম্বর দিন (যেমনঃ SK25091712AB3)" value="<%= orderNumber %>" required>
+    <button type="submit" class="btn btn-buy-now">খুঁজুন</button>
+  </form>
+
+  <% if (notFound) { %>
+    <div class="alert alert-warning text-center">এই অর্ডার নম্বরে কোনো অর্ডার পাওয়া যায়নি।</div>
+  <% } else if (order) { %>
+    <div class="checkout-box mx-auto" style="max-width:700px">
+      <div class="d-flex justify-content-between flex-wrap mb-3">
+        <div><strong>অর্ডার নম্বর:</strong> #<%= order.orderNumber %></div>
+        <div><strong>তারিখ:</strong> <%= new Date(order.createdAt).toLocaleDateString('bn-BD', { day: '2-digit', month: 'short', year: 'numeric' }) %></div>
+      </div>
+
+      <% if (order.status === 'cancelled') { %>
+        <div class="alert alert-danger">এই অর্ডারটি বাতিল করা হয়েছে।</div>
+      <% } else { %>
+        <% const current = statusSteps[order.status] || 1; %>
+        <div class="order-track-steps">
+          <div class="track-step <%= current >= 1 ? 'active' : '' %>"><i class="bi bi-receipt"></i><span>অর্ডার গৃহীত</span></div>
+          <div class="track-step <%= current >= 2 ? 'active' : '' %>"><i class="bi bi-gear"></i><span>প্রসেসিং</span></div>
+          <div class="track-step <%= current >= 3 ? 'active' : '' %>"><i class="bi bi-truck"></i><span>শিপড</span></div>
+          <div class="track-step <%= current >= 4 ? 'active' : '' %>"><i class="bi bi-house-check"></i><span>ডেলিভার্ড</span></div>
+        </div>
+      <% } %>
+
+      <hr>
+      <ul class="checkout-item-list">
+        <% order.items.forEach(function (item) { %>
+          <li>
+            <img src="<%= productImageUrl(item.productImage) %>" alt="">
+            <div class="flex-grow-1"><%= item.productName %> <small class="text-muted">x<%= item.qty %></small></div>
+            <div><%= currency(item.lineTotal) %></div>
+          </li>
+        <% }); %>
+      </ul>
+      <div class="d-flex justify-content-between fw-bold fs-5"><span>মোট</span><span><%= currency(order.total) %></span></div>
+    </div>
+  <% } %>
+</div>
+<%- include('partials/footer') %>

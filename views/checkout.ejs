@@ -1,0 +1,114 @@
+<%- include('partials/header') %>
+
+<div class="container py-4">
+  <h2 class="mb-4">চেকআউট</h2>
+
+  <% if (errors.length) { %>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        <% errors.forEach(function (err) { %><li><%= err %></li><% }); %>
+      </ul>
+    </div>
+  <% } %>
+
+  <form method="post" action="/checkout" id="checkoutForm">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+    <% if (buyNowId) { %><input type="hidden" name="buyNowId" value="<%= buyNowId %>"><% } %>
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="checkout-box">
+          <h5>ডেলিভারি তথ্য</h5>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">পুরো নাম *</label>
+              <input type="text" name="name" class="form-control" required value="<%= formData.name || (customer ? customer.name : '') %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">মোবাইল নম্বর *</label>
+              <input type="text" name="phone" class="form-control" required placeholder="01XXXXXXXXX" value="<%= formData.phone || (customer ? customer.phone : '') %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">ইমেইল (ঐচ্ছিক)</label>
+              <input type="email" name="email" class="form-control" value="<%= formData.email || (customer ? customer.email : '') %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">শহর</label>
+              <input type="text" name="city" class="form-control" value="<%= formData.city || (customer ? customer.city : 'Dhaka') %>">
+            </div>
+            <div class="col-12">
+              <label class="form-label">সম্পূর্ণ ঠিকানা *</label>
+              <textarea name="address" class="form-control" rows="2" required><%= formData.address || (customer ? customer.address : '') %></textarea>
+            </div>
+            <div class="col-12">
+              <label class="form-label">অর্ডার নোট (ঐচ্ছিক)</label>
+              <textarea name="notes" class="form-control" rows="2"><%= formData.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="checkout-box mt-4">
+          <h5>পেমেন্ট মেথড</h5>
+
+          <div class="payment-option">
+            <label>
+              <input type="radio" name="paymentMethod" value="cod" checked>
+              <span><i class="bi bi-cash-coin"></i> ক্যাশ অন ডেলিভারি (COD)</span>
+            </label>
+          </div>
+
+          <div class="payment-option">
+            <label>
+              <input type="radio" name="paymentMethod" value="bkash" id="pmBkash">
+              <span><i class="bi bi-phone"></i> bKash (<%= settings.bkash_number ? 'Send Money' : '' %>)</span>
+            </label>
+            <div class="payment-extra" id="bkashExtra" style="display:none">
+              <p class="small mb-2"><strong><%= settings.bkash_number %></strong> নম্বরে <strong><%= currency(grandTotal) %></strong> "Send Money" করুন, তারপর নিচে Transaction ID দিন।</p>
+              <input type="text" name="bkashTrxId" class="form-control" placeholder="bKash Transaction ID">
+            </div>
+          </div>
+
+          <div class="payment-option">
+            <label>
+              <input type="radio" name="paymentMethod" value="sslcommerz">
+              <span><i class="bi bi-credit-card"></i> কার্ড / মোবাইল ব্যাংকিং (SSLCommerz)</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="checkout-box order-summary-box">
+          <h5>অর্ডার সামারি</h5>
+          <ul class="checkout-item-list">
+            <% items.forEach(function (item) { %>
+              <li>
+                <img src="<%= productImageUrl(item.product.image) %>" alt="">
+                <div class="flex-grow-1">
+                  <div><%= item.product.name %></div>
+                  <small class="text-muted">Qty: <%= item.qty %></small>
+                </div>
+                <div><%= currency(item.lineTotal) %></div>
+              </li>
+            <% }); %>
+          </ul>
+          <hr>
+          <div class="d-flex justify-content-between"><span>সাবটোটাল</span><span><%= currency(subtotal) %></span></div>
+          <div class="d-flex justify-content-between"><span>ডেলিভারি চার্জ</span><span><%= currency(shippingFee) %></span></div>
+          <hr>
+          <div class="d-flex justify-content-between fw-bold fs-5"><span>মোট</span><span><%= currency(grandTotal) %></span></div>
+          <button type="submit" class="btn btn-buy-now w-100 mt-3">অর্ডার কনফার্ম করুন <i class="bi bi-check2-circle"></i></button>
+        </div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+document.querySelectorAll('input[name="paymentMethod"]').forEach(function (radio) {
+  radio.addEventListener('change', function () {
+    document.getElementById('bkashExtra').style.display = (document.getElementById('pmBkash').checked) ? 'block' : 'none';
+  });
+});
+</script>
+
+<%- include('partials/footer') %>

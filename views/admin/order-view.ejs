@@ -1,0 +1,70 @@
+<%- include('partials/admin-header') %>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <h5>প্রোডাক্ট তালিকা</h5>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>প্রোডাক্ট</th><th>মূল্য</th><th>পরিমাণ</th><th>সাবটোটাল</th></tr></thead>
+          <tbody>
+            <% order.items.forEach(function (item) { %>
+              <tr>
+                <td class="d-flex align-items-center gap-2">
+                  <img src="<%= productImageUrl(item.productImage) %>" class="admin-thumb">
+                  <%= item.productName %>
+                </td>
+                <td><%= currency(item.price) %></td>
+                <td><%= item.qty %></td>
+                <td><%= currency(item.lineTotal) %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+          <tfoot>
+            <tr><td colspan="3" class="text-end">সাবটোটাল</td><td><%= currency(order.subtotal) %></td></tr>
+            <tr><td colspan="3" class="text-end">ডেলিভারি চার্জ</td><td><%= currency(order.shippingFee) %></td></tr>
+            <tr><td colspan="3" class="text-end fw-bold">সর্বমোট</td><td class="fw-bold"><%= currency(order.total) %></td></tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="admin-card">
+      <h5>কাস্টমার তথ্য</h5>
+      <p class="mb-1"><strong><%= order.customerName %></strong></p>
+      <p class="mb-1"><i class="bi bi-telephone"></i> <%= order.customerPhone %></p>
+      <% if (order.customerEmail) { %><p class="mb-1"><i class="bi bi-envelope"></i> <%= order.customerEmail %></p><% } %>
+      <p class="mb-1"><i class="bi bi-geo-alt"></i> <%= order.shippingAddress %>, <%= order.shippingCity %></p>
+      <% if (order.notes) { %><p class="mb-0"><strong>নোট:</strong> <%= order.notes %></p><% } %>
+    </div>
+
+    <div class="admin-card mt-4">
+      <h5>স্ট্যাটাস আপডেট</h5>
+      <form method="post" action="/admin/orders/<%= order._id %>">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-3">
+          <label class="form-label">অর্ডার স্ট্যাটাস</label>
+          <select name="status" class="form-select">
+            <% ['pending', 'processing', 'shipped', 'delivered', 'cancelled'].forEach(function (s) { %>
+              <option value="<%= s %>" <%= order.status === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">পেমেন্ট স্ট্যাটাস</label>
+          <select name="paymentStatus" class="form-select">
+            <% ['unpaid', 'pending', 'paid', 'failed', 'cancelled'].forEach(function (s) { %>
+              <option value="<%= s %>" <%= order.paymentStatus === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option>
+            <% }); %>
+          </select>
+        </div>
+        <p class="small text-muted mb-3">পেমেন্ট মেথড: <strong><%= order.paymentMethod.toUpperCase() %></strong><% if (order.transactionId) { %><br>Transaction ID: <code><%= order.transactionId %></code><% } %></p>
+        <button type="submit" class="btn btn-brand w-100">আপডেট করুন</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

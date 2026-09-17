@@ -1,0 +1,96 @@
+<%
+  const hasSale = product.salePrice && product.salePrice < product.price;
+  const discount = hasSale ? Math.round(((product.price - product.salePrice) / product.price) * 100) : 0;
+  const rating = product.rating || 4.5;
+%>
+<%- include('partials/header') %>
+
+<div class="container py-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">হোম</a></li>
+      <li class="breadcrumb-item active"><%= product.name %></li>
+    </ol>
+  </nav>
+
+  <div class="row g-4">
+    <div class="col-md-5">
+      <div class="product-gallery">
+        <img src="<%= productImageUrl(product.image) %>" class="img-fluid rounded" alt="<%= product.name %>" onerror="this.src='/images/product-placeholder.svg'">
+      </div>
+    </div>
+    <div class="col-md-7">
+      <h1 class="product-detail-title"><%= product.name %></h1>
+      <div class="product-rating mb-2">
+        <% for (let i = 1; i <= 5; i++) { %>
+          <% if (i <= Math.round(rating)) { %><i class="bi bi-star-fill"></i><% } else { %><i class="bi bi-star"></i><% } %>
+        <% } %>
+        <span class="rating-num">(<%= rating.toFixed(1) %>) · SKU: <%= product.sku || 'N/A' %></span>
+      </div>
+
+      <div class="product-detail-price mb-3">
+        <% if (hasSale) { %>
+          <span class="price-now big"><%= currency(product.salePrice) %></span>
+          <span class="price-old big"><%= currency(product.price) %></span>
+          <span class="badge-discount static">-<%= discount %>%</span>
+        <% } else { %>
+          <span class="price-now big"><%= currency(product.price) %></span>
+        <% } %>
+      </div>
+
+      <p class="product-short-desc"><%= product.shortDescription %></p>
+
+      <div class="stock-status mb-3">
+        <% if (product.stock > 0) { %>
+          <span class="text-success"><i class="bi bi-check-circle-fill"></i> স্টকে আছে (<%= product.stock %> পিস)</span>
+        <% } else { %>
+          <span class="text-danger"><i class="bi bi-x-circle-fill"></i> স্টক শেষ</span>
+        <% } %>
+      </div>
+
+      <% if (product.stock > 0) { %>
+      <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+        <div class="qty-input">
+          <button type="button" class="qty-btn" data-qty-minus>-</button>
+          <input type="number" id="qtyInput" value="1" min="1" max="<%= product.stock %>">
+          <button type="button" class="qty-btn" data-qty-plus>+</button>
+        </div>
+        <button class="btn btn-add-cart px-4" data-add-cart data-id="<%= product._id %>" data-qty-source="qtyInput">
+          <i class="bi bi-cart-plus"></i> কার্টে যোগ করুন
+        </button>
+        <a href="/checkout?buyNow=<%= product._id %>" class="btn btn-buy-now px-4">এখনই কিনুন</a>
+      </div>
+      <% } %>
+
+      <div class="delivery-info">
+        <div><i class="bi bi-truck"></i> ঢাকায় সেম ডে ডেলিভারি, ঢাকার বাইরে ২৪-৪৮ ঘণ্টা</div>
+        <div><i class="bi bi-shield-check"></i> ১০০% অরিজিনাল প্রোডাক্টের নিশ্চয়তা</div>
+        <div><i class="bi bi-cash-coin"></i> ক্যাশ অন ডেলিভারি সুবিধা আছে</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-5">
+    <div class="col-12">
+      <ul class="nav nav-tabs" id="productTabs">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#desc">বিস্তারিত বিবরণ</button></li>
+      </ul>
+      <div class="tab-content border border-top-0 p-4 mb-4">
+        <div class="tab-pane fade show active" id="desc">
+          <%- nl2br(product.description) %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <% if (related.length) { %>
+  <div class="section-heading">
+    <h2>সম্পর্কিত প্রোডাক্ট</h2>
+  </div>
+  <div class="product-grid">
+    <% related.forEach(function (p) { %><%- include('partials/product-card', { p }) %><% }); %>
+  </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

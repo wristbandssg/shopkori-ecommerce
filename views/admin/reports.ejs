@@ -1,0 +1,94 @@
+<%- include('partials/admin-header') %>
+
+<div class="admin-card">
+  <form method="get" class="d-flex gap-2 align-items-end flex-wrap">
+    <div>
+      <label class="form-label">শুরুর তারিখ</label>
+      <input type="date" name="from" class="form-control" value="<%= from %>">
+    </div>
+    <div>
+      <label class="form-label">শেষ তারিখ</label>
+      <input type="date" name="to" class="form-control" value="<%= to %>">
+    </div>
+    <button class="btn btn-brand">ফিল্টার করুন</button>
+  </form>
+</div>
+
+<div class="stat-cards mt-4">
+  <div class="stat-card">
+    <div class="stat-icon bg-primary"><i class="bi bi-cash-stack"></i></div>
+    <div><span class="stat-value"><%= currency(totalSales) %></span><span class="stat-label">মোট বিক্রয় (নির্বাচিত সময়ে)</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon bg-success"><i class="bi bi-bag-check"></i></div>
+    <div><span class="stat-value"><%= totalOrdersInRange %></span><span class="stat-label">মোট অর্ডার</span></div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon bg-info"><i class="bi bi-graph-up"></i></div>
+    <div><span class="stat-value"><%= currency(avgOrderValue) %></span><span class="stat-label">গড় অর্ডার মূল্য</span></div>
+  </div>
+</div>
+
+<div class="row g-4 mt-1">
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <h5>বিক্রয় ট্রেন্ড</h5>
+      <canvas id="reportSalesChart" height="110"></canvas>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="admin-card">
+      <h5>ক্যাটাগরি অনুযায়ী বিক্রয়</h5>
+      <canvas id="categoryChart" height="180"></canvas>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card mt-4">
+  <h5>সর্বাধিক বিক্রিত প্রোডাক্ট</h5>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>প্রোডাক্ট</th><th>বিক্রিত পরিমাণ</th><th>মোট আয়</th></tr></thead>
+      <tbody>
+        <% topProducts.forEach(function (tp) { %>
+          <tr>
+            <td class="d-flex align-items-center gap-2"><img src="<%= productImageUrl(tp._id.image) %>" class="admin-thumb"><%= tp._id.name %></td>
+            <td><%= tp.qtySold %></td>
+            <td><%= currency(tp.revenue) %></td>
+          </tr>
+        <% }); %>
+        <% if (!topProducts.length) { %><tr><td colspan="3" class="text-center text-muted">এই সময়ে কোনো বিক্রয় নেই।</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+new Chart(document.getElementById('reportSalesChart'), {
+  type: 'bar',
+  data: {
+    labels: <%- JSON.stringify(labels) %>,
+    datasets: [{
+      label: 'সেলস (<%= settings.currency_symbol %>)',
+      data: <%- JSON.stringify(salesData) %>,
+      backgroundColor: '#1e3a5f',
+      borderRadius: 4,
+    }]
+  },
+  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+});
+
+new Chart(document.getElementById('categoryChart'), {
+  type: 'doughnut',
+  data: {
+    labels: <%- JSON.stringify(categorySales.map(function (r) { return r._id || 'Uncategorized'; })) %>,
+    datasets: [{
+      data: <%- JSON.stringify(categorySales.map(function (r) { return r.revenue; })) %>,
+      backgroundColor: ['#1e3a5f','#d4a537','#4c8a7d','#c0554e','#7a6bab','#5b9bd5','#f4a460','#6b8e23'],
+    }]
+  },
+  options: { plugins: { legend: { position: 'bottom' } } }
+});
+</script>
+
+<%- include('partials/admin-footer') %>

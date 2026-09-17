@@ -1,0 +1,29 @@
+<%- include('partials/admin-header') %>
+
+<div class="admin-card">
+  <form method="get" class="mb-3 d-flex gap-2">
+    <input type="text" name="q" class="form-control" placeholder="নাম, ইমেইল বা ফোন খুঁজুন" value="<%= q %>">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i></button>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>নাম</th><th>ইমেইল</th><th>ফোন</th><th>মোট অর্ডার</th><th>মোট খরচ</th><th>যোগদান</th></tr></thead>
+      <tbody>
+        <% customers.forEach(function (c) { %>
+          <tr>
+            <td><%= c.name %></td>
+            <td><%= c.email %></td>
+            <td><%= c.phone %></td>
+            <td><%= c.orderCount %></td>
+            <td><%= currency(c.totalSpent) %></td>
+            <td><%= new Date(c.createdAt).toLocaleDateString('bn-BD', { day: '2-digit', month: 'short', year: 'numeric' }) %></td>
+          </tr>
+        <% }); %>
+        <% if (!customers.length) { %><tr><td colspan="6" class="text-center text-muted">কোনো কাস্টমার পাওয়া যায়নি।</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

@@ -1,0 +1,24 @@
+<%- include('partials/header') %>
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <h2 class="mb-4">যোগাযোগ করুন</h2>
+      <% if (sent) { %>
+        <div class="alert alert-success">আপনার বার্তা পাঠানো হয়েছে। আমরা শীঘ্রই যোগাযোগ করবো।</div>
+      <% } %>
+      <form method="post" action="/contact" class="checkout-box">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-3"><label class="form-label">নাম</label><input type="text" name="name" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">ইমেইল</label><input type="email" name="email" class="form-control" required></div>
+        <div class="mb-3"><label class="form-label">বার্তা</label><textarea name="message" class="form-control" rows="4" required></textarea></div>
+        <button type="submit" class="btn btn-buy-now">পাঠান</button>
+      </form>
+      <div class="mt-4">
+        <p><i class="bi bi-geo-alt"></i> <%= settings.address %></p>
+        <p><i class="bi bi-telephone"></i> <%= settings.phone %></p>
+        <p><i class="bi bi-envelope"></i> <%= settings.email %></p>
+      </div>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>
