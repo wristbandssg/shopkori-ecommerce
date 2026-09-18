@@ -2,7 +2,7 @@
 <div class="container py-5">
   <div class="static-page mx-auto">
     <h2><%= title %></h2>
-    <p><%= body %></p>
+    <p><%- nl2br(body) %></p>
   </div>
 </div>
 <%- include('partials/footer') %>

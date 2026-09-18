@@ -1,16 +1,16 @@
 /* =========================================================
-   ShopKori Storefront Styles
-   Brand palette: Cream/Off-white + Baby Pink + White + Dark Brown/Charcoal
+   GiftBox Storefront Styles
+   Brand palette: Blue + Orange (inspired by giftallbd.com)
    ========================================================= */
 
 :root {
-  --brand-navy: #D9789A;       /* Primary accent (Baby Pink) - was navy */
-  --brand-navy-dark: #8C4A5E;  /* Darker rose-brown (was navy-dark) */
-  --brand-gold: #F7CBDA;       /* Secondary accent (Soft Pink) - was gold */
-  --brand-gold-dark: #EDA9C0;  /* Darker soft pink for hover (was gold-dark) */
-  --brand-red: #D6336C;        /* Rose-red for sale/alert badges */
-  --text-dark: #3B2A2A;        /* Dark Brown / Charcoal text */
-  --bg-light: #FBF3EF;         /* Cream / Off-white section background */
+  --brand-navy: #1A56A8;       /* Primary blue (header/nav/buttons) */
+  --brand-navy-dark: #0F3B76;  /* Darker blue (topbar/footer, hover) */
+  --brand-gold: #FF9800;       /* Orange accent (badges, highlights) */
+  --brand-gold-dark: #E68600;  /* Darker orange for hover */
+  --brand-red: #E63946;        /* Sale/alert red */
+  --text-dark: #222222;
+  --bg-light: #F4F7FB;         /* Light neutral section background */
   --radius: 8px;
 }
 
@@ -19,7 +19,7 @@
 body {
   font-family: 'Hind Siliguri', 'Poppins', sans-serif;
   color: var(--text-dark);
-  background: var(--bg-light);
+  background: #fff;
 }
 
 a { text-decoration: none; color: inherit; }
@@ -28,14 +28,23 @@ a { text-decoration: none; color: inherit; }
 .topbar {
   background: var(--brand-navy-dark);
   color: #dbe3ec;
-  font-size: 13px;
-  padding: 6px 0;
+  font-size: 12px;
+  padding: 5px 0;
 }
-.topbar a { color: #dbe3ec; margin-left: 4px; }
+.topbar a { color: #dbe3ec; white-space: nowrap; }
 .topbar a:hover { color: var(--brand-gold); }
 
 /* ---------- Header ---------- */
-.main-header { background: #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+/* Sticky: stays pinned to the top on scroll while .topbar (above it, outside
+   this element) scrolls out of view naturally, so only the compact header
+   + category nav remain visible once the page is scrolled. */
+.main-header {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 0;
+  z-index: 1030;
+}
 
 .brand-logo {
   font-family: 'Poppins', sans-serif;
@@ -103,7 +112,7 @@ a { text-decoration: none; color: inherit; }
   display: flex;
   gap: 22px;
   margin: 0;
-  padding: 10px 0;
+  padding: 8px 0;
   overflow-x: auto;
   white-space: nowrap;
 }

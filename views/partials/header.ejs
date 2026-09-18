@@ -13,29 +13,33 @@
 </head>
 <body>
 
-<!-- Top utility bar -->
+<!-- Top utility bar (scrolls away; only the sticky-header below stays visible on scroll) -->
 <div class="topbar">
   <div class="container d-flex justify-content-between align-items-center">
-    <div class="topbar-left d-none d-md-flex align-items-center gap-3">
+    <div class="topbar-left d-flex align-items-center gap-3">
       <span><i class="bi bi-telephone-fill"></i> <%= settings.phone %></span>
-      <span><i class="bi bi-envelope-fill"></i> <%= settings.email %></span>
     </div>
-    <div class="topbar-right ms-auto d-flex align-items-center gap-3">
+    <div class="topbar-right ms-auto d-flex align-items-center flex-wrap gap-3">
+      <a href="/blog" class="d-none d-lg-inline">ব্লগ</a>
+      <a href="/how-to-order" class="d-none d-lg-inline">অর্ডার কিভাবে করবেন?</a>
+      <a href="/how-to-pay" class="d-none d-lg-inline">পেমেন্ট কিভাবে করবেন?</a>
+      <a href="/faq" class="d-none d-lg-inline">FAQ</a>
+      <a href="/contact" class="d-none d-lg-inline">যোগাযোগ</a>
+      <a href="/about" class="d-none d-lg-inline">আমাদের সম্পর্কে</a>
       <a href="/track-order">অর্ডার ট্র্যাক করুন</a>
       <% if (customer) { %>
         <a href="/account"><i class="bi bi-person-circle"></i> আমার অ্যাকাউন্ট</a>
         <a href="/logout">লগআউট</a>
       <% } else { %>
-        <a href="/login">লগইন</a>
-        <a href="/register">রেজিস্টার</a>
+        <a href="/login">লগইন / রেজিস্টার</a>
       <% } %>
     </div>
   </div>
 </div>
 
-<!-- Main header -->
+<!-- Sticky header: stays pinned on scroll, topbar above scrolls away -->
 <header class="main-header">
-  <div class="container d-flex align-items-center gap-4 py-3 flex-wrap">
+  <div class="container d-flex align-items-center gap-4 py-2 flex-wrap">
     <a href="/" class="brand-logo">
       <i class="bi bi-gift-fill"></i> <%= settings.site_name %>
     </a>
