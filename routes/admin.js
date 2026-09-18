@@ -8,6 +8,8 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
 const Admin = require('../models/Admin');
+const Page = require('../models/Page');
+const BlogPost = require('../models/BlogPost');
 const { getSettings, setSetting } = require('../models/Setting');
 
 const adminLocals = require('../middleware/adminLocals');
@@ -458,6 +460,145 @@ router.post('/settings', verifyCsrf, async (req, res, next) => {
     await Promise.all(keys.map((key) => (req.body[key] !== undefined ? setSetting(key, req.body[key]) : null)));
     req.flash('success', 'সেটিংস সংরক্ষণ করা হয়েছে।');
     res.redirect('/admin/settings');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   PAGES (About Us, FAQ, How to Order, How to Pay, Terms, Privacy,
+   Refund, Shipping) — editable static content, replaces hardcoded text.
+   ===================================================================== */
+const PAGE_DEFAULTS = [
+  ['about', 'আমাদের সম্পর্কে'],
+  ['how-to-order', 'কিভাবে অর্ডার করবেন'],
+  ['how-to-pay', 'কিভাবে পেমেন্ট করবেন'],
+  ['faq', 'সচরাচর জিজ্ঞাসিত প্রশ্ন (FAQ)'],
+  ['terms', 'শর্তাবলী'],
+  ['privacy', 'প্রাইভেসি পলিসি'],
+  ['refund', 'রিফান্ড পলিসি'],
+  ['shipping', 'শিপিং পলিসি'],
+];
+
+router.get('/pages', async (req, res, next) => {
+  try {
+    // Make sure every known page key has a row to edit, even on first visit.
+    const existing = await Page.find({});
+    const existingKeys = new Set(existing.map((p) => p.key));
+    const missing = PAGE_DEFAULTS.filter(([key]) => !existingKeys.has(key));
+    if (missing.length) {
+      await Page.insertMany(missing.map(([key, title]) => ({ key, title, body: '' })));
+    }
+    const pages = await Page.find({}).sort({ key: 1 });
+    res.render('admin/pages', { adminPageTitle: 'পেজ ম্যানেজমেন্ট', pages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/pages/:key', verifyCsrf, async (req, res, next) => {
+  try {
+    const { title, body } = req.body;
+    await Page.findOneAndUpdate(
+      { key: req.params.key },
+      { title: (title || '').trim(), body: body || '' },
+      { upsert: true }
+    );
+    req.flash('success', 'পেজ আপডেট হয়েছে।');
+    res.redirect('/admin/pages');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   BLOG
+   ===================================================================== */
+router.get('/blog', async (req, res, next) => {
+  try {
+    const posts = await BlogPost.find({}).sort({ createdAt: -1 });
+    res.render('admin/blog', { adminPageTitle: 'ব্লগ ম্যানেজমেন্ট', posts });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/blog/new', (req, res) => {
+  res.render('admin/blog-form', { adminPageTitle: 'নতুন ব্লগ পোস্ট', post: null, errors: [] });
+});
+
+router.get('/blog/:id/edit', async (req, res, next) => {
+  try {
+    const post = await BlogPost.findById(req.params.id);
+    if (!post) {
+      req.flash('danger', 'ব্লগ পোস্ট পাওয়া যায়নি।');
+      return res.redirect('/admin/blog');
+    }
+    res.render('admin/blog-form', { adminPageTitle: 'ব্লগ পোস্ট এডিট করুন', post, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function saveBlogPost(req, res, next, existingId) {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'ফর্ম মেয়াদোত্তীর্ণ হয়েছে।');
+      return res.redirect('/admin/blog');
+    }
+    const existing = existingId ? await BlogPost.findById(existingId) : null;
+    const { title, excerpt, content } = req.body;
+    const errors = [];
+    if (!title || !title.trim()) errors.push('শিরোনাম আবশ্যক।');
+
+    let imageName = existing ? existing.coverImage : null;
+    if (req.file) imageName = req.file.filename;
+
+    if (errors.length) {
+      return res.render('admin/blog-form', {
+        adminPageTitle: existing ? 'ব্লগ পোস্ট এডিট করুন' : 'নতুন ব্লগ পোস্ট',
+        post: { ...(existing ? existing.toObject() : {}), ...req.body, coverImage: imageName },
+        errors,
+      });
+    }
+
+    const baseSlug = slugify(title);
+    const slug = await ensureUniqueSlug(BlogPost, baseSlug, existingId || null);
+
+    const data = {
+      title: title.trim(),
+      slug,
+      excerpt: (excerpt || '').trim(),
+      content: content || '',
+      coverImage: imageName,
+      status: !!req.body.status,
+    };
+
+    if (existing) {
+      await BlogPost.updateOne({ _id: existingId }, data);
+      req.flash('success', 'ব্লগ পোস্ট আপডেট হয়েছে।');
+    } else {
+      await BlogPost.create(data);
+      req.flash('success', 'নতুন ব্লগ পোস্ট প্রকাশ করা হয়েছে।');
+    }
+    res.redirect('/admin/blog');
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post('/blog/new', upload.single('coverImage'), (req, res, next) => saveBlogPost(req, res, next, null));
+router.post('/blog/:id/edit', upload.single('coverImage'), (req, res, next) => saveBlogPost(req, res, next, req.params.id));
+
+router.get('/blog/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'অবৈধ রিকোয়েস্ট।');
+      return res.redirect('/admin/blog');
+    }
+    await BlogPost.deleteOne({ _id: req.params.id });
+    req.flash('success', 'ব্লগ পোস্ট ডিলিট করা হয়েছে।');
+    res.redirect('/admin/blog');
   } catch (err) {
     next(err);
   }

@@ -24,20 +24,10 @@ body {
 
 a { text-decoration: none; color: inherit; }
 
-/* ---------- Top bar ---------- */
-.topbar {
-  background: var(--brand-navy-dark);
-  color: #dbe3ec;
-  font-size: 12px;
-  padding: 5px 0;
-}
-.topbar a { color: #dbe3ec; white-space: nowrap; }
-.topbar a:hover { color: var(--brand-gold); }
-
 /* ---------- Header ---------- */
-/* Sticky: stays pinned to the top on scroll while .topbar (above it, outside
-   this element) scrolls out of view naturally, so only the compact header
-   + category nav remain visible once the page is scrolled. */
+/* Sticky: single-row header (logo + search + icon-links) stays pinned to the
+   top on scroll, with the category bar directly below it. Ghorerbazar.com-style
+   layout: no separate top utility bar — everything lives in one compact row. */
 .main-header {
   background: #fff;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -46,10 +36,18 @@ a { text-decoration: none; color: inherit; }
   z-index: 1030;
 }
 
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 12px 0;
+  flex-wrap: wrap;
+}
+
 .brand-logo {
   font-family: 'Poppins', sans-serif;
   font-weight: 700;
-  font-size: 26px;
+  font-size: 24px;
   color: var(--brand-navy);
   display: flex;
   align-items: center;
@@ -60,7 +58,8 @@ a { text-decoration: none; color: inherit; }
 
 .search-form {
   display: flex;
-  max-width: 520px;
+  flex: 1 1 320px;
+  max-width: 560px;
   border: 2px solid var(--brand-navy);
   border-radius: 30px;
   overflow: hidden;
@@ -79,19 +78,34 @@ a { text-decoration: none; color: inherit; }
   padding: 0 20px;
 }
 
-.cart-btn {
-  position: relative;
+.header-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  color: var(--brand-navy);
-  font-size: 20px;
+  gap: 4px;
+  margin-left: auto;
 }
+
+.header-action-link {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-dark);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.header-action-link:hover { background: var(--bg-light); color: var(--brand-navy); }
+.header-action-link i { font-size: 20px; color: var(--brand-navy); }
+
+.header-action-link.cart-btn i { position: relative; }
 .cart-count {
   position: absolute;
-  top: -8px;
-  left: 14px;
+  top: -2px;
+  right: 6px;
   background: var(--brand-red);
   color: #fff;
   font-size: 11px;
@@ -101,6 +115,16 @@ a { text-decoration: none; color: inherit; }
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.more-dropdown .dropdown-toggle::after { display: none; }
+.more-dropdown .dropdown-menu { border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); border: none; padding: 8px 0; min-width: 220px; }
+.more-dropdown .dropdown-header { color: var(--brand-navy); font-weight: 700; }
+.more-dropdown .dropdown-item:hover { background: var(--bg-light); color: var(--brand-navy); }
+
+@media (max-width: 767px) {
+  .header-action-link span:not(.cart-count) { display: none; }
+  .header-action-link { padding: 4px 8px; }
 }
 
 .category-nav {

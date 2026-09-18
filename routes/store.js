@@ -7,6 +7,8 @@ const Category = require('../models/Category');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
+const Page = require('../models/Page');
+const BlogPost = require('../models/BlogPost');
 const { getSettings, setSetting: setSiteSetting } = require('../models/Setting');
 
 const storeLocals = require('../middleware/storeLocals');
@@ -529,9 +531,18 @@ router.get('/search', async (req, res, next) => {
 });
 
 /* =====================================================================
-   STATIC PAGES
+   STATIC PAGES (content is editable from Admin > পেজ ম্যানেজমেন্ট)
    ===================================================================== */
-router.get('/about', (req, res) => res.render('about', { pageTitle: 'আমাদের সম্পর্কে' }));
+router.get('/about', async (req, res, next) => {
+  try {
+    const page = await Page.findOne({ key: 'about' });
+    const title = page && page.title ? page.title : 'আমাদের সম্পর্কে';
+    const body = page && page.body ? page.body : 'এই পেজের লেখা এখনো যোগ করা হয়নি। অ্যাডমিন প্যানেল থেকে "পেজ ম্যানেজমেন্ট" এ গিয়ে যোগ করুন।';
+    res.render('policy', { pageTitle: title, title, body });
+  } catch (err) {
+    next(err);
+  }
+});
 
 router.get('/contact', (req, res) => res.render('contact', { pageTitle: 'যোগাযোগ', sent: false }));
 router.post('/contact', verifyCsrf, (req, res) => {
@@ -539,20 +550,27 @@ router.post('/contact', verifyCsrf, (req, res) => {
   res.render('contact', { pageTitle: 'যোগাযোগ', sent: true });
 });
 
-const POLICY_PAGES = {
-  terms: ['শর্তাবলী', 'এই ওয়েবসাইট ব্যবহার করে আপনি আমাদের শর্তাবলীতে সম্মত হচ্ছেন। অর্ডার প্লেস করার পূর্বে দয়া করে সকল তথ্য যাচাই করুন। মূল্য ও স্টক যেকোনো সময় পরিবর্তন হতে পারে।'],
-  privacy: ['প্রাইভেসি পলিসি', 'আমরা আপনার ব্যক্তিগত তথ্য (নাম, ঠিকানা, ফোন নম্বর) শুধুমাত্র অর্ডার প্রসেসিং ও ডেলিভারির উদ্দেশ্যে ব্যবহার করি। কোনো তৃতীয় পক্ষের কাছে বিক্রি বা শেয়ার করা হয় না।'],
-  refund: ['রিফান্ড পলিসি', 'পণ্য ক্ষতিগ্রস্ত বা ভুল অবস্থায় পৌঁছালে ডেলিভারির ৭ দিনের মধ্যে যোগাযোগ করুন। পচনশীল পণ্য (কেক, ফুল) ডেলিভারির পর রিটার্নযোগ্য নয়, তবে মান সংক্রান্ত সমস্যায় রিপ্লেসমেন্ট/রিফান্ড দেওয়া হবে।'],
-  shipping: ['শিপিং পলিসি', 'ঢাকার মধ্যে সেম ডে ডেলিভারি (নির্দিষ্ট সময়ের আগে অর্ডার করলে), ঢাকার বাইরে ২৪-৪৮ ঘণ্টার মধ্যে ডেলিভারি করা হয়। স্ট্যান্ডার্ড ডেলিভারি চার্জ প্রযোজ্য।'],
-  'how-to-order': ['কিভাবে অর্ডার করবেন', 'ধাপ ১: পছন্দের প্রোডাক্টে ক্লিক করে "কার্টে যোগ করুন" বাটনে চাপুন।\nধাপ ২: উপরে ডানদিকের কার্ট আইকনে ক্লিক করে আপনার কার্ট দেখুন, প্রয়োজনে পরিমাণ পরিবর্তন করুন।\nধাপ ৩: "চেকআউট করুন" বাটনে চাপুন।\nধাপ ৪: আপনার নাম, ঠিকানা ও ফোন নম্বর দিন।\nধাপ ৫: পছন্দের পেমেন্ট পদ্ধতি (ক্যাশ অন ডেলিভারি / bKash / কার্ড) সিলেক্ট করে অর্ডার কনফার্ম করুন।\nধাপ ৬: অর্ডার প্লেস হওয়ার পর একটা অর্ডার নম্বর পাবেন, যা দিয়ে "অর্ডার ট্র্যাক করুন" পেজ থেকে অর্ডারের অবস্থা দেখতে পারবেন।'],
-  'how-to-pay': ['কিভাবে পেমেন্ট করবেন', 'আমরা নিচের পেমেন্ট পদ্ধতিগুলো গ্রহণ করি:\n\n১. ক্যাশ অন ডেলিভারি (COD) — পণ্য হাতে পাওয়ার পর টাকা দিন, কোনো অগ্রিম পেমেন্ট লাগবে না।\n২. bKash — চেকআউটের সময় দেওয়া bKash নম্বরে টাকা পাঠিয়ে Transaction ID টি ফর্মে বসিয়ে দিন।\n৩. অনলাইন কার্ড/মোবাইল ব্যাংকিং পেমেন্ট — চেকআউটের সময় সিলেক্ট করলে নিরাপদ পেমেন্ট পেজে নিয়ে যাওয়া হবে।\n\nপেমেন্ট সংক্রান্ত যেকোনো সমস্যায় আমাদের সাথে যোগাযোগ করুন।'],
-  faq: ['সচরাচর জিজ্ঞাসিত প্রশ্ন (FAQ)', 'প্রশ্ন: ডেলিভারি চার্জ কত?\nউত্তর: ঢাকার ভিতরে ও বাইরে স্ট্যান্ডার্ড ডেলিভারি চার্জ প্রযোজ্য, চেকআউটের সময় দেখতে পাবেন।\n\nপ্রশ্ন: ডেলিভারি পেতে কত সময় লাগে?\nউত্তর: ঢাকার মধ্যে সেম-ডে/পরের দিন, ঢাকার বাইরে সাধারণত ২৪-৪৮ ঘণ্টা।\n\nপ্রশ্ন: অর্ডার বাতিল বা পরিবর্তন করা যাবে কি?\nউত্তর: ডেলিভারির আগ পর্যন্ত আমাদের সাথে যোগাযোগ করে অর্ডার পরিবর্তন/বাতিল করা যাবে।\n\nপ্রশ্ন: পণ্য পছন্দ না হলে ফেরত দেওয়া যাবে কি?\nউত্তর: রিফান্ড পলিসি পেজে বিস্তারিত দেখুন।'],
+const POLICY_KEYS = ['terms', 'privacy', 'refund', 'shipping', 'how-to-order', 'how-to-pay', 'faq'];
+const POLICY_FALLBACK_TITLES = {
+  terms: 'শর্তাবলী',
+  privacy: 'প্রাইভেসি পলিসি',
+  refund: 'রিফান্ড পলিসি',
+  shipping: 'শিপিং পলিসি',
+  'how-to-order': 'কিভাবে অর্ডার করবেন',
+  'how-to-pay': 'কিভাবে পেমেন্ট করবেন',
+  faq: 'সচরাচর জিজ্ঞাসিত প্রশ্ন (FAQ)',
 };
 
-router.get('/policy/:type?', (req, res) => {
-  const type = POLICY_PAGES[req.params.type] ? req.params.type : 'terms';
-  const [title, body] = POLICY_PAGES[type];
-  res.render('policy', { pageTitle: title, title, body });
+router.get('/policy/:type?', async (req, res, next) => {
+  try {
+    const type = POLICY_KEYS.includes(req.params.type) ? req.params.type : 'terms';
+    const page = await Page.findOne({ key: type });
+    const title = page && page.title ? page.title : POLICY_FALLBACK_TITLES[type];
+    const body = page && page.body ? page.body : 'এই পেজের লেখা এখনো যোগ করা হয়নি। অ্যাডমিন প্যানেল থেকে "পেজ ম্যানেজমেন্ট" এ গিয়ে যোগ করুন।';
+    res.render('policy', { pageTitle: title, title, body });
+  } catch (err) {
+    next(err);
+  }
 });
 
 /* Convenience aliases so nav links can use short, memorable URLs */
@@ -560,6 +578,29 @@ router.get('/how-to-order', (req, res) => res.redirect('/policy/how-to-order'));
 router.get('/how-to-pay', (req, res) => res.redirect('/policy/how-to-pay'));
 router.get('/faq', (req, res) => res.redirect('/policy/faq'));
 
-router.get('/blog', (req, res) => res.render('blog', { pageTitle: 'ব্লগ' }));
+/* =====================================================================
+   BLOG (posts are written/edited from Admin > ব্লগ)
+   ===================================================================== */
+router.get('/blog', async (req, res, next) => {
+  try {
+    const posts = await BlogPost.find({ status: true }).sort({ createdAt: -1 });
+    res.render('blog', { pageTitle: 'ব্লগ', posts });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/blog/:slug', async (req, res, next) => {
+  try {
+    const post = await BlogPost.findOne({ slug: req.params.slug, status: true });
+    if (!post) {
+      req.flash('danger', 'ব্লগ পোস্টটি খুঁজে পাওয়া যায়নি।');
+      return res.redirect('/blog');
+    }
+    res.render('blog-post', { pageTitle: post.title, post });
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;
