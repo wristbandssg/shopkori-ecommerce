@@ -34,6 +34,13 @@ async function storeLocals(req, res, next) {
 
     res.locals.settings = settings;
     res.locals.currency = currencyFormatter(settings.currency_symbol || '৳');
+    // Absolute site URL, used to build canonical links and the absolute
+    // URLs schema.org JSON-LD structured data requires (Organization/WebSite
+    // on every page, Product/BreadcrumbList on product & category pages).
+    res.locals.baseUrl = `${req.protocol}://${req.get('host')}`;
+    // req itself isn't passed to EJS views, so the current path is exposed
+    // separately for the canonical <link> tag (header.ejs).
+    res.locals.currentUrl = req.originalUrl;
     res.locals.navCategories = navCategories;
     res.locals.cartCount = cartCount(req);
     res.locals.productImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/product-placeholder.svg');

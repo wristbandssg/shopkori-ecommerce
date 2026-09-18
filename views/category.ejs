@@ -1,4 +1,26 @@
-<%- include('partials/header') %>
+<%
+  const ogImage = (category && category.image) ? baseUrl + categoryImageUrl(category.image) : '';
+%>
+<%- include('partials/header', { ogImage }) %>
+
+<%
+  // ---- schema.org structured data ----
+  // BreadcrumbList so Google can show Home > Category in the search result
+  // path, and an ItemList of this page's products so a category/collection
+  // page reads as a real product listing, not just plain text + links.
+  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'হোম', item: baseUrl + '/' }];
+  if (category) breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: category.name, item: baseUrl + '/category/' + category.slug });
+  const categoryBreadcrumbSchema = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: breadcrumbItems };
+  const categoryItemListSchema = products.length ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: products.map(function (p, i) {
+      return { '@type': 'ListItem', position: (page - 1) * perPage + i + 1, url: baseUrl + '/product/' + p.slug };
+    }),
+  } : null;
+%>
+<script type="application/ld+json"><%- JSON.stringify(categoryBreadcrumbSchema) %></script>
+<% if (categoryItemListSchema) { %><script type="application/ld+json"><%- JSON.stringify(categoryItemListSchema) %></script><% } %>
 
 <div class="container py-4">
   <nav aria-label="breadcrumb">
@@ -7,6 +29,13 @@
       <li class="breadcrumb-item active"><%= pageTitle %></li>
     </ol>
   </nav>
+
+  <% if (category && (category.pageTitle || category.shortDescription)) { %>
+    <div class="category-intro mb-3">
+      <% if (category.pageTitle) { %><h1 class="category-intro-title"><%= category.pageTitle %></h1><% } %>
+      <% if (category.shortDescription) { %><p class="category-intro-text text-muted"><%- nl2br(category.shortDescription) %></p><% } %>
+    </div>
+  <% } %>
 
   <div class="row">
     <div class="col-lg-3 mb-4">
@@ -23,7 +52,7 @@
 
     <div class="col-lg-9">
       <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h4 class="mb-0"><%= pageTitle %> <small class="text-muted">(<%= total %> টি প্রোডাক্ট)</small></h4>
+        <h4 class="mb-0"><%= category && category.pageTitle ? category.name : pageTitle %> <small class="text-muted">(<%= total %> টি প্রোডাক্ট)</small></h4>
         <form method="get" class="d-flex align-items-center gap-2">
           <label class="mb-0 small">সাজান:</label>
           <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
@@ -56,6 +85,12 @@
       <% } %>
     </div>
   </div>
+
+  <% if (category && category.description) { %>
+    <div class="category-seo-content mt-4 pt-4 border-top">
+      <%- category.description %>
+    </div>
+  <% } %>
 </div>
 
 <%- include('partials/footer') %>

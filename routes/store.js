@@ -159,6 +159,9 @@ router.get(['/category', '/category/:slug'], async (req, res, next) => {
       totalPages: Math.ceil(total / perPage),
       sort,
       query: req.query,
+      metaTitle: category ? category.metaTitle : '',
+      metaKeywords: category ? category.metaKeywords : '',
+      metaDescription: category ? category.metaDescription : '',
     });
   } catch (err) {
     next(err);
@@ -170,7 +173,9 @@ router.get(['/category', '/category/:slug'], async (req, res, next) => {
    ===================================================================== */
 router.get('/product/:slug', async (req, res, next) => {
   try {
-    const product = await Product.findOne({ slug: req.params.slug, status: true });
+    const product = await Product.findOne({ slug: req.params.slug, status: true })
+      .populate('category')
+      .populate('brand');
     if (!product) {
       return res.status(404).render('404', { pageTitle: 'প্রোডাক্ট পাওয়া যায়নি' });
     }

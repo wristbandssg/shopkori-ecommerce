@@ -10,8 +10,66 @@
     if (maxOrderQty) cap = Math.min(cap, maxOrderQty);
     return cap;
   };
+
+  // Open Graph image/type for the <head> tags in partials/header — computed
+  // here (before the include) since EJS includes share the caller's scope.
+  const ogImage = baseUrl + productImageUrl(product.image);
+  const ogType = 'product';
 %>
-<%- include('partials/header') %>
+<%- include('partials/header', { ogImage, ogType }) %>
+
+<%
+  // ---- schema.org structured data ----
+  // Product: name/image/price/availability so Google can show a rich result
+  // (price, in-stock badge) for this product in search. No aggregateRating —
+  // the store has no real review/rating collection yet, and fabricating one
+  // would violate Google's structured-data guidelines.
+  const productUrl = baseUrl + '/product/' + product.slug;
+  let offersSchema;
+  if (hasVariants) {
+    const variantPrices = product.variants.map(function (v) {
+      const base = v.price != null ? v.price : product.price;
+      return (v.salePrice != null && v.salePrice < base) ? v.salePrice : base;
+    });
+    offersSchema = {
+      '@type': 'AggregateOffer',
+      priceCurrency: 'BDT',
+      lowPrice: Math.min.apply(null, variantPrices),
+      highPrice: Math.max.apply(null, variantPrices),
+      offerCount: product.variants.length,
+      availability: (product.overselling || product.variants.some(function (v) { return v.stock > 0; }))
+        ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+    };
+  } else {
+    offersSchema = {
+      '@type': 'Offer',
+      url: productUrl,
+      priceCurrency: 'BDT',
+      price: product.effectivePrice,
+      availability: (product.overselling || product.stock > 0) ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+      itemCondition: product.condition === 'used' ? 'https://schema.org/UsedCondition'
+        : (product.condition === 'refurbished' ? 'https://schema.org/RefurbishedCondition' : 'https://schema.org/NewCondition'),
+    };
+  }
+  const productSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: product.name,
+    image: [ogImage],
+    description: (product.shortDescription || '').trim() || product.name,
+    sku: product.sku || undefined,
+    brand: (product.brand && product.brand.name) ? { '@type': 'Brand', name: product.brand.name } : undefined,
+    offers: offersSchema,
+  };
+  const breadcrumbItems = [{ '@type': 'ListItem', position: 1, name: 'হোম', item: baseUrl + '/' }];
+  if (product.category && product.category.name) {
+    breadcrumbItems.push({ '@type': 'ListItem', position: 2, name: product.category.name, item: baseUrl + '/category/' + product.category.slug });
+  }
+  breadcrumbItems.push({ '@type': 'ListItem', position: breadcrumbItems.length + 1, name: product.name, item: productUrl });
+  const breadcrumbSchema = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: breadcrumbItems };
+%>
+<script type="application/ld+json"><%- JSON.stringify(productSchema) %></script>
+<script type="application/ld+json"><%- JSON.stringify(breadcrumbSchema) %></script>
 
 <div class="container py-4">
   <nav aria-label="breadcrumb">

@@ -1,0 +1,257 @@
+<%
+  const d = category || {};
+  const isEdit = !!(category && category._id);
+  const formAction = isEdit ? `/admin/categories/${category._id}/edit` : '/admin/categories/new';
+  const selectedParentId = d.parent ? String(d.parent._id || d.parent) : '';
+  const hasAdvancedData = !!(d.metaTitle || d.metaKeywords || d.metaDescription);
+  const advDisplay = hasAdvancedData ? '' : 'none';
+%>
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+<% } %>
+
+<form method="post" action="<%= formAction %>" enctype="multipart/form-data" id="categoryForm">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-diagram-3-fill text-brand"></i> <%= isEdit ? 'Edit Category' : 'Add New Category' %></h4>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" id="toggleAdvanced" <%= hasAdvancedData ? 'checked' : '' %>>
+        <label class="form-check-label" for="toggleAdvanced">Show Advanced Options</label>
+      </div>
+      <a href="/admin/categories" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- =====================================================
+         MAIN COLUMN — the category's page content
+         ===================================================== -->
+    <div class="col-lg-8">
+
+      <!-- ---------- Basic Information ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-card-text"></i> Basic Information</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Category Name *</label>
+            <input type="text" name="name" class="form-control" required value="<%= d.name || '' %>">
+            <div class="form-text">Used in the menu, breadcrumb and URL.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Category Page Content (SEO) ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-file-earmark-richtext"></i> Category Page Content</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Page Title <small class="text-muted">(big heading shown on the category page — leave blank to just use the name above)</small></label>
+            <input type="text" name="pageTitle" class="form-control" placeholder="e.g. Face Cream Online BD | Moisturizer Care | <%= settings.site_name %>" value="<%= d.pageTitle || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Short Intro <small class="text-muted">(~150 words, shown right under the page title, above the products)</small></label>
+            <textarea name="shortDescription" class="form-control" rows="3" placeholder="e.g. Shop face creams for daily moisture, dry skin, oily skin..."><%= d.shortDescription || '' %></textarea>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label mb-1">Google Search Preview <small class="text-muted">(updates as you type)</small></label>
+            <div class="serp-preview" id="serpPreview">
+              <div class="serp-preview-url"><span id="serpUrl"><%= settings.site_name %> › category › <%= d.slug || 'your-category' %></span></div>
+              <div class="serp-preview-title" id="serpTitle"></div>
+              <div class="serp-preview-desc" id="serpDesc"></div>
+            </div>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Content Below Products <small class="text-muted">(longer SEO write-up, shown after the product grid)</small></label>
+            <div class="custom-editor" id="descEditorWrap">
+              <div class="custom-editor-toolbar" id="descToolbar">
+                <button type="button" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+                <button type="button" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+                <button type="button" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
+                <button type="button" data-cmd="strikeThrough" title="Strikethrough"><i class="bi bi-type-strikethrough"></i></button>
+                <span class="custom-editor-sep"></span>
+                <button type="button" data-cmd="formatBlock" data-value="H2" title="Heading"><i class="bi bi-type-h2"></i></button>
+                <button type="button" data-cmd="formatBlock" data-value="H3" title="Subheading"><i class="bi bi-type-h3"></i></button>
+                <button type="button" data-cmd="formatBlock" data-value="P" title="Paragraph">¶</button>
+                <span class="custom-editor-sep"></span>
+                <button type="button" data-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+                <button type="button" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
+                <button type="button" data-cmd="formatBlock" data-value="BLOCKQUOTE" title="Quote"><i class="bi bi-quote"></i></button>
+                <span class="custom-editor-sep"></span>
+                <button type="button" id="descLinkBtn" title="Insert link"><i class="bi bi-link-45deg"></i></button>
+                <button type="button" data-cmd="unlink" title="Remove link"><i class="bi bi-link"></i></button>
+                <span class="custom-editor-sep"></span>
+                <button type="button" data-cmd="removeFormat" title="Clear formatting"><i class="bi bi-eraser"></i></button>
+              </div>
+              <div class="custom-editor-body" id="descEditor" contenteditable="true"><%- d.description || '' %></div>
+            </div>
+            <textarea name="description" id="description" style="display:none"><%= d.description || '' %></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- SEO (advanced) ---------- -->
+      <div class="admin-card mb-3 advanced-block" style="display:<%= advDisplay %>">
+        <h5><i class="bi bi-search"></i> SEO</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Meta Title</label>
+            <input type="text" name="metaTitle" class="form-control" value="<%= d.metaTitle || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Meta Keywords</label>
+            <input type="text" name="metaKeywords" class="form-control" value="<%= d.metaKeywords || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Meta Description</label>
+            <input type="text" name="metaDescription" class="form-control" value="<%= d.metaDescription || '' %>">
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- =====================================================
+         SIDEBAR — status, organization, image
+         ===================================================== -->
+    <div class="col-lg-4">
+
+      <!-- ---------- Status ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-toggle2-on"></i> Status</h5>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="status" id="catStatus" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
+          <label class="form-check-label" for="catStatus">Active (Show in Store)</label>
+        </div>
+      </div>
+
+      <!-- ---------- Organization ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-diagram-3"></i> Organization</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Parent Category <small class="text-muted">(optional)</small></label>
+            <select name="parent" class="form-select">
+              <option value="">— No parent —</option>
+              <% parentOptions.forEach(function (p) { %>
+                <option value="<%= p._id %>" <%= selectedParentId === String(p._id) ? 'selected' : '' %>><%= p.name %></option>
+              <% }); %>
+            </select>
+            <div class="form-text">Choosing a parent makes this a subcategory in the mega menu.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sortOrder" class="form-control" value="<%= d.sortOrder !== undefined ? d.sortOrder : 0 %>">
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Image ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-images"></i> Image</h5>
+        <label class="form-label">Shown as the subcategory icon in the mega menu</label>
+        <input type="file" name="image" class="form-control" accept="image/*">
+        <% if (d.image) { %><img src="<%= categoryImageUrl(d.image) %>" class="admin-thumb mt-2"><% } %>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+    <a href="/admin/categories" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // ---- Live Google search-result preview ----
+  // Meta Title/Description (if the admin filled them in under Advanced)
+  // win, same as real Google behavior; otherwise falls back to Page
+  // Title/Short Intro, then plain Category Name — so the preview always
+  // shows exactly what a visitor would actually see get indexed.
+  (function () {
+    var nameInput = document.querySelector('input[name="name"]');
+    var pageTitleInput = document.querySelector('input[name="pageTitle"]');
+    var shortDescInput = document.querySelector('textarea[name="shortDescription"]');
+    var metaTitleInput = document.querySelector('input[name="metaTitle"]');
+    var metaDescInput = document.querySelector('input[name="metaDescription"]');
+    var siteName = <%- JSON.stringify(settings.site_name) %>;
+    var titleEl = document.getElementById('serpTitle');
+    var descEl = document.getElementById('serpDesc');
+    var urlEl = document.getElementById('serpUrl');
+
+    function slugPreview(text) {
+      return (text || 'your-category')
+        .toLowerCase().trim()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-') || 'your-category';
+    }
+
+    function updatePreview() {
+      var title = metaTitleInput.value.trim() || pageTitleInput.value.trim() || nameInput.value.trim() || 'Category Title';
+      var desc = metaDescInput.value.trim() || shortDescInput.value.trim() || 'Add a Short Intro or Meta Description so this shows up nicely in Google.';
+      titleEl.textContent = title + ' | ' + siteName;
+      descEl.textContent = desc.length > 160 ? desc.slice(0, 157) + '…' : desc;
+      urlEl.textContent = siteName + ' › category › ' + slugPreview(pageTitleInput.value || nameInput.value);
+    }
+
+    [nameInput, pageTitleInput, shortDescInput, metaTitleInput, metaDescInput].forEach(function (el) {
+      el.addEventListener('input', updatePreview);
+    });
+    updatePreview();
+  })();
+
+  // ---- Show Advanced Options toggle ----
+  (function () {
+    var advToggle = document.getElementById('toggleAdvanced');
+    var advBlocks = document.querySelectorAll('.advanced-block');
+    advToggle.addEventListener('change', function () {
+      advBlocks.forEach(function (el) {
+        el.style.display = advToggle.checked ? '' : 'none';
+      });
+    });
+  })();
+
+  // ---- Custom rich text editor for "Content Below Products" ----
+  // Self-contained (contenteditable + document.execCommand) — no external
+  // script/CSS to load, so it can never render broken. Same editor used on
+  // the product form's Long Description field.
+  (function () {
+    var toolbar = document.getElementById('descToolbar');
+    var editor = document.getElementById('descEditor');
+    var hiddenDesc = document.getElementById('description');
+    var linkBtn = document.getElementById('descLinkBtn');
+
+    function exec(cmd, value) {
+      editor.focus();
+      var v = (cmd === 'formatBlock' && value) ? '<' + value + '>' : (value || null);
+      document.execCommand(cmd, false, v);
+    }
+
+    toolbar.querySelectorAll('button[data-cmd]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        exec(btn.getAttribute('data-cmd'), btn.getAttribute('data-value'));
+      });
+    });
+
+    linkBtn.addEventListener('click', function () {
+      var url = window.prompt('লিংকের URL দিন (উদাহরণ: https://example.com):');
+      if (url) exec('createLink', url);
+    });
+
+    document.getElementById('categoryForm').addEventListener('submit', function () {
+      hiddenDesc.value = editor.innerHTML;
+    });
+  })();
+});
+</script>
+
+<%- include('partials/admin-footer') %>

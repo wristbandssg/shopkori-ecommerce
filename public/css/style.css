@@ -535,3 +535,16 @@ a { text-decoration: none; color: inherit; }
   padding: 4px 10px; border-radius: 20px; border: 1px solid #eee;
 }
 .tag-pill:hover { background: var(--brand-pink); color: #fff; border-color: var(--brand-pink); }
+
+/* Category page SEO content — title/intro above the grid, longer write-up below it */
+.category-intro-title { font-size: 26px; font-weight: 700; margin-bottom: 8px; }
+.category-intro-text { max-width: 900px; line-height: 1.7; margin-bottom: 0; }
+.category-seo-content { max-width: 900px; line-height: 1.8; color: #444; }
+.category-seo-content h2 { font-size: 22px; font-weight: 700; margin: 24px 0 12px; }
+.category-seo-content h3 { font-size: 18px; font-weight: 700; margin: 20px 0 10px; }
+.category-seo-content p { margin-bottom: 14px; }
+.category-seo-content blockquote {
+  border-left: 3px solid var(--brand-pink); margin: 16px 0; padding: 8px 16px;
+  color: #666; font-style: italic;
+}
+.category-seo-content ul, .category-seo-content ol { margin-bottom: 14px; padding-left: 22px; }

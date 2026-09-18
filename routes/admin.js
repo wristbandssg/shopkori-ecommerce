@@ -1212,47 +1212,112 @@ router.post('/products/:id/edit', productUpload, (req, res, next) => saveProduct
 router.get('/categories', async (req, res, next) => {
   try {
     const categories = await Category.find().sort({ sortOrder: 1, name: 1 });
-    // Only top-level categories can be picked as a "parent" — the storefront
-    // mega menu only nests 2 levels deep (category -> subcategory).
-    const parentOptions = categories.filter((c) => !c.parent);
-    res.render('admin/categories', { adminPageTitle: 'Category Management', categories, parentOptions });
+    res.render('admin/categories', { adminPageTitle: 'Category Management', categories });
   } catch (err) {
     next(err);
   }
 });
 
-// upload.single runs before verifyCsrf here because multer is what parses
-// multipart/form-data — req.body (and so req.body.csrfToken) isn't populated
-// until after it runs.
-router.post('/categories', upload.single('image'), verifyCsrf, async (req, res, next) => {
+async function renderCategoryForm(res, { category, errors, formData }) {
+  const categories = await Category.find().sort({ sortOrder: 1, name: 1 });
+  // Only top-level categories can be picked as a "parent" (and a category
+  // can't be its own parent) — the storefront mega menu only nests 2 levels
+  // deep (category -> subcategory).
+  const parentOptions = categories.filter((c) => !c.parent && (!category || String(c._id) !== String(category._id)));
+  res.render('admin/category-form', {
+    adminPageTitle: category && category._id ? 'Edit Category' : 'Add New Category',
+    category: category || {},
+    parentOptions,
+    errors: errors || [],
+    formData: formData || {},
+  });
+}
+
+router.get('/categories/new', async (req, res, next) => {
   try {
-    const { id, name, sortOrder, parent } = req.body;
-    if (!name || !name.trim()) return res.redirect('/admin/categories');
+    await renderCategoryForm(res, { category: null });
+  } catch (err) {
+    next(err);
+  }
+});
 
-    // A category can't be its own parent, and we only support 2 levels deep.
-    const parentId = parent && parent !== id ? parent : null;
+router.get('/categories/:id/edit', async (req, res, next) => {
+  try {
+    const category = await Category.findById(req.params.id);
+    if (!category) {
+      req.flash('danger', 'Category not found.');
+      return res.redirect('/admin/categories');
+    }
+    await renderCategoryForm(res, { category });
+  } catch (err) {
+    next(err);
+  }
+});
 
-    const existing = id ? await Category.findById(id) : null;
+// CSRF is checked manually below (not via the verifyCsrf middleware) because
+// multer's upload.single('image') is what parses multipart/form-data —
+// req.body (and so req.body.csrfToken) isn't populated until after it runs.
+async function saveCategory(req, res, next, existingId) {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/categories');
+    }
+    const {
+      name, sortOrder, parent,
+      pageTitle, shortDescription, description,
+      metaTitle, metaKeywords, metaDescription,
+    } = req.body;
+
+    const errors = [];
+    if (!name || !name.trim()) errors.push('Category name is required.');
+
+    const existing = existingId ? await Category.findById(existingId) : null;
     let imageName = existing ? existing.image : null;
     if (req.file) imageName = req.file.filename;
 
-    if (id) {
-      const slug = await ensureUniqueSlug(Category, slugify(name), id);
-      await Category.updateOne(
-        { _id: id },
-        { name, slug, sortOrder: parseInt(sortOrder, 10) || 0, status: !!req.body.status, parent: parentId, image: imageName }
-      );
+    if (errors.length) {
+      return renderCategoryForm(res, {
+        category: { ...(existing ? existing.toObject() : {}), ...req.body, image: imageName },
+        errors,
+        formData: req.body,
+      });
+    }
+
+    // A category can't be its own parent, and we only support 2 levels deep.
+    const parentId = parent && parent !== existingId ? parent : null;
+
+    const data = {
+      name: name.trim(),
+      sortOrder: parseInt(sortOrder, 10) || 0,
+      status: !!req.body.status,
+      parent: parentId,
+      image: imageName,
+      pageTitle: (pageTitle || '').trim(),
+      shortDescription: (shortDescription || '').trim(),
+      description: description || '',
+      metaTitle: (metaTitle || '').trim(),
+      metaKeywords: (metaKeywords || '').trim(),
+      metaDescription: (metaDescription || '').trim(),
+    };
+
+    if (existing) {
+      data.slug = await ensureUniqueSlug(Category, slugify(name), existingId);
+      await Category.updateOne({ _id: existingId }, data);
       req.flash('success', 'Category updated successfully.');
     } else {
-      const slug = await ensureUniqueSlug(Category, slugify(name), null);
-      await Category.create({ name, slug, sortOrder: parseInt(sortOrder, 10) || 0, status: !!req.body.status, parent: parentId, image: imageName });
+      data.slug = await ensureUniqueSlug(Category, slugify(name), null);
+      await Category.create(data);
       req.flash('success', 'New category added successfully.');
     }
     res.redirect('/admin/categories');
   } catch (err) {
     next(err);
   }
-});
+}
+
+router.post('/categories/new', upload.single('image'), (req, res, next) => saveCategory(req, res, next, null));
+router.post('/categories/:id/edit', upload.single('image'), (req, res, next) => saveCategory(req, res, next, req.params.id));
 
 router.get('/categories/delete/:id', async (req, res, next) => {
   try {

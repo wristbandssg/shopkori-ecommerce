@@ -3,14 +3,61 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title><%= (typeof metaTitle !== 'undefined' && metaTitle) ? metaTitle : pageTitle %> | <%= settings.site_name %></title>
-<meta name="description" content="<%= (typeof metaDescription !== 'undefined' && metaDescription) ? metaDescription : settings.site_tagline %>">
+<%
+  const pageMetaTitle = (typeof metaTitle !== 'undefined' && metaTitle) ? metaTitle : pageTitle;
+  const pageMetaDescription = (typeof metaDescription !== 'undefined' && metaDescription) ? metaDescription : settings.site_tagline;
+  const canonicalUrl = baseUrl + (typeof currentUrl !== 'undefined' ? currentUrl : '/');
+  const ogImageUrl = (typeof ogImage !== 'undefined' && ogImage) ? ogImage : '';
+%>
+<title><%= pageMetaTitle %> | <%= settings.site_name %></title>
+<meta name="description" content="<%= pageMetaDescription %>">
 <% if (typeof metaKeywords !== 'undefined' && metaKeywords) { %><meta name="keywords" content="<%= metaKeywords %>"><% } %>
+<link rel="canonical" href="<%= canonicalUrl %>">
+
+<!-- Open Graph / social share -->
+<meta property="og:site_name" content="<%= settings.site_name %>">
+<meta property="og:type" content="<%= typeof ogType !== 'undefined' ? ogType : 'website' %>">
+<meta property="og:title" content="<%= pageMetaTitle %>">
+<meta property="og:description" content="<%= pageMetaDescription %>">
+<meta property="og:url" content="<%= canonicalUrl %>">
+<% if (ogImageUrl) { %><meta property="og:image" content="<%= ogImageUrl %>"><% } %>
+<meta name="twitter:card" content="<%= ogImageUrl ? 'summary_large_image' : 'summary' %>">
+<meta name="twitter:title" content="<%= pageMetaTitle %>">
+<meta name="twitter:description" content="<%= pageMetaDescription %>">
+<% if (ogImageUrl) { %><meta name="twitter:image" content="<%= ogImageUrl %>"><% } %>
+
 <link rel="icon" href="/images/favicon.svg">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="/css/style.css" rel="stylesheet">
+
+<!-- Sitewide structured data (schema.org): every page carries Organization +
+     WebSite (with a Sitelinks Search Box action) so Google can attribute
+     search results to the right business and offer an in-SERP search box.
+     Page-specific schema (Product, BreadcrumbList, CollectionPage/ItemList)
+     is added by the individual page templates below. -->
+<script type="application/ld+json"><%- JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'Organization',
+  name: settings.site_name,
+  url: baseUrl,
+  logo: baseUrl + '/images/favicon.svg',
+  ...(settings.phone ? { telephone: settings.phone } : {}),
+  ...(settings.email ? { email: settings.email } : {}),
+  ...(settings.address ? { address: { '@type': 'PostalAddress', streetAddress: settings.address } } : {}),
+}) %></script>
+<script type="application/ld+json"><%- JSON.stringify({
+  '@context': 'https://schema.org',
+  '@type': 'WebSite',
+  name: settings.site_name,
+  url: baseUrl,
+  potentialAction: {
+    '@type': 'SearchAction',
+    target: baseUrl + '/search?q={search_term_string}',
+    'query-input': 'required name=search_term_string',
+  },
+}) %></script>
 </head>
 <body>
 

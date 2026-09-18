@@ -1,108 +1,41 @@
 <%- include('partials/admin-header') %>
 
-<div class="row g-4">
-  <div class="col-lg-4">
-    <div class="admin-card">
-      <h5>Add New Category</h5>
-      <form method="post" action="/admin/categories" enctype="multipart/form-data">
-        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
-        <div class="mb-3">
-          <label class="form-label">Name</label>
-          <input type="text" name="name" class="form-control" required>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Parent Category (optional)</label>
-          <select name="parent" class="form-select">
-            <option value="">— No parent (shows as a separate category in the menu) —</option>
-            <% parentOptions.forEach(function (p) { %>
-              <option value="<%= p._id %>"><%= p.name %></option>
-            <% }); %>
-          </select>
-          <small class="text-muted">Choosing a parent makes this show as a subcategory in the mega menu.</small>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Image (shown as the subcategory icon in the mega menu)</label>
-          <input type="file" name="image" class="form-control" accept="image/*">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Sort Order</label>
-          <input type="number" name="sortOrder" class="form-control" value="0">
-        </div>
-        <div class="form-check mb-3">
-          <input class="form-check-input" type="checkbox" name="status" id="catStatus" checked>
-          <label class="form-check-label" for="catStatus">Active</label>
-        </div>
-        <button type="submit" class="btn btn-brand w-100">Add</button>
-      </form>
-    </div>
+<div class="admin-card mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-diagram-3-fill text-brand"></i> All Categories</h4>
+    <a href="/admin/categories/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> New Category</a>
   </div>
+</div>
 
-  <div class="col-lg-8">
-    <div class="admin-card">
-      <h5>All Categories</h5>
-      <div class="table-responsive">
-        <table class="table align-middle">
-          <thead><tr><th>Image</th><th>Name</th><th>Slug</th><th>Parent</th><th>Order</th><th>Status</th><th>Action</th></tr></thead>
-          <tbody>
-            <% categories.forEach(function (c) { %>
-              <tr>
-                <td><img src="<%= categoryImageUrl(c.image) %>" class="admin-thumb"></td>
-                <td><%= c.name %></td>
-                <td><code><%= c.slug %></code></td>
-                <td>
-                  <% if (c.parent) { %>
-                    <% const p = categories.find(function (x) { return String(x._id) === String(c.parent); }); %>
-                    <span class="badge bg-light text-dark border">Sub of <%= p ? p.name : '—' %></span>
-                  <% } else { %>
-                    <span class="text-muted">—</span>
-                  <% } %>
-                </td>
-                <td><%= c.sortOrder %></td>
-                <td><span class="badge bg-<%= c.status ? 'success' : 'secondary' %>"><%= c.status ? 'Active' : 'Hidden' %></span></td>
-                <td class="text-nowrap">
-                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editModal<%= c._id %>"><i class="bi bi-pencil"></i></button>
-                  <a href="/admin/categories/delete/<%= c._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this category?')"><i class="bi bi-trash"></i></a>
-                </td>
-              </tr>
-
-              <div class="modal fade" id="editModal<%= c._id %>" tabindex="-1">
-                <div class="modal-dialog">
-                  <div class="modal-content">
-                    <form method="post" action="/admin/categories" enctype="multipart/form-data">
-                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
-                      <input type="hidden" name="id" value="<%= c._id %>">
-                      <div class="modal-header"><h5 class="modal-title">Edit Category</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                      <div class="modal-body">
-                        <div class="mb-3"><label class="form-label">Name</label><input type="text" name="name" class="form-control" value="<%= c.name %>" required></div>
-                        <div class="mb-3">
-                          <label class="form-label">Parent Category (optional)</label>
-                          <select name="parent" class="form-select">
-                            <option value="">— No parent —</option>
-                            <% parentOptions.forEach(function (p) { %>
-                              <% if (String(p._id) !== String(c._id)) { %>
-                                <option value="<%= p._id %>" <%= (c.parent && String(c.parent) === String(p._id)) ? 'selected' : '' %>><%= p.name %></option>
-                              <% } %>
-                            <% }); %>
-                          </select>
-                        </div>
-                        <div class="mb-3">
-                          <label class="form-label">Image</label>
-                          <input type="file" name="image" class="form-control" accept="image/*">
-                          <% if (c.image) { %><img src="<%= categoryImageUrl(c.image) %>" class="admin-thumb mt-2"><% } %>
-                        </div>
-                        <div class="mb-3"><label class="form-label">Sort Order</label><input type="number" name="sortOrder" class="form-control" value="<%= c.sortOrder %>"></div>
-                        <div class="form-check"><input class="form-check-input" type="checkbox" name="status" <%= c.status ? 'checked' : '' %>><label class="form-check-label">Active</label></div>
-                      </div>
-                      <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            <% }); %>
-          </tbody>
-        </table>
-      </div>
-    </div>
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Image</th><th>Name</th><th>Slug</th><th>Parent</th><th>Order</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        <% categories.forEach(function (c) { %>
+          <tr>
+            <td><img src="<%= categoryImageUrl(c.image) %>" class="admin-thumb"></td>
+            <td><%= c.name %></td>
+            <td><code><%= c.slug %></code></td>
+            <td>
+              <% if (c.parent) { %>
+                <% const p = categories.find(function (x) { return String(x._id) === String(c.parent); }); %>
+                <span class="badge bg-light text-dark border">Sub of <%= p ? p.name : '—' %></span>
+              <% } else { %>
+                <span class="text-muted">—</span>
+              <% } %>
+            </td>
+            <td><%= c.sortOrder %></td>
+            <td><span class="badge bg-<%= c.status ? 'success' : 'secondary' %>"><%= c.status ? 'Active' : 'Hidden' %></span></td>
+            <td class="text-nowrap">
+              <a href="/admin/categories/<%= c._id %>/edit" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+              <a href="/admin/categories/delete/<%= c._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this category?" title="Delete"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!categories.length) { %><tr><td colspan="7" class="text-center text-muted">No categories yet.</td></tr><% } %>
+      </tbody>
+    </table>
   </div>
 </div>
 
