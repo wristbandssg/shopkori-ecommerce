@@ -54,6 +54,94 @@ router.get('/logout', (req, res) => {
 router.use(requireAdminLogin);
 
 /* =====================================================================
+   COMING SOON PLACEHOLDERS
+   ---------------------------------------------------------------------
+   The full clickdokan-style sidebar (see views/admin/partials/admin-header.ejs)
+   links to a lot of modules that aren't built yet. Rather than 404 on
+   click, every one of those links renders this same friendly "coming
+   soon" page until its real backend is built, module by module.
+   Real, working modules (Products, Category, Orders, Customers,
+   Settings, Blog, Pages) are NOT in this list — they have their own
+   routes below.
+   Registered FIRST (before any /orders/:id-style wildcard route further
+   down) so an exact path like /orders/incomplete is never swallowed by
+   a wildcard route meant for a real order id.
+   ===================================================================== */
+const COMING_SOON_PAGES = {
+  '/marketing': 'মার্কেটিং',
+  '/analytics': 'অ্যানালিটিক্স',
+
+  '/landing-page/main': 'মেইন ল্যান্ডিং পেজ',
+  '/landing-page/short': 'শর্ট ল্যান্ডিং পেজ',
+  '/landing-page/checkout': 'ল্যান্ডিং চেকআউট',
+  '/landing-page/advance': 'অ্যাডভান্স ল্যান্ডিং পেজ',
+
+  '/customization': 'কাস্টমাইজেশন',
+
+  '/products/variant': 'ভ্যারিয়েন্ট',
+  '/products/brands': 'ব্র্যান্ডস',
+  '/products/supplier': 'সাপ্লায়ার',
+
+  '/inventory': 'ইনভেন্টরি',
+  '/inventory/purchase': 'পারচেজ',
+
+  '/offer/flash-sale': 'ফ্ল্যাশ সেল',
+  '/offer/combo': 'কম্বো অফার',
+  '/offer/best-sale': 'বেস্ট সেল প্রোডাক্টস',
+  '/offer/popular': 'পপুলার প্রোডাক্টস',
+  '/offer/hot-deal': 'হট ডিল',
+  '/offer/special': 'স্পেশাল অফার',
+  '/offer/latest': 'লেটেস্ট প্রোডাক্টস',
+  '/offer/popup': 'পপআপ অফার',
+
+  '/staff': 'স্টাফ',
+
+  '/accounting/income': 'ইনকাম',
+  '/accounting/expenses': 'এক্সপেন্স',
+  '/accounting/expense-list': 'এক্সপেন্স লিস্ট',
+  '/accounting/due-payment': 'বকেয়া পেমেন্ট',
+  '/accounting/employee-salary': 'কর্মচারী বেতন',
+  '/accounting/bill-statements': 'বিল স্টেটমেন্ট',
+  '/accounting/balance-transfer': 'ব্যালেন্স ট্রান্সফার',
+  '/accounting/balance-overview': 'ব্যালেন্স ওভারভিউ',
+
+  '/task-management': 'টাস্ক ম্যানেজমেন্ট',
+  '/pos': 'POS',
+
+  '/delivery/delivery-man': 'ডেলিভারি ম্যান',
+  '/delivery/delivered': 'ডেলিভার্ড অর্ডার',
+  '/delivery/clear': 'ক্লিয়ার ডেলিভারি',
+  '/delivery/cancelled': 'ক্যান্সেল্ড অর্ডার',
+  '/delivery/return-confirm': 'রিটার্ন কনফার্ম',
+  '/delivery/amount-request': 'অ্যামাউন্ট রিকোয়েস্ট',
+  '/delivery/commission': 'ডেলিভারি কমিশন',
+  '/delivery/commission-request': 'কমিশন রিকোয়েস্ট',
+
+  '/orders/incomplete': 'অসম্পূর্ণ অর্ডার',
+  '/orders/returned': 'রিটার্ন অর্ডার',
+  '/orders/delivery-issue': 'ডেলিভারি ইস্যু',
+  '/orders/follow-up': 'ফলো আপ',
+  '/orders/user-activity': 'ইউজার অ্যাক্টিভিটি',
+  '/orders/near-by': 'নিয়ারবাই অর্ডার',
+  '/orders/blocked': 'ব্লক করা অর্ডার',
+  '/orders/deleted': 'ডিলিট করা অর্ডার',
+  '/orders/setting': 'অর্ডার সেটিং',
+  '/orders/missed': 'মিসড অর্ডার',
+  '/orders/after-confirm': 'আফটার কনফার্ম',
+  '/orders/store-analytics': 'স্টোর অ্যানালিটিক্স',
+
+  '/referral-program': 'রেফারেল প্রোগ্রাম',
+  '/our-service': 'আমাদের সার্ভিস',
+  '/help-support': 'হেল্প ও সাপোর্ট',
+};
+
+Object.keys(COMING_SOON_PAGES).forEach((subPath) => {
+  router.get(subPath, (req, res) => {
+    res.render('admin/coming-soon', { adminPageTitle: COMING_SOON_PAGES[subPath] });
+  });
+});
+
+/* =====================================================================
    DASHBOARD
    ===================================================================== */
 router.get('/', async (req, res, next) => {

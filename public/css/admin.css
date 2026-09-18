@@ -6,6 +6,9 @@
   --admin-navy-dark: #16283f;
   --admin-gold: #d4a537;
   --admin-bg: #f4f6f9;
+  --admin-pink: #EC0E8C;
+  --admin-pink-soft: #FDE7F4;
+  --admin-text: #4a4a55;
 }
 
 * { box-sizing: border-box; }
@@ -13,42 +16,85 @@ body { font-family: 'Poppins', sans-serif; background: var(--admin-bg); margin: 
 
 .admin-wrapper { display: flex; min-height: 100vh; }
 
-/* ---------- Sidebar ---------- */
+/* ---------- Sidebar (clickdokan-style: light bg, pink pill active state) ---------- */
 .admin-sidebar {
-  width: 250px;
-  background: var(--admin-navy-dark);
-  color: #dbe3ec;
+  width: 270px;
+  background: #fdfcfd;
+  color: var(--admin-text);
   flex-shrink: 0;
   position: sticky;
   top: 0;
   height: 100vh;
   overflow-y: auto;
+  border-right: 1px solid #eee;
 }
 .admin-brand {
   padding: 22px 20px;
   font-weight: 700;
   font-size: 18px;
-  color: #fff;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  color: var(--admin-navy);
+  border-bottom: 1px solid #eee;
 }
-.admin-brand i { color: var(--admin-gold); margin-right: 6px; }
-.admin-brand span { display: block; font-size: 11px; font-weight: 400; color: #9fb0c3; margin-top: 4px; }
+.admin-brand i { color: var(--admin-pink); margin-right: 6px; }
+.admin-brand span { display: block; font-size: 11px; font-weight: 400; color: #9aa; margin-top: 4px; }
 
-.admin-nav { display: flex; flex-direction: column; padding: 14px 0; }
-.admin-nav a {
-  color: #cdd7e3;
+.admin-nav { display: flex; flex-direction: column; padding: 14px 12px; gap: 3px; }
+
+/* Top-level link / group-toggle button share the same pill look */
+.admin-nav > a, .admin-nav-toggle {
+  color: var(--admin-text);
   text-decoration: none;
-  padding: 11px 22px;
-  font-size: 14px;
+  padding: 11px 16px;
+  font-size: 14.5px;
+  font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 10px;
-  border-left: 3px solid transparent;
+  gap: 12px;
+  border-radius: 10px;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
 }
-.admin-nav a i { font-size: 16px; width: 18px; }
-.admin-nav a:hover { background: rgba(255,255,255,0.05); color: #fff; }
-.admin-nav a.active { background: rgba(212,165,55,0.12); border-left-color: var(--admin-gold); color: var(--admin-gold); font-weight: 600; }
-.admin-nav hr { border-color: rgba(255,255,255,0.08); margin: 10px 20px; }
+.admin-nav > a i:first-child, .admin-nav-toggle i:first-child { font-size: 16px; width: 18px; text-align: center; }
+.admin-nav > a:hover, .admin-nav-toggle:hover { background: var(--admin-pink-soft); color: var(--admin-pink); }
+.admin-nav > a.active, .admin-nav-toggle.active {
+  background: var(--admin-pink);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(236,14,140,0.28);
+}
+.admin-nav-toggle .chevron { margin-left: auto; font-size: 12px; transition: transform 0.2s; }
+.admin-nav-toggle[aria-expanded="true"] .chevron { transform: rotate(180deg); }
+.admin-nav hr { border-color: #eee; margin: 10px 12px; }
+
+/* Submenu (collapsible) */
+.admin-submenu { display: flex; flex-direction: column; padding: 2px 0 2px 20px; gap: 1px; }
+.admin-submenu a {
+  color: #7a7a85;
+  text-decoration: none;
+  font-size: 13.5px;
+  padding: 8px 14px 8px 10px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.admin-submenu a::before {
+  content: '';
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #c9c9d2;
+  flex-shrink: 0;
+}
+.admin-submenu a:hover { color: var(--admin-pink); background: var(--admin-pink-soft); }
+.admin-submenu a.active {
+  background: var(--admin-pink-soft);
+  color: var(--admin-pink);
+  font-weight: 600;
+}
+.admin-submenu a.active::before { background: var(--admin-pink); }
 
 /* ---------- Main content ---------- */
 .admin-content { flex: 1; min-width: 0; }
@@ -137,6 +183,6 @@ body { font-family: 'Poppins', sans-serif; background: var(--admin-bg); margin: 
 }
 
 @media (max-width: 991px) {
-  .admin-sidebar { position: fixed; left: -250px; z-index: 1000; transition: 0.3s; }
+  .admin-sidebar { position: fixed; left: -270px; z-index: 1000; transition: 0.3s; }
   .admin-sidebar.open { left: 0; }
 }
