@@ -45,7 +45,7 @@
   const hasAdvancedData = !!(
     weightValue || d.buyingPrice || (tagsValue && tagsValue.length) || d.discountValue ||
     (d.condition && d.condition !== 'new') || (d.availability && d.availability !== 'in_stock') ||
-    d.shortDescription || offerText || d.videoEmbed || d.variantsChartImage ||
+    offerText || d.videoEmbed || d.variantsChartImage ||
     d.metaTitle || d.metaKeywords || d.metaDescription ||
     minOrderQtyValue > 1 || maxOrderQtyValue
   );
@@ -257,22 +257,18 @@
       <div class="admin-card mb-3">
         <h5><i class="bi bi-file-earmark-text"></i> Description</h5>
         <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Short Description</label>
+            <textarea name="shortDescription" class="form-control" rows="2"><%= d.shortDescription || '' %></textarea>
+          </div>
           <div class="col-12 advanced-block" style="display:<%= advDisplay %>">
-            <div class="row g-3">
-              <div class="col-12">
-                <label class="form-label">Offer Description</label>
-                <div class="input-group">
-                  <select name="offerDescriptionType" class="form-select" style="max-width:120px">
-                    <option value="fixed" <%= offerType === 'fixed' ? 'selected' : '' %>>Fixed</option>
-                    <option value="percent" <%= offerType === 'percent' ? 'selected' : '' %>>Percent</option>
-                  </select>
-                  <input type="text" name="offerDescriptionText" class="form-control" placeholder="Offer Description" value="<%= offerText %>">
-                </div>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Short Description</label>
-                <textarea name="shortDescription" class="form-control" rows="2"><%= d.shortDescription || '' %></textarea>
-              </div>
+            <label class="form-label">Offer Description</label>
+            <div class="input-group">
+              <select name="offerDescriptionType" class="form-select" style="max-width:120px">
+                <option value="fixed" <%= offerType === 'fixed' ? 'selected' : '' %>>Fixed</option>
+                <option value="percent" <%= offerType === 'percent' ? 'selected' : '' %>>Percent</option>
+              </select>
+              <input type="text" name="offerDescriptionText" class="form-control" placeholder="Offer Description" value="<%= offerText %>">
             </div>
           </div>
           <div class="col-12">
