@@ -25,8 +25,9 @@
         <span class="price-now"><%= currency(p.price) %></span>
       <% } %>
     </div>
-    <button class="btn btn-add-cart w-100" data-add-cart data-id="<%= p._id %>">
-      <i class="bi bi-cart-plus"></i> কার্টে যোগ করুন
-    </button>
+    <div class="product-actions">
+      <button class="btn btn-add-cart" data-add-cart data-id="<%= p._id %>">আরো কিনুন</button>
+      <a href="/checkout?buyNow=<%= p._id %>" class="btn btn-buy-now">এখনই কিনুন</a>
+    </div>
   </div>
 </div>
