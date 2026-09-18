@@ -864,6 +864,67 @@ router.get('/products/delete/:id', async (req, res, next) => {
   }
 });
 
+router.post('/products/bulk-delete', verifyCsrf, async (req, res, next) => {
+  try {
+    const ids = parseIds(req.body);
+    if (ids.length) {
+      await Product.deleteMany({ _id: { $in: ids } });
+      req.flash('success', `${ids.length} product(s) deleted.`);
+    }
+    res.redirect(req.get('Referer') || '/admin/products');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/products/bulk-status', verifyCsrf, async (req, res, next) => {
+  try {
+    const ids = parseIds(req.body);
+    const status = req.query.status === 'active';
+    if (ids.length) {
+      await Product.updateMany({ _id: { $in: ids } }, { status });
+      req.flash('success', `${ids.length} product(s) ${status ? 'activated' : 'deactivated'}.`);
+    }
+    res.redirect(req.get('Referer') || '/admin/products');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/products/duplicate/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/products');
+    }
+    const original = await Product.findById(req.params.id).lean();
+    if (!original) {
+      req.flash('danger', 'Product not found.');
+      return res.redirect('/admin/products');
+    }
+    const copy = { ...original };
+    delete copy._id;
+    delete copy.__v;
+    delete copy.createdAt;
+    delete copy.updatedAt;
+    delete copy.views;
+    copy.name = `${original.name} (Copy)`;
+    copy.slug = await ensureUniqueSlug(Product, slugify(copy.name), null);
+    copy.sku = original.sku ? `${original.sku}-COPY` : '';
+    copy.status = false; // duplicated products start hidden so they can be reviewed/edited first
+    // Variant subdocuments need fresh _ids of their own, not the originals'.
+    copy.variants = (original.variants || []).map((v) => {
+      const { _id, ...rest } = v;
+      return rest;
+    });
+    const created = await Product.create(copy);
+    req.flash('success', 'Product duplicated. It is hidden (Inactive) until you review and publish it.');
+    res.redirect(`/admin/products/${created._id}/edit`);
+  } catch (err) {
+    next(err);
+  }
+});
+
 async function loadProductFormLookups(excludeId) {
   const productFilter = { status: true };
   if (excludeId) productFilter._id = { $ne: excludeId };

@@ -33,373 +33,399 @@
 <form method="post" action="<%= formAction %>" enctype="multipart/form-data" id="productForm">
   <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
 
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <h4 class="mb-0"><%= isEdit ? 'Edit Product' : 'Add New Product' %></h4>
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-box-seam-fill text-brand"></i> <%= isEdit ? 'Edit Product' : 'Add New Product' %></h4>
     <div class="d-flex gap-2">
       <a href="/admin/products" class="btn btn-outline-secondary">Cancel</a>
       <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
     </div>
   </div>
 
-  <!-- ---------- Basic Information ---------- -->
-  <div class="admin-card mb-3">
-    <h5>Product Basic Information</h5>
-    <div class="row g-3">
-      <div class="col-md-8">
-        <label class="form-label">Product Name / Title *</label>
-        <input type="text" name="name" class="form-control" required value="<%= d.name || '' %>">
+  <div class="row g-3">
+    <!-- =====================================================
+         MAIN COLUMN — the product's actual content
+         ===================================================== -->
+    <div class="col-lg-8">
+
+      <!-- ---------- Basic Information ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-card-text"></i> Product Basic Information</h5>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label">Product Name / Title *</label>
+            <input type="text" name="name" class="form-control" required value="<%= d.name || '' %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Product SKU ID</label>
+            <input type="text" name="sku" class="form-control" value="<%= skuValue %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Slug / URL</label>
+            <input type="text" name="slug" class="form-control" placeholder="Auto-generated from name if left blank" value="<%= d.slug || '' %>">
+          </div>
+        </div>
       </div>
-      <div class="col-md-4">
-        <label class="form-label">Product SKU ID</label>
-        <input type="text" name="sku" class="form-control" value="<%= skuValue %>">
+
+      <!-- ---------- Product Media ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-camera-video"></i> Product Media</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Insert Video Embed (YouTube/Facebook/Vimeo)</label>
+            <textarea name="videoEmbed" class="form-control" rows="2" placeholder="Paste an embed URL, e.g. https://www.youtube.com/embed/..."><%= d.videoEmbed || '' %></textarea>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Video Position</label>
+            <select name="videoPosition" class="form-select">
+              <option value="" <%= !d.videoPosition ? 'selected' : '' %>>No Select</option>
+              <option value="top" <%= d.videoPosition === 'top' ? 'selected' : '' %>>Above Gallery</option>
+              <option value="bottom" <%= d.videoPosition === 'bottom' ? 'selected' : '' %>>Below Description</option>
+            </select>
+          </div>
+        </div>
       </div>
-      <div class="col-md-6">
-        <label class="form-label">Slug / URL</label>
-        <input type="text" name="slug" class="form-control" placeholder="Auto-generated from name if left blank" value="<%= d.slug || '' %>">
+
+      <!-- ---------- Product Image ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-images"></i> Product Image</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Cover Image <small class="text-muted">Size (800x800)</small></label>
+            <input type="file" name="image" class="form-control" accept="image/*">
+            <% if (d.image) { %><img src="<%= productImageUrl(d.image) %>" class="admin-thumb mt-2"><% } %>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Product Image <small class="text-muted">Size (600x600)</small></label>
+            <input type="file" name="galleryImage" class="form-control" accept="image/*">
+            <% if (d.galleryImage) { %><img src="<%= productImageUrl(d.galleryImage) %>" class="admin-thumb mt-2"><% } %>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Variants Chart Image</label>
+            <input type="file" name="variantsChartImage" class="form-control" accept="image/*">
+            <% if (d.variantsChartImage) { %><img src="<%= productImageUrl(d.variantsChartImage) %>" class="admin-thumb mt-2"><% } %>
+          </div>
+        </div>
       </div>
-      <div class="col-md-6"></div>
-      <div class="col-md-4">
-        <label class="form-label">Category *</label>
-        <select name="categoryId" class="form-select" required>
-          <option value="">-- Select Categories --</option>
-          <% categories.forEach(function (c) { %>
-            <option value="<%= c._id %>" <%= selectedCategoryId === String(c._id) ? 'selected' : '' %>><%= c.name %></option>
-          <% }); %>
-        </select>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Brand</label>
-        <select name="brandId" class="form-select">
-          <option value="">-- Select Brand --</option>
-          <% brands.forEach(function (b) { %>
-            <option value="<%= b._id %>" <%= selectedBrandId === String(b._id) ? 'selected' : '' %>><%= b.name %></option>
-          <% }); %>
-        </select>
-        <div class="form-text">No brand yet? <a href="/admin/products/brands" target="_blank">Add one</a>.</div>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Supplier</label>
-        <select name="supplierId" class="form-select">
-          <option value="">-- Select Supplier --</option>
-          <% suppliers.forEach(function (s) { %>
-            <option value="<%= s._id %>" <%= selectedSupplierId === String(s._id) ? 'selected' : '' %>><%= s.name %></option>
-          <% }); %>
-        </select>
-        <div class="form-text">No supplier yet? <a href="/admin/products/supplier" target="_blank">Add one</a>.</div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Tags</label>
-        <input type="text" name="tags" class="form-control" placeholder="e.g. birthday, gift, cake" value="<%= tagsValue %>">
-        <div class="form-text">Comma-separated. Used to help customers find this product in search.</div>
-      </div>
-      <div class="col-md-6">
-        <label class="form-label">Additional Categories <small class="text-muted">(also list this product under)</small></label>
-        <div class="border rounded p-2" style="max-height:120px; overflow-y:auto;">
-          <% categories.forEach(function (c) { %>
-            <% if (String(c._id) !== selectedCategoryId) { %>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="categories" value="<%= c._id %>" id="cat<%= c._id %>" <%= selectedCategoryIds.includes(String(c._id)) ? 'checked' : '' %>>
-                <label class="form-check-label" for="cat<%= c._id %>"><%= c.name %></label>
+
+      <!-- ---------- Product Information ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-tags"></i> Product Information</h5>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <label class="form-label">Stock</label>
+            <input type="number" name="stock" class="form-control" value="<%= d.stock !== undefined ? d.stock : 0 %>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Stock Alert</label>
+            <input type="number" name="stockAlert" class="form-control" value="<%= d.stockAlert !== undefined ? d.stockAlert : 5 %>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Product Condition</label>
+            <select name="condition" class="form-select">
+              <option value="new" <%= (d.condition || 'new') === 'new' ? 'selected' : '' %>>New</option>
+              <option value="used" <%= d.condition === 'used' ? 'selected' : '' %>>Used</option>
+              <option value="refurbished" <%= d.condition === 'refurbished' ? 'selected' : '' %>>Refurbished</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Product Availability</label>
+            <select name="availability" class="form-select">
+              <option value="in_stock" <%= (d.availability || 'in_stock') === 'in_stock' ? 'selected' : '' %>>In Stock</option>
+              <option value="out_of_stock" <%= d.availability === 'out_of_stock' ? 'selected' : '' %>>Out of Stock</option>
+              <option value="pre_order" <%= d.availability === 'pre_order' ? 'selected' : '' %>>Pre-order</option>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Weight (kg)</label>
+            <input type="number" step="0.01" name="weight" class="form-control" value="<%= weightValue %>">
+            <div class="form-text">Shown as product info — not yet used to calculate shipping cost.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Min Order Quantity</label>
+            <input type="number" min="1" name="minOrderQty" class="form-control" value="<%= minOrderQtyValue %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Max Order Quantity</label>
+            <input type="number" min="1" name="maxOrderQty" class="form-control" placeholder="No limit" value="<%= maxOrderQtyValue %>">
+          </div>
+
+          <div class="col-12"><hr class="my-1"></div>
+
+          <div class="col-md-3">
+            <label class="form-label">Buying Price</label>
+            <input type="number" step="0.01" name="buyingPrice" class="form-control" value="<%= d.buyingPrice || '' %>">
+            <div class="form-text">Cost price — admin only, never shown on the storefront.</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Regular Price *</label>
+            <input type="number" step="0.01" name="price" id="priceInput" class="form-control" required value="<%= d.price || '' %>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Discount</label>
+            <div class="input-group">
+              <select name="discountType" id="discountType" class="form-select" style="max-width:110px">
+                <option value="flat" <%= (d.discountType || 'flat') === 'flat' ? 'selected' : '' %>>Flat</option>
+                <option value="percent" <%= d.discountType === 'percent' ? 'selected' : '' %>>Percent</option>
+              </select>
+              <input type="number" step="0.01" name="discountValue" id="discountValue" class="form-control" value="<%= d.discountValue || 0 %>">
+            </div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Sale Price *</label>
+            <input type="number" step="0.01" name="salePrice" id="salePriceInput" class="form-control" required value="<%= d.salePrice || '' %>">
+          </div>
+
+          <div class="col-12">
+            <div class="d-flex flex-wrap gap-4 mt-2">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="hasVariants" id="hasVariants" <%= hasVariantsChecked ? 'checked' : '' %>>
+                <label class="form-check-label" for="hasVariants">Add Variant</label>
               </div>
-            <% } %>
-          <% }); %>
-          <% if (!categories.length) { %><p class="text-muted small mb-0">No other categories.</p><% } %>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ---------- Product Media ---------- -->
-  <div class="admin-card mb-3">
-    <h5>Product Media</h5>
-    <div class="row g-3">
-      <div class="col-12">
-        <label class="form-label">Insert Video Embed (YouTube/Facebook/Vimeo)</label>
-        <textarea name="videoEmbed" class="form-control" rows="2" placeholder="Paste an embed URL, e.g. https://www.youtube.com/embed/..."><%= d.videoEmbed || '' %></textarea>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Video Position</label>
-        <select name="videoPosition" class="form-select">
-          <option value="" <%= !d.videoPosition ? 'selected' : '' %>>No Select</option>
-          <option value="top" <%= d.videoPosition === 'top' ? 'selected' : '' %>>Above Gallery</option>
-          <option value="bottom" <%= d.videoPosition === 'bottom' ? 'selected' : '' %>>Below Description</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- ---------- Product Image ---------- -->
-  <div class="admin-card mb-3">
-    <h5>Product Image</h5>
-    <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label">Cover Image <small class="text-muted">Size (800x800)</small></label>
-        <input type="file" name="image" class="form-control" accept="image/*">
-        <% if (d.image) { %><img src="<%= productImageUrl(d.image) %>" class="admin-thumb mt-2"><% } %>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Product Image <small class="text-muted">Size (600x600)</small></label>
-        <input type="file" name="galleryImage" class="form-control" accept="image/*">
-        <% if (d.galleryImage) { %><img src="<%= productImageUrl(d.galleryImage) %>" class="admin-thumb mt-2"><% } %>
-      </div>
-      <div class="col-md-4">
-        <label class="form-label">Variants Chart Image</label>
-        <input type="file" name="variantsChartImage" class="form-control" accept="image/*">
-        <% if (d.variantsChartImage) { %><img src="<%= productImageUrl(d.variantsChartImage) %>" class="admin-thumb mt-2"><% } %>
-      </div>
-    </div>
-  </div>
-
-  <!-- ---------- Product Information ---------- -->
-  <div class="admin-card mb-3">
-    <h5>Product Information</h5>
-    <div class="row g-3">
-      <div class="col-md-3">
-        <label class="form-label">Stock</label>
-        <input type="number" name="stock" class="form-control" value="<%= d.stock !== undefined ? d.stock : 0 %>">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Stock Alert</label>
-        <input type="number" name="stockAlert" class="form-control" value="<%= d.stockAlert !== undefined ? d.stockAlert : 5 %>">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Product Condition</label>
-        <select name="condition" class="form-select">
-          <option value="new" <%= (d.condition || 'new') === 'new' ? 'selected' : '' %>>New</option>
-          <option value="used" <%= d.condition === 'used' ? 'selected' : '' %>>Used</option>
-          <option value="refurbished" <%= d.condition === 'refurbished' ? 'selected' : '' %>>Refurbished</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Product Availability</label>
-        <select name="availability" class="form-select">
-          <option value="in_stock" <%= (d.availability || 'in_stock') === 'in_stock' ? 'selected' : '' %>>In Stock</option>
-          <option value="out_of_stock" <%= d.availability === 'out_of_stock' ? 'selected' : '' %>>Out of Stock</option>
-          <option value="pre_order" <%= d.availability === 'pre_order' ? 'selected' : '' %>>Pre-order</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Weight (kg)</label>
-        <input type="number" step="0.01" name="weight" class="form-control" value="<%= weightValue %>">
-        <div class="form-text">Shown as product info — not yet used to calculate shipping cost.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Min Order Quantity</label>
-        <input type="number" min="1" name="minOrderQty" class="form-control" value="<%= minOrderQtyValue %>">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Max Order Quantity</label>
-        <input type="number" min="1" name="maxOrderQty" class="form-control" placeholder="No limit" value="<%= maxOrderQtyValue %>">
-      </div>
-
-      <div class="col-md-3">
-        <label class="form-label">Buying Price</label>
-        <input type="number" step="0.01" name="buyingPrice" class="form-control" value="<%= d.buyingPrice || '' %>">
-        <div class="form-text">Cost price — admin only, never shown on the storefront.</div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Regular Price *</label>
-        <input type="number" step="0.01" name="price" id="priceInput" class="form-control" required value="<%= d.price || '' %>">
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Discount</label>
-        <div class="input-group">
-          <select name="discountType" id="discountType" class="form-select" style="max-width:110px">
-            <option value="flat" <%= (d.discountType || 'flat') === 'flat' ? 'selected' : '' %>>Flat</option>
-            <option value="percent" <%= d.discountType === 'percent' ? 'selected' : '' %>>Percent</option>
-          </select>
-          <input type="number" step="0.01" name="discountValue" id="discountValue" class="form-control" value="<%= d.discountValue || 0 %>">
-        </div>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label">Sale Price *</label>
-        <input type="number" step="0.01" name="salePrice" id="salePriceInput" class="form-control" required value="<%= d.salePrice || '' %>">
-      </div>
-
-      <div class="col-12">
-        <div class="d-flex flex-wrap gap-4 mt-2">
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" name="hasVariants" id="hasVariants" <%= hasVariantsChecked ? 'checked' : '' %>>
-            <label class="form-check-label" for="hasVariants">Add Variant</label>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="variantMandatory" id="variantMandatory" <%= variantMandatoryChecked ? 'checked' : '' %>>
+                <label class="form-check-label" for="variantMandatory">Variant Mandatory</label>
+              </div>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" name="overselling" id="overselling" <%= oversellingChecked ? 'checked' : '' %>>
+                <label class="form-check-label" for="overselling">Over Selling</label>
+              </div>
+            </div>
           </div>
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" name="variantMandatory" id="variantMandatory" <%= variantMandatoryChecked ? 'checked' : '' %>>
-            <label class="form-check-label" for="variantMandatory">Variant Mandatory</label>
-          </div>
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" name="overselling" id="overselling" <%= oversellingChecked ? 'checked' : '' %>>
-            <label class="form-check-label" for="overselling">Over Selling</label>
+
+          <div class="col-12" id="variantSection" style="<%= hasVariantsChecked ? '' : 'display:none' %>">
+            <hr>
+            <label class="form-label">Variants <small class="text-muted">— each row is its own SKU / price / stock</small></label>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle" id="variantTable">
+                <thead><tr><th>Image</th><th>Label</th><th>SKU</th><th>Price</th><th>Sale Price</th><th>Stock</th><th></th></tr></thead>
+                <tbody id="variantRows">
+                  <% variantsInitial.forEach(function (v, i) { %>
+                    <tr>
+                      <td style="width:70px">
+                        <% if (v.image) { %><img src="<%= productImageUrl(v.image) %>" class="admin-thumb mb-1" style="width:32px;height:32px"><% } %>
+                        <input type="file" name="variantImage[<%= i %>]" class="form-control form-control-sm" accept="image/*">
+                      </td>
+                      <td><input type="text" name="variants[<%= i %>][label]" class="form-control form-control-sm" placeholder="e.g. Red / Large" value="<%= v.label || '' %>"></td>
+                      <td><input type="text" name="variants[<%= i %>][sku]" class="form-control form-control-sm" value="<%= v.sku || '' %>"></td>
+                      <td><input type="number" step="0.01" name="variants[<%= i %>][price]" class="form-control form-control-sm" placeholder="Regular price" value="<%= v.price != null ? v.price : '' %>"></td>
+                      <td><input type="number" step="0.01" name="variants[<%= i %>][salePrice]" class="form-control form-control-sm" value="<%= v.salePrice != null ? v.salePrice : '' %>"></td>
+                      <td><input type="number" name="variants[<%= i %>][stock]" class="form-control form-control-sm" value="<%= v.stock || 0 %>"></td>
+                      <td><button type="button" class="btn btn-sm btn-outline-danger js-remove-variant-row"><i class="bi bi-trash"></i></button></td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-primary" id="addVariantRow"><i class="bi bi-plus-lg"></i> Add Row</button>
+            <div class="form-text">Leave Price / Sale Price blank on a row to use the product's own Regular / Sale Price for that variant.</div>
           </div>
         </div>
       </div>
 
-      <div class="col-12" id="variantSection" style="<%= hasVariantsChecked ? '' : 'display:none' %>">
-        <hr>
-        <label class="form-label">Variants <small class="text-muted">— each row is its own SKU / price / stock</small></label>
-        <div class="table-responsive">
-          <table class="table table-sm align-middle" id="variantTable">
-            <thead><tr><th>Image</th><th>Label</th><th>SKU</th><th>Price</th><th>Sale Price</th><th>Stock</th><th></th></tr></thead>
-            <tbody id="variantRows">
-              <% variantsInitial.forEach(function (v, i) { %>
-                <tr>
-                  <td style="width:70px">
-                    <% if (v.image) { %><img src="<%= productImageUrl(v.image) %>" class="admin-thumb mb-1" style="width:32px;height:32px"><% } %>
-                    <input type="file" name="variantImage[<%= i %>]" class="form-control form-control-sm" accept="image/*">
-                  </td>
-                  <td><input type="text" name="variants[<%= i %>][label]" class="form-control form-control-sm" placeholder="e.g. Red / Large" value="<%= v.label || '' %>"></td>
-                  <td><input type="text" name="variants[<%= i %>][sku]" class="form-control form-control-sm" value="<%= v.sku || '' %>"></td>
-                  <td><input type="number" step="0.01" name="variants[<%= i %>][price]" class="form-control form-control-sm" placeholder="Regular price" value="<%= v.price != null ? v.price : '' %>"></td>
-                  <td><input type="number" step="0.01" name="variants[<%= i %>][salePrice]" class="form-control form-control-sm" value="<%= v.salePrice != null ? v.salePrice : '' %>"></td>
-                  <td><input type="number" name="variants[<%= i %>][stock]" class="form-control form-control-sm" value="<%= v.stock || 0 %>"></td>
-                  <td><button type="button" class="btn btn-sm btn-outline-danger js-remove-variant-row"><i class="bi bi-trash"></i></button></td>
-                </tr>
+      <!-- ---------- Product Description ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-file-earmark-text"></i> Product Description</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Offer Description</label>
+            <div class="input-group">
+              <select name="offerDescriptionType" class="form-select" style="max-width:130px">
+                <option value="fixed" <%= offerType === 'fixed' ? 'selected' : '' %>>Fixed</option>
+                <option value="percent" <%= offerType === 'percent' ? 'selected' : '' %>>Percent</option>
+              </select>
+              <input type="text" name="offerDescriptionText" class="form-control" placeholder="Offer Description" value="<%= offerText %>">
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Short Description</label>
+            <textarea name="shortDescription" class="form-control" rows="2"><%= d.shortDescription || '' %></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Long Description *</label>
+            <div class="custom-editor" id="descEditorWrap">
+              <div class="custom-editor-toolbar" id="descToolbar">
+                <button type="button" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+                <button type="button" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+                <button type="button" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
+                <button type="button" data-cmd="strikeThrough" title="Strikethrough"><i class="bi bi-type-strikethrough"></i></button>
+                <span class="custom-editor-sep"></span>
+                <button type="button" data-cmd="formatBlock" data-value="H2" title="Heading"><i class="bi bi-type-h2"></i></button>
+                <button type="button" data-cmd="formatBlock" data-value="H3" title="Subheading"><i class="bi bi-type-h3"></i></button>
+                <button type="button" data-cmd="formatBlock" data-value="P" title="Paragraph">¶</button>
+                <span class="custom-editor-sep"></span>
+                <button type="button" data-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+                <button type="button" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
+                <button type="button" data-cmd="formatBlock" data-value="BLOCKQUOTE" title="Quote"><i class="bi bi-quote"></i></button>
+                <span class="custom-editor-sep"></span>
+                <button type="button" id="descLinkBtn" title="Insert link"><i class="bi bi-link-45deg"></i></button>
+                <button type="button" data-cmd="unlink" title="Remove link"><i class="bi bi-link"></i></button>
+                <span class="custom-editor-sep"></span>
+                <button type="button" data-cmd="removeFormat" title="Clear formatting"><i class="bi bi-eraser"></i></button>
+              </div>
+              <div class="custom-editor-body" id="descEditor" contenteditable="true"><%- d.description || '' %></div>
+            </div>
+            <textarea name="description" id="description" style="display:none"><%= d.description || '' %></textarea>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- =====================================================
+         SIDEBAR — status, organization, delivery, upsell, SEO
+         ===================================================== -->
+    <div class="col-lg-4">
+
+      <!-- ---------- Status & Visibility ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-toggle2-on"></i> Status &amp; Visibility</h5>
+        <div class="d-flex flex-column gap-2">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="status" id="isActive" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
+            <label class="form-check-label" for="isActive">Active (Show in Store)</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="isFeatured" id="isFeatured" <%= d.isFeatured ? 'checked' : '' %>>
+            <label class="form-check-label" for="isFeatured">Featured Product</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="isFlashSale" id="isFlash" <%= d.isFlashSale ? 'checked' : '' %>>
+            <label class="form-check-label" for="isFlash">Show in Flash Sale</label>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Organization ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-diagram-3"></i> Organization</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Category *</label>
+            <select name="categoryId" class="form-select" required>
+              <option value="">-- Select Categories --</option>
+              <% categories.forEach(function (c) { %>
+                <option value="<%= c._id %>" <%= selectedCategoryId === String(c._id) ? 'selected' : '' %>><%= c.name %></option>
               <% }); %>
-            </tbody>
-          </table>
-        </div>
-        <button type="button" class="btn btn-sm btn-outline-primary" id="addVariantRow"><i class="bi bi-plus-lg"></i> Add Row</button>
-        <div class="form-text">Leave Price / Sale Price blank on a row to use the product's own Regular / Sale Price for that variant.</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ---------- Product Description ---------- -->
-  <div class="admin-card mb-3">
-    <h5>Product Description</h5>
-    <div class="row g-3">
-      <div class="col-12">
-        <label class="form-label">Offer Description</label>
-        <div class="input-group">
-          <select name="offerDescriptionType" class="form-select" style="max-width:130px">
-            <option value="fixed" <%= offerType === 'fixed' ? 'selected' : '' %>>Fixed</option>
-            <option value="percent" <%= offerType === 'percent' ? 'selected' : '' %>>Percent</option>
-          </select>
-          <input type="text" name="offerDescriptionText" class="form-control" placeholder="Offer Description" value="<%= offerText %>">
-        </div>
-      </div>
-      <div class="col-12">
-        <label class="form-label">Short Description</label>
-        <textarea name="shortDescription" class="form-control" rows="2"><%= d.shortDescription || '' %></textarea>
-      </div>
-      <div class="col-12">
-        <label class="form-label">Long Description *</label>
-        <div class="custom-editor" id="descEditorWrap">
-          <div class="custom-editor-toolbar" id="descToolbar">
-            <button type="button" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
-            <button type="button" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
-            <button type="button" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
-            <button type="button" data-cmd="strikeThrough" title="Strikethrough"><i class="bi bi-type-strikethrough"></i></button>
-            <span class="custom-editor-sep"></span>
-            <button type="button" data-cmd="formatBlock" data-value="H2" title="Heading"><i class="bi bi-type-h2"></i></button>
-            <button type="button" data-cmd="formatBlock" data-value="H3" title="Subheading"><i class="bi bi-type-h3"></i></button>
-            <button type="button" data-cmd="formatBlock" data-value="P" title="Paragraph">¶</button>
-            <span class="custom-editor-sep"></span>
-            <button type="button" data-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
-            <button type="button" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
-            <button type="button" data-cmd="formatBlock" data-value="BLOCKQUOTE" title="Quote"><i class="bi bi-quote"></i></button>
-            <span class="custom-editor-sep"></span>
-            <button type="button" id="descLinkBtn" title="Insert link"><i class="bi bi-link-45deg"></i></button>
-            <button type="button" data-cmd="unlink" title="Remove link"><i class="bi bi-link"></i></button>
-            <span class="custom-editor-sep"></span>
-            <button type="button" data-cmd="removeFormat" title="Clear formatting"><i class="bi bi-eraser"></i></button>
+            </select>
           </div>
-          <div class="custom-editor-body" id="descEditor" contenteditable="true"><%- d.description || '' %></div>
-        </div>
-        <textarea name="description" id="description" style="display:none"><%= d.description || '' %></textarea>
-      </div>
-    </div>
-  </div>
-
-  <!-- ---------- Delivery Type ---------- -->
-  <div class="admin-card mb-3">
-    <h5>Delivery Type</h5>
-    <div class="btn-group" role="group">
-      <input type="radio" class="btn-check" name="deliveryType" id="dtManual" value="manual" autocomplete="off" <%= deliveryTypeValue === 'manual' ? 'checked' : '' %>>
-      <label class="btn btn-outline-primary" for="dtManual">Manual Type</label>
-      <input type="radio" class="btn-check" name="deliveryType" id="dtFree" value="free_shipping" autocomplete="off" <%= deliveryTypeValue === 'free_shipping' ? 'checked' : '' %>>
-      <label class="btn btn-outline-primary" for="dtFree">Free Shipping</label>
-      <input type="radio" class="btn-check" name="deliveryType" id="dtFlat" value="flat_rate" autocomplete="off" <%= deliveryTypeValue === 'flat_rate' ? 'checked' : '' %>>
-      <label class="btn btn-outline-primary" for="dtFlat">Flat Rate</label>
-    </div>
-    <div class="mt-3" id="flatRateAmountWrap" style="<%= deliveryTypeValue === 'flat_rate' ? '' : 'display:none' %>">
-      <label class="form-label">Flat Rate Amount (৳)</label>
-      <input type="number" step="0.01" name="deliveryFlatRate" class="form-control" style="max-width:200px" value="<%= deliveryFlatRateValue %>">
-    </div>
-    <div class="form-text mt-2">Manual = use the site's default delivery charge (Admin &gt; Setting). Free Shipping makes the whole order free when every cart item is free-shipping; otherwise the highest applicable rate in the cart is charged.</div>
-  </div>
-
-  <!-- ---------- Delivery Method ---------- -->
-  <div class="admin-card mb-3">
-    <h5>Delivery Method</h5>
-    <div class="btn-group" role="group">
-      <input type="checkbox" class="btn-check" name="deliveryMethods" id="dmCod" value="cod" autocomplete="off" <%= deliveryMethodsSelected.includes('cod') ? 'checked' : '' %>>
-      <label class="btn btn-outline-primary" for="dmCod">Cash On Delivery</label>
-      <input type="checkbox" class="btn-check" name="deliveryMethods" id="dmBkash" value="bkash" autocomplete="off" <%= deliveryMethodsSelected.includes('bkash') ? 'checked' : '' %>>
-      <label class="btn btn-outline-primary" for="dmBkash">bKash Payment</label>
-      <input type="checkbox" class="btn-check" name="deliveryMethods" id="dmSsl" value="sslcommerz" autocomplete="off" <%= deliveryMethodsSelected.includes('sslcommerz') ? 'checked' : '' %>>
-      <label class="btn btn-outline-primary" for="dmSsl">Card / SSLCommerz</label>
-    </div>
-    <div class="form-text mt-2">Leave all unchecked to allow every payment method the store offers. Check one or more to restrict checkout of this product to just those methods.</div>
-  </div>
-
-  <!-- ---------- After Confirm Products ---------- -->
-  <div class="admin-card mb-3">
-    <h5>After Confirm Products</h5>
-    <div class="form-check form-switch mb-3">
-      <input class="form-check-input" type="checkbox" name="afterConfirmEnabled" id="afterConfirmEnabled" <%= afterConfirmEnabledChecked ? 'checked' : '' %>>
-      <label class="form-check-label" for="afterConfirmEnabled">Show an upsell offer on the order-success page after this product is bought</label>
-    </div>
-    <div id="afterConfirmSection" style="<%= afterConfirmEnabledChecked ? '' : 'display:none' %>">
-      <label class="form-label">After Order Offer Description</label>
-      <input type="text" name="afterConfirmOfferDescription" class="form-control mb-3" placeholder="e.g. Complete the look — 20% off these picks" value="<%= afterConfirmOfferDescriptionValue %>">
-      <label class="form-label">Select After Confirm Products</label>
-      <input type="text" class="form-control mb-2" id="afterConfirmSearch" placeholder="Search products...">
-      <div class="border rounded p-2" style="max-height:220px; overflow-y:auto;">
-        <% allProducts.forEach(function (p) { %>
-          <div class="form-check after-confirm-item" data-name="<%= p.name.toLowerCase() %>">
-            <input class="form-check-input" type="checkbox" name="afterConfirmProductIds" value="<%= p._id %>" id="acp<%= p._id %>" <%= afterConfirmSelectedIds.includes(String(p._id)) ? 'checked' : '' %>>
-            <label class="form-check-label" for="acp<%= p._id %>"><%= p.name %></label>
+          <div class="col-12">
+            <label class="form-label">Brand</label>
+            <select name="brandId" class="form-select">
+              <option value="">-- Select Brand --</option>
+              <% brands.forEach(function (b) { %>
+                <option value="<%= b._id %>" <%= selectedBrandId === String(b._id) ? 'selected' : '' %>><%= b.name %></option>
+              <% }); %>
+            </select>
+            <div class="form-text">No brand yet? <a href="/admin/products/brands" target="_blank">Add one</a>.</div>
           </div>
-        <% }); %>
-        <% if (!allProducts.length) { %><p class="text-muted small mb-0">No other products yet.</p><% } %>
+          <div class="col-12">
+            <label class="form-label">Supplier</label>
+            <select name="supplierId" class="form-select">
+              <option value="">-- Select Supplier --</option>
+              <% suppliers.forEach(function (s) { %>
+                <option value="<%= s._id %>" <%= selectedSupplierId === String(s._id) ? 'selected' : '' %>><%= s.name %></option>
+              <% }); %>
+            </select>
+            <div class="form-text">No supplier yet? <a href="/admin/products/supplier" target="_blank">Add one</a>.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Tags</label>
+            <input type="text" name="tags" class="form-control" placeholder="e.g. birthday, gift, cake" value="<%= tagsValue %>">
+            <div class="form-text">Comma-separated. Used to help customers find this product in search.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Additional Categories <small class="text-muted">(also list this product under)</small></label>
+            <div class="border rounded p-2" style="max-height:140px; overflow-y:auto;">
+              <% categories.forEach(function (c) { %>
+                <% if (String(c._id) !== selectedCategoryId) { %>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="categories" value="<%= c._id %>" id="cat<%= c._id %>" <%= selectedCategoryIds.includes(String(c._id)) ? 'checked' : '' %>>
+                    <label class="form-check-label" for="cat<%= c._id %>"><%= c.name %></label>
+                  </div>
+                <% } %>
+              <% }); %>
+              <% if (!categories.length) { %><p class="text-muted small mb-0">No other categories.</p><% } %>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
-  </div>
 
-  <!-- ---------- SEO ---------- -->
-  <div class="admin-card mb-3">
-    <h5>Product (Search Engine Optimisation) SEO</h5>
-    <div class="row g-3">
-      <div class="col-12">
-        <label class="form-label">Product Meta Title</label>
-        <input type="text" name="metaTitle" class="form-control" value="<%= d.metaTitle || '' %>">
+      <!-- ---------- Delivery Type ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-truck"></i> Delivery Type</h5>
+        <div class="btn-group flex-wrap" role="group">
+          <input type="radio" class="btn-check" name="deliveryType" id="dtManual" value="manual" autocomplete="off" <%= deliveryTypeValue === 'manual' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="dtManual">Manual Type</label>
+          <input type="radio" class="btn-check" name="deliveryType" id="dtFree" value="free_shipping" autocomplete="off" <%= deliveryTypeValue === 'free_shipping' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="dtFree">Free Shipping</label>
+          <input type="radio" class="btn-check" name="deliveryType" id="dtFlat" value="flat_rate" autocomplete="off" <%= deliveryTypeValue === 'flat_rate' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="dtFlat">Flat Rate</label>
+        </div>
+        <div class="mt-3" id="flatRateAmountWrap" style="<%= deliveryTypeValue === 'flat_rate' ? '' : 'display:none' %>">
+          <label class="form-label">Flat Rate Amount (৳)</label>
+          <input type="number" step="0.01" name="deliveryFlatRate" class="form-control" value="<%= deliveryFlatRateValue %>">
+        </div>
+        <div class="form-text mt-2">Manual = use the site's default delivery charge (Admin &gt; Setting). Free Shipping makes the whole order free when every cart item is free-shipping; otherwise the highest applicable rate in the cart is charged.</div>
       </div>
-      <div class="col-12">
-        <label class="form-label">Product Meta Keywords</label>
-        <input type="text" name="metaKeywords" class="form-control" value="<%= d.metaKeywords || '' %>">
-      </div>
-      <div class="col-12">
-        <label class="form-label">Product Meta Descriptions</label>
-        <input type="text" name="metaDescription" class="form-control" value="<%= d.metaDescription || '' %>">
-      </div>
-    </div>
-  </div>
 
-  <div class="admin-card mb-3">
-    <h5>Other</h5>
-    <div class="d-flex flex-wrap gap-4">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="isFeatured" id="isFeatured" <%= d.isFeatured ? 'checked' : '' %>>
-        <label class="form-check-label" for="isFeatured">Featured Product</label>
+      <!-- ---------- Delivery Method ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-credit-card"></i> Delivery Method</h5>
+        <div class="btn-group flex-wrap" role="group">
+          <input type="checkbox" class="btn-check" name="deliveryMethods" id="dmCod" value="cod" autocomplete="off" <%= deliveryMethodsSelected.includes('cod') ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="dmCod">Cash On Delivery</label>
+          <input type="checkbox" class="btn-check" name="deliveryMethods" id="dmBkash" value="bkash" autocomplete="off" <%= deliveryMethodsSelected.includes('bkash') ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="dmBkash">bKash Payment</label>
+          <input type="checkbox" class="btn-check" name="deliveryMethods" id="dmSsl" value="sslcommerz" autocomplete="off" <%= deliveryMethodsSelected.includes('sslcommerz') ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="dmSsl">Card / SSLCommerz</label>
+        </div>
+        <div class="form-text mt-2">Leave all unchecked to allow every payment method the store offers. Check one or more to restrict checkout of this product to just those methods.</div>
       </div>
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="isFlashSale" id="isFlash" <%= d.isFlashSale ? 'checked' : '' %>>
-        <label class="form-check-label" for="isFlash">Show in Flash Sale</label>
+
+      <!-- ---------- After Confirm Products ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-gift"></i> After Confirm Products</h5>
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" name="afterConfirmEnabled" id="afterConfirmEnabled" <%= afterConfirmEnabledChecked ? 'checked' : '' %>>
+          <label class="form-check-label" for="afterConfirmEnabled">Show an upsell offer on the order-success page after this product is bought</label>
+        </div>
+        <div id="afterConfirmSection" style="<%= afterConfirmEnabledChecked ? '' : 'display:none' %>">
+          <label class="form-label">After Order Offer Description</label>
+          <input type="text" name="afterConfirmOfferDescription" class="form-control mb-3" placeholder="e.g. Complete the look — 20% off these picks" value="<%= afterConfirmOfferDescriptionValue %>">
+          <label class="form-label">Select After Confirm Products</label>
+          <input type="text" class="form-control mb-2" id="afterConfirmSearch" placeholder="Search products...">
+          <div class="border rounded p-2" style="max-height:220px; overflow-y:auto;">
+            <% allProducts.forEach(function (p) { %>
+              <div class="form-check after-confirm-item" data-name="<%= p.name.toLowerCase() %>">
+                <input class="form-check-input" type="checkbox" name="afterConfirmProductIds" value="<%= p._id %>" id="acp<%= p._id %>" <%= afterConfirmSelectedIds.includes(String(p._id)) ? 'checked' : '' %>>
+                <label class="form-check-label" for="acp<%= p._id %>"><%= p.name %></label>
+              </div>
+            <% }); %>
+            <% if (!allProducts.length) { %><p class="text-muted small mb-0">No other products yet.</p><% } %>
+          </div>
+        </div>
       </div>
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" name="status" id="isActive" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
-        <label class="form-check-label" for="isActive">Active (Show in Store)</label>
+
+      <!-- ---------- SEO ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-search"></i> SEO</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Product Meta Title</label>
+            <input type="text" name="metaTitle" class="form-control" value="<%= d.metaTitle || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Product Meta Keywords</label>
+            <input type="text" name="metaKeywords" class="form-control" value="<%= d.metaKeywords || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Product Meta Descriptions</label>
+            <input type="text" name="metaDescription" class="form-control" value="<%= d.metaDescription || '' %>">
+          </div>
+        </div>
       </div>
+
     </div>
   </div>
 

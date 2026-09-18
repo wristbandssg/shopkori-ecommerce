@@ -1,7 +1,7 @@
 <%- include('partials/admin-header') %>
 
-<div class="admin-card">
-  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+<div class="admin-card mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
     <form method="get" class="d-flex align-items-center gap-2">
       <select name="perPage" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
         <% [10, 25, 50, 100].forEach(function (n) { %>
@@ -14,45 +14,65 @@
     </form>
     <a href="/admin/products/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> New Product</a>
   </div>
+</div>
 
-  <div class="table-responsive">
-    <table class="table align-middle">
-      <thead><tr><th>Products</th><th>Category</th><th>Price</th><th>Quantity</th><th>Stock</th><th>Overselling</th><th>Created At</th><th>Action</th></tr></thead>
-      <tbody>
-        <% products.forEach(function (p) { %>
-          <tr>
-            <td class="d-flex align-items-center gap-2">
-              <img src="<%= productImageUrl(p.image) %>" class="admin-thumb">
-              <div>
-                <div><%= p.name %></div>
-                <small class="text-muted">SKU: <%= p.sku || '—' %></small>
-              </div>
-            </td>
-            <td><%= p.category ? p.category.name : '-' %></td>
-            <td>
-              <% if (p.salePrice) { %>
-                <span class="text-decoration-line-through text-muted"><%= currency(p.price) %></span><br>
-                <span class="fw-bold"><%= currency(p.salePrice) %></span>
-              <% } else { %>
-                <%= currency(p.price) %>
-              <% } %>
-            </td>
-            <td><% if (p.stock <= (p.stockAlert || 0)) { %><span class="text-danger fw-bold"><%= p.stock %></span><% } else { %><%= p.stock %><% } %></td>
-            <td>
-              <span class="badge bg-<%= p.stockStatus === 'In Stock' ? 'success' : (p.stockStatus === 'Low Stock' ? 'warning' : (p.stockStatus === 'Pre-order' ? 'info' : 'danger')) %>"><%= p.stockStatus %></span>
-            </td>
-            <td><span class="badge bg-<%= p.overselling ? 'success' : 'secondary' %>"><%= p.overselling ? 'ON' : 'OFF' %></span></td>
-            <td><small class="text-muted"><%= new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
-            <td class="text-nowrap">
-              <a href="/admin/products/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-              <a href="/admin/products/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this product?')"><i class="bi bi-trash"></i></a>
-            </td>
-          </tr>
-        <% }); %>
-        <% if (!products.length) { %><tr><td colspan="8" class="text-center text-muted">No entries found.</td></tr><% } %>
-      </tbody>
-    </table>
-  </div>
+<div class="admin-card">
+  <form method="post" id="productsForm">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+      <div class="form-check">
+        <input type="checkbox" class="form-check-input js-select-all" id="selectAllProducts">
+        <label class="form-check-label" for="selectAllProducts">Select All</label>
+      </div>
+      <button type="submit" formaction="/admin/products/bulk-status?status=active" class="btn btn-outline-primary btn-sm"><i class="bi bi-check-circle"></i> Activate Selected</button>
+      <button type="submit" formaction="/admin/products/bulk-status?status=inactive" class="btn btn-outline-secondary btn-sm"><i class="bi bi-slash-circle"></i> Deactivate Selected</button>
+      <button type="submit" formaction="/admin/products/bulk-delete" class="btn btn-outline-danger btn-sm js-confirm" data-confirm="Permanently delete the selected product(s)? This can't be undone.">
+        <i class="bi bi-trash"></i> Delete Selected
+      </button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th></th><th>Products</th><th>Category</th><th>Price</th><th>Quantity</th><th>Stock</th><th>Overselling</th><th>Created At</th><th>Action</th></tr></thead>
+        <tbody>
+          <% products.forEach(function (p) { %>
+            <tr>
+              <td><input type="checkbox" class="form-check-input" name="ids" value="<%= p._id %>"></td>
+              <td class="d-flex align-items-center gap-2">
+                <img src="<%= productImageUrl(p.image) %>" class="admin-thumb">
+                <div>
+                  <div><%= p.name %></div>
+                  <small class="text-muted">SKU: <%= p.sku || '—' %></small>
+                </div>
+              </td>
+              <td><%= p.category ? p.category.name : '-' %></td>
+              <td>
+                <% if (p.salePrice) { %>
+                  <span class="text-decoration-line-through text-muted"><%= currency(p.price) %></span><br>
+                  <span class="fw-bold"><%= currency(p.salePrice) %></span>
+                <% } else { %>
+                  <%= currency(p.price) %>
+                <% } %>
+              </td>
+              <td><% if (p.stock <= (p.stockAlert || 0)) { %><span class="text-danger fw-bold"><%= p.stock %></span><% } else { %><%= p.stock %><% } %></td>
+              <td>
+                <span class="badge bg-<%= p.stockStatus === 'In Stock' ? 'success' : (p.stockStatus === 'Low Stock' ? 'warning' : (p.stockStatus === 'Pre-order' ? 'info' : 'danger')) %>"><%= p.stockStatus %></span>
+              </td>
+              <td><span class="badge bg-<%= p.overselling ? 'success' : 'secondary' %>"><%= p.overselling ? 'ON' : 'OFF' %></span></td>
+              <td><small class="text-muted"><%= new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
+              <td class="text-nowrap">
+                <a href="/admin/products/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+                <a href="/admin/products/duplicate/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-secondary" title="Duplicate"><i class="bi bi-copy"></i></a>
+                <a href="/admin/products/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Are you sure you want to delete this product?" title="Delete"><i class="bi bi-trash"></i></a>
+              </td>
+            </tr>
+          <% }); %>
+          <% if (!products.length) { %><tr><td colspan="9" class="text-center text-muted">No entries found.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </form>
 
   <% if (totalPages > 1) { %>
     <nav class="d-flex justify-content-between align-items-center mt-3">
