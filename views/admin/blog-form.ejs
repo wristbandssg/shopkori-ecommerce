@@ -14,35 +14,35 @@
     <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
     <div class="row g-3">
       <div class="col-12">
-        <label class="form-label">শিরোনাম *</label>
+        <label class="form-label">Title *</label>
         <input type="text" name="title" class="form-control" required value="<%= d.title || '' %>">
       </div>
 
       <div class="col-md-6">
-        <label class="form-label">কভার ছবি</label>
+        <label class="form-label">Cover Image</label>
         <input type="file" name="coverImage" class="form-control" accept="image/*">
         <% if (d.coverImage) { %><img src="<%= productImageUrl(d.coverImage) %>" class="admin-thumb mt-2"><% } %>
       </div>
       <div class="col-md-6">
         <div class="form-check mt-4">
           <input class="form-check-input" type="checkbox" name="status" id="isPublished" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
-          <label class="form-check-label" for="isPublished">Published (সাইটে দেখান)</label>
+          <label class="form-check-label" for="isPublished">Published (show on site)</label>
         </div>
       </div>
 
       <div class="col-12">
-        <label class="form-label">সংক্ষিপ্ত বিবরণ (তালিকায় দেখাবে)</label>
+        <label class="form-label">Short Excerpt (shown in listing)</label>
         <input type="text" name="excerpt" class="form-control" value="<%= d.excerpt || '' %>">
       </div>
       <div class="col-12">
-        <label class="form-label">পোস্টের মূল লেখা</label>
+        <label class="form-label">Post Content</label>
         <textarea name="content" class="form-control" rows="10"><%= d.content || '' %></textarea>
       </div>
     </div>
 
     <div class="mt-4">
-      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> সংরক্ষণ করুন</button>
-      <a href="/admin/blog" class="btn btn-outline-secondary">বাতিল</a>
+      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+      <a href="/admin/blog" class="btn btn-outline-secondary">Cancel</a>
     </div>
   </form>
 </div>

@@ -10,6 +10,7 @@ const Order = require('../models/Order');
 const Page = require('../models/Page');
 const BlogPost = require('../models/BlogPost');
 const { getSettings, setSetting: setSiteSetting } = require('../models/Setting');
+const { getOrderSettings } = require('../models/OrderSetting');
 
 const storeLocals = require('../middleware/storeLocals');
 const { requireCustomerLogin } = require('../middleware/auth');
@@ -19,6 +20,26 @@ const { generateOrderNumber } = require('../middleware/helpers');
 const sslcommerz = require('../lib/sslcommerz');
 
 router.use(storeLocals);
+
+/* =====================================================================
+   ORDER SETTING enforcement (Admin > Orders > Order Setting)
+   ---------------------------------------------------------------------
+   Only the cards below are backed by real, checkable data — same phone
+   number, same IP, same browser session and Bangladeshi phone format —
+   so only these are actually enforced here. The other cards on that page
+   (VPN/Incognito/Fingerprint block, Number/IP block list, Fake Order,
+   Offer Missed Order) save and display correctly but don't block
+   anything yet: real VPN/device-fingerprint detection needs a paid
+   third-party service, and Number/IP blocking needs a blocklist manager
+   that isn't built yet.
+   ===================================================================== */
+async function checkOrderLimitCard(card, matchQuery, fallbackMessage) {
+  if (!card || !card.status || !card.orderLimit) return null;
+  const windowStart = new Date(Date.now() - (card.blockMinutes || 60) * 60000);
+  const count = await Order.countDocuments({ ...matchQuery, isDeleted: false, createdAt: { $gte: windowStart } });
+  if (count >= card.orderLimit) return card.message || fallbackMessage;
+  return null;
+}
 
 /* =====================================================================
    HOME
@@ -257,6 +278,40 @@ router.post('/checkout', async (req, res, next) => {
     if (!['cod', 'bkash', 'sslcommerz'].includes(paymentMethod)) errors.push('পেমেন্ট মেথড নির্বাচন করুন।');
     if (paymentMethod === 'bkash' && (!bkashTrxId || !bkashTrxId.trim())) errors.push('bKash Transaction ID আবশ্যক।');
 
+    // Order Setting enforcement (see block comment above router.use(storeLocals)).
+    const orderSettings = await getOrderSettings();
+    const clientIp = req.ip || '';
+    const trackToken = req.sessionID || '';
+    if (!errors.length) {
+      if (orderSettings.numberValidation.status && phone && !/^01[3-9]\d{8}$/.test(phone.trim())) {
+        errors.push(orderSettings.numberValidation.message || 'অনুগ্রহ করে একটি সঠিক ও সচল মোবাইল নম্বর প্রদান করুন।');
+      }
+      if (!errors.length && phone) {
+        const numberMsg = await checkOrderLimitCard(
+          orderSettings.sameNumberLimit,
+          { customerPhone: phone.trim() },
+          'এই মোবাইল নম্বর দিয়ে নির্ধারিত সংখ্যার বেশি অর্ডার করা সম্ভব নয়।'
+        );
+        if (numberMsg) errors.push(numberMsg);
+      }
+      if (!errors.length && clientIp) {
+        const ipMsg = await checkOrderLimitCard(
+          orderSettings.sameIpLimit,
+          { ip: clientIp },
+          'এই IP ঠিকানা থেকে নির্ধারিত সংখ্যার বেশি অর্ডার করা সম্ভব নয়।'
+        );
+        if (ipMsg) errors.push(ipMsg);
+      }
+      if (!errors.length && trackToken) {
+        const cookieMsg = await checkOrderLimitCard(
+          orderSettings.cookiesLimit,
+          { trackToken },
+          'এই ব্রাউজার থেকে নির্ধারিত সংখ্যার বেশি অর্ডার করা সম্ভব নয়।'
+        );
+        if (cookieMsg) errors.push(cookieMsg);
+      }
+    }
+
     if (errors.length) {
       return res.render('checkout', {
         pageTitle: 'চেকআউট',
@@ -297,6 +352,8 @@ router.post('/checkout', async (req, res, next) => {
       paymentStatus,
       transactionId: paymentMethod === 'bkash' ? bkashTrxId.trim() : null,
       status: 'pending',
+      ip: clientIp,
+      trackToken,
     });
 
     // decrement stock

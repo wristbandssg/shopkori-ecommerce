@@ -1,0 +1,48 @@
+<%- include('partials/admin-header') %>
+
+<p class="text-muted mb-3">Every order that reached "Confirmed" status at least once. Total Confirm Amount is still active; Total Cancel Amount was confirmed and later cancelled.</p>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#2e9e5b;"><i class="bi bi-check-circle"></i></div>
+      <div><span class="stat-value"><%= currency(totalConfirmAmount) %></span><span class="stat-label">Total Confirm Amount</span></div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#d9534f;"><i class="bi bi-x-circle"></i></div>
+      <div><span class="stat-value"><%= currency(totalCancelAmount) %></span><span class="stat-label">Total Cancel Amount</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex gap-2 flex-wrap">
+    <input type="text" name="q" class="form-control" style="max-width:260px" placeholder="Search order#, name or phone" value="<%= q %>">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Search</button>
+  </form>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Order ID</th><th>Customer Info</th><th>Amount</th><th>Confirmed At</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        <% orders.forEach(function (o) { %>
+          <tr>
+            <td><strong>#<%= o.orderNumber %></strong></td>
+            <td><%= o.customerName %><br><small class="text-muted"><i class="bi bi-telephone"></i> <%= o.customerPhone %></small></td>
+            <td><%= currency(o.total) %></td>
+            <td><small class="text-muted"><%= o.confirmedAt ? new Date(o.confirmedAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' %></small></td>
+            <td><span class="badge bg-<%= statusBadge(o.status) %>"><%= statusLabel(o.status) %></span></td>
+            <td><a href="/admin/orders/<%= o._id %>" class="btn btn-sm btn-outline-primary">Details</a></td>
+          </tr>
+        <% }); %>
+        <% if (!orders.length) { %><tr><td colspan="6" class="text-center text-muted py-4">No confirmed orders found.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

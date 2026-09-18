@@ -1,0 +1,143 @@
+<%- include('partials/admin-header') %>
+
+<%
+  function esc(str) {
+    return String(str == null ? '' : str)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function simpleCard(cardKey, title, icon, note) {
+    var s = settings[cardKey] || {};
+    return '' +
+      '<div class="admin-card order-setting-card">' +
+        '<div class="d-flex align-items-center justify-content-between mb-2">' +
+          '<h6 class="mb-0"><i class="bi ' + icon + ' me-2"></i>' + title + '</h6>' +
+          '<span class="badge ' + (s.status ? 'bg-success' : 'bg-secondary') + '">' + (s.status ? 'ON' : 'OFF') + '</span>' +
+        '</div>' +
+        (note ? '<p class="small text-muted mb-2">' + note + '</p>' : '') +
+        '<form method="post" action="/admin/orders/setting/' + cardKey + '">' +
+          '<input type="hidden" name="csrfToken" value="' + csrfToken + '">' +
+          '<div class="mb-2"><label class="form-label small">Message shown to customer</label>' +
+            '<textarea name="message" class="form-control" rows="2">' + esc(s.message) + '</textarea></div>' +
+          '<div class="mb-2"><label class="form-label small">Status</label>' +
+            '<select name="status" class="form-select form-select-sm">' +
+              '<option value="on"' + (s.status ? ' selected' : '') + '>ON</option>' +
+              '<option value="off"' + (!s.status ? ' selected' : '') + '>OFF</option>' +
+            '</select></div>' +
+          '<button type="submit" class="btn btn-brand btn-sm w-100">Save Changes</button>' +
+        '</form>' +
+      '</div>';
+  }
+
+  function limitCard(cardKey, title, icon, note) {
+    var s = settings[cardKey] || {};
+    return '' +
+      '<div class="admin-card order-setting-card">' +
+        '<div class="d-flex align-items-center justify-content-between mb-2">' +
+          '<h6 class="mb-0"><i class="bi ' + icon + ' me-2"></i>' + title + '</h6>' +
+          '<span class="badge ' + (s.status ? 'bg-success' : 'bg-secondary') + '">' + (s.status ? 'ON' : 'OFF') + '</span>' +
+        '</div>' +
+        (note ? '<p class="small text-muted mb-2">' + note + '</p>' : '') +
+        '<form method="post" action="/admin/orders/setting/' + cardKey + '">' +
+          '<input type="hidden" name="csrfToken" value="' + csrfToken + '">' +
+          '<div class="mb-2"><label class="form-label small">Message shown to customer</label>' +
+            '<textarea name="message" class="form-control" rows="2">' + esc(s.message) + '</textarea></div>' +
+          '<div class="row g-2 mb-2">' +
+            '<div class="col-6"><label class="form-label small">Support Number</label>' +
+              '<input type="text" name="supportNumber" class="form-control form-control-sm" value="' + esc(s.supportNumber) + '"></div>' +
+            '<div class="col-3"><label class="form-label small">Order Limit</label>' +
+              '<input type="number" min="0" name="orderLimit" class="form-control form-control-sm" value="' + (s.orderLimit || 0) + '"></div>' +
+            '<div class="col-3"><label class="form-label small">Block (min)</label>' +
+              '<input type="number" min="1" name="blockMinutes" class="form-control form-control-sm" value="' + (s.blockMinutes || 60) + '"></div>' +
+          '</div>' +
+          '<div class="mb-2"><label class="form-label small">Status</label>' +
+            '<select name="status" class="form-select form-select-sm">' +
+              '<option value="on"' + (s.status ? ' selected' : '') + '>ON</option>' +
+              '<option value="off"' + (!s.status ? ' selected' : '') + '>OFF</option>' +
+            '</select></div>' +
+          '<button type="submit" class="btn btn-brand btn-sm w-100">Save Changes</button>' +
+        '</form>' +
+      '</div>';
+  }
+%>
+
+<div class="order-setting-grid">
+  <%- simpleCard('numberBlocked', 'Number Blocked', 'bi-telephone-x', 'Save-only for now — blocking a specific phone number needs an Order Block list, which isn\'t built yet.') %>
+  <%- simpleCard('ipBlocked', 'IP Blocked', 'bi-hdd-network', 'Save-only for now — blocking a specific IP needs an Order Block list, which isn\'t built yet.') %>
+  <%- simpleCard('vpnBlocked', 'VPN Blocked', 'bi-shield-slash', 'Save-only — real VPN detection needs a paid third-party service that isn\'t connected.') %>
+  <%- simpleCard('incognitoBlocked', 'Incognito Mode Blocked', 'bi-incognito', 'Save-only — detecting private/incognito browsing needs a paid third-party service that isn\'t connected.') %>
+  <%- simpleCard('numberValidation', 'Number Validation', 'bi-patch-check', 'Enforced — checkout is rejected if the phone number isn\'t a valid Bangladeshi mobile number.') %>
+  <%- limitCard('sameNumberLimit', 'Same Number Limit', 'bi-phone', 'Enforced — blocks checkout once this phone number places the Order Limit within the Block window.') %>
+  <%- limitCard('sameIpLimit', 'Same IP Limit', 'bi-globe', 'Enforced — blocks checkout once this IP address places the Order Limit within the Block window.') %>
+  <%- limitCard('cookiesLimit', 'Cookies Limit', 'bi-cookie', 'Enforced — blocks checkout once this browser (session cookie) places the Order Limit within the Block window.') %>
+  <%- limitCard('fingerprintLimit', 'Fingerprint Limit', 'bi-fingerprint', 'Save-only — real device fingerprinting needs a paid third-party service that isn\'t connected.') %>
+
+  <div class="admin-card order-setting-card">
+    <% var fos = settings.fakeOrderSetting || {}; %>
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <h6 class="mb-0"><i class="bi bi-exclamation-octagon me-2"></i>Fake Order Setting</h6>
+      <span class="badge <%= fos.status ? 'bg-success' : 'bg-secondary' %>"><%= fos.status ? 'ON' : 'OFF' %></span>
+    </div>
+    <p class="small text-muted mb-2">Save-only — an OTP-verification checkout flow (SMS gateway) isn't built yet, so this can't yet block fake orders automatically.</p>
+    <form method="post" action="/admin/orders/setting/fakeOrderSetting">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+      <div class="mb-2">
+        <label class="form-label small">Cancel order if delivery success rate is below (%)</label>
+        <input type="number" min="0" max="100" name="deliveryPercent" class="form-control form-control-sm" value="<%= fos.deliveryPercent || 0 %>">
+      </div>
+      <div class="mb-2">
+        <label class="form-label small">System Setting</label>
+        <select name="systemSetting" class="form-select form-select-sm">
+          <option value="OTP Mode" <%= (fos.systemSetting || 'OTP Mode') === 'OTP Mode' ? 'selected' : '' %>>OTP Mode</option>
+          <option value="Manual Call Mode" <%= fos.systemSetting === 'Manual Call Mode' ? 'selected' : '' %>>Manual Call Mode</option>
+        </select>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="on" <%= fos.status ? 'selected' : '' %>>ON</option>
+          <option value="off" <%= !fos.status ? 'selected' : '' %>>OFF</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-brand btn-sm w-100">Save Changes</button>
+    </form>
+  </div>
+
+  <div class="admin-card order-setting-card">
+    <% var omo = settings.offerMissedOrder || {}; %>
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <h6 class="mb-0"><i class="bi bi-gift me-2"></i>Offer Missed Order Message</h6>
+      <span class="badge <%= omo.status ? 'bg-success' : 'bg-secondary' %>"><%= omo.status ? 'ON' : 'OFF' %></span>
+    </div>
+    <p class="small text-muted mb-2">Save-only — showing an exit-intent coupon popup on checkout needs storefront JS that isn't built yet.</p>
+    <form method="post" action="/admin/orders/setting/offerMissedOrder">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+      <div class="mb-2">
+        <label class="form-label small">Heading</label>
+        <input type="text" name="heading" class="form-control form-control-sm" value="<%= omo.heading || '' %>">
+      </div>
+      <div class="mb-2">
+        <label class="form-label small">Message</label>
+        <textarea name="message" class="form-control" rows="2"><%= omo.message || '' %></textarea>
+      </div>
+      <div class="row g-2 mb-2">
+        <div class="col-6"><label class="form-label small">Coupon Code</label>
+          <input type="text" name="couponCode" class="form-control form-control-sm" value="<%= omo.couponCode || '' %>"></div>
+        <div class="col-3"><label class="form-label small">Value</label>
+          <input type="number" min="0" name="couponValue" class="form-control form-control-sm" value="<%= omo.couponValue || 0 %>"></div>
+        <div class="col-3"><label class="form-label small">Delay (sec)</label>
+          <input type="number" min="0" name="timeSeconds" class="form-control form-control-sm" value="<%= omo.timeSeconds || 3 %>"></div>
+      </div>
+      <div class="mb-2">
+        <label class="form-label small">Status</label>
+        <select name="status" class="form-select form-select-sm">
+          <option value="on" <%= omo.status ? 'selected' : '' %>>ON</option>
+          <option value="off" <%= !omo.status ? 'selected' : '' %>>OFF</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-brand btn-sm w-100">Save Changes</button>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

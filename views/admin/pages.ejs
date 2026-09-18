@@ -1,18 +1,18 @@
 <%- include('partials/admin-header') %>
 
 <div class="admin-card">
-  <h5>স্ট্যাটিক পেজ ম্যানেজমেন্ট</h5>
-  <p class="text-muted" style="margin-top:-10px;">এখান থেকে "About Us", "FAQ", "How to order", "How to pay" এবং পলিসি পেজগুলোর লেখা এডিট করুন — সাইটে সাথে সাথে বদলে যাবে।</p>
+  <h5>Static Page Management</h5>
+  <p class="text-muted" style="margin-top:-10px;">Edit the text for "About Us", "FAQ", "How to order", "How to pay" and policy pages here — changes apply to the site immediately.</p>
   <div class="table-responsive">
     <table class="table align-middle">
-      <thead><tr><th>পেজ</th><th>শিরোনাম</th><th>একশন</th></tr></thead>
+      <thead><tr><th>Page</th><th>Title</th><th>Action</th></tr></thead>
       <tbody>
         <% pages.forEach(function (p) { %>
           <tr>
             <td><code><%= p.key %></code></td>
             <td><%= p.title %></td>
             <td>
-              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPage<%= p.key %>"><i class="bi bi-pencil"></i> এডিট</button>
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPage<%= p.key %>"><i class="bi bi-pencil"></i> Edit</button>
             </td>
           </tr>
 
@@ -22,20 +22,20 @@
                 <form method="post" action="/admin/pages/<%= p.key %>">
                   <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                   <div class="modal-header">
-                    <h5 class="modal-title"><%= p.title %> এডিট করুন</h5>
+                    <h5 class="modal-title">Edit <%= p.title %></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                   </div>
                   <div class="modal-body">
                     <div class="mb-3">
-                      <label class="form-label">শিরোনাম</label>
+                      <label class="form-label">Title</label>
                       <input type="text" name="title" class="form-control" value="<%= p.title %>" required>
                     </div>
                     <div class="mb-3">
-                      <label class="form-label">বিস্তারিত লেখা</label>
+                      <label class="form-label">Content</label>
                       <textarea name="body" class="form-control" rows="8"><%= p.body %></textarea>
                     </div>
                   </div>
-                  <div class="modal-footer"><button type="submit" class="btn btn-brand">সংরক্ষণ করুন</button></div>
+                  <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
                 </form>
               </div>
             </div>

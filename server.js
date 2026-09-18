@@ -14,6 +14,15 @@ const { csrfMiddleware } = require('./middleware/csrf');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Render.com (and most PaaS hosts) sit behind a reverse proxy, so without
+// this req.ip always resolves to the proxy's address instead of the real
+// visitor — which would break the Same IP Limit check in Admin > Orders >
+// Order Setting. Same env var the session cookie's `secure` flag already
+// keys off of.
+if (process.env.TRUST_PROXY === 'true') {
+  app.set('trust proxy', 1);
+}
+
 // ---- View engine ----
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));

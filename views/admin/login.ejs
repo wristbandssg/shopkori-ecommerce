@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -22,14 +22,14 @@
     <form method="post" action="/admin/login">
       <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
       <div class="mb-3">
-        <label class="form-label">ইউজারনেম / ইমেইল</label>
+        <label class="form-label">Username / Email</label>
         <input type="text" name="username" class="form-control" required autofocus value="<%= formData.username || '' %>">
       </div>
       <div class="mb-3">
-        <label class="form-label">পাসওয়ার্ড</label>
+        <label class="form-label">Password</label>
         <input type="password" name="password" class="form-control" required>
       </div>
-      <button type="submit" class="btn btn-brand w-100">লগইন</button>
+      <button type="submit" class="btn btn-brand w-100">Login</button>
     </form>
     <p class="text-center text-muted mt-3 small">Demo login: <strong>admin</strong> / <strong>admin123</strong></p>
   </div>

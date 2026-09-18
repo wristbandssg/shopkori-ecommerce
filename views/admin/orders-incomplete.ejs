@@ -1,0 +1,87 @@
+<%- include('partials/admin-header') %>
+
+<p class="text-muted mb-3">Checkouts started with an online payment (bKash / SSLCommerz) that was never confirmed as paid — i.e. the customer left before finishing payment. Cash-on-delivery orders confirm instantly, so they never show up here.</p>
+
+<div class="order-tabs mb-3">
+  <a href="/admin/orders/incomplete?tab=all" class="order-tab <%= tab === 'all' ? 'active' : '' %>">All <span class="order-tab-count"><%= totalAll %></span></a>
+  <a href="/admin/orders/incomplete?tab=new" class="order-tab <%= tab === 'new' ? 'active' : '' %>">New <span class="order-tab-count"><%= countMap.new %></span></a>
+  <a href="/admin/orders/incomplete?tab=cancelled" class="order-tab <%= tab === 'cancelled' ? 'active' : '' %>">Cancel <span class="order-tab-count"><%= countMap.cancelled %></span></a>
+  <a href="/admin/orders/incomplete?tab=hold" class="order-tab <%= tab === 'hold' ? 'active' : '' %>">Hold <span class="order-tab-count"><%= countMap.hold %></span></a>
+</div>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex gap-2 flex-wrap">
+    <input type="hidden" name="tab" value="<%= tab %>">
+    <input type="text" name="q" class="form-control" style="max-width:260px" placeholder="Search order#, name or phone" value="<%= q %>">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Search</button>
+  </form>
+</div>
+
+<div class="admin-card">
+  <form method="post" id="incompleteForm">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+      <div class="form-check">
+        <input type="checkbox" class="form-check-input js-select-all" id="selectAllIncomplete">
+        <label class="form-check-label" for="selectAllIncomplete">Select All</label>
+      </div>
+      <select name="employeeId" class="form-select" style="max-width:220px">
+        <option value="">-- Assign to employee --</option>
+        <% employees.forEach(function (e) { %>
+          <option value="<%= e._id %>"><%= e.fullName || e.username %></option>
+        <% }); %>
+      </select>
+      <button type="submit" formaction="/admin/orders/incomplete/assign" class="btn btn-outline-primary btn-sm">Assign Selected</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr><th></th><th>Order ID</th><th>Customer Info</th><th>Amount</th><th>Payment Method</th><th>Employee</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <% orders.forEach(function (o) { %>
+            <tr>
+              <td><input type="checkbox" class="form-check-input" name="ids" value="<%= o._id %>"></td>
+              <td>
+                <strong>#<%= o.orderNumber %></strong>
+                <br><small class="text-muted"><%= new Date(o.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></small>
+              </td>
+              <td><%= o.customerName %><br><small class="text-muted"><i class="bi bi-telephone"></i> <%= o.customerPhone %></small></td>
+              <td><%= currency(o.total) %></td>
+              <td><span class="badge bg-light text-dark border"><%= o.paymentMethod.toUpperCase() %></span></td>
+              <td><%= o.assignedEmployee ? (o.assignedEmployee.fullName || o.assignedEmployee.username) : '—' %></td>
+              <td>
+                <span class="badge bg-<%= o.incompleteStatus === 'cancelled' ? 'danger' : (o.incompleteStatus === 'hold' ? 'warning' : 'secondary') %>">
+                  <%= o.incompleteStatus === 'cancelled' ? 'Cancelled' : (o.incompleteStatus === 'hold' ? 'On Hold' : 'New') %>
+                </span>
+              </td>
+              <td>
+                <div class="d-flex gap-1">
+                  <a href="/admin/orders/<%= o._id %>" class="btn btn-sm btn-outline-primary">Details</a>
+                  <% if (o.incompleteStatus !== 'hold') { %>
+                    <form method="post" action="/admin/orders/incomplete/<%= o._id %>/status" class="d-inline">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="incompleteStatus" value="hold">
+                      <button type="submit" class="btn btn-sm btn-outline-warning">Hold</button>
+                    </form>
+                  <% } %>
+                  <% if (o.incompleteStatus !== 'cancelled') { %>
+                    <form method="post" action="/admin/orders/incomplete/<%= o._id %>/status" class="d-inline">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="incompleteStatus" value="cancelled">
+                      <button type="submit" class="btn btn-sm btn-outline-danger">Cancel</button>
+                    </form>
+                  <% } %>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+          <% if (!orders.length) { %><tr><td colspan="8" class="text-center text-muted py-4">No incomplete orders found.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

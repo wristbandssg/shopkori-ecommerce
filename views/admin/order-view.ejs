@@ -3,10 +3,10 @@
 <div class="row g-4">
   <div class="col-lg-8">
     <div class="admin-card">
-      <h5>প্রোডাক্ট তালিকা</h5>
+      <h5>Order Items</h5>
       <div class="table-responsive">
         <table class="table align-middle">
-          <thead><tr><th>প্রোডাক্ট</th><th>মূল্য</th><th>পরিমাণ</th><th>সাবটোটাল</th></tr></thead>
+          <thead><tr><th>Product</th><th>Price</th><th>Qty</th><th>Subtotal</th></tr></thead>
           <tbody>
             <% order.items.forEach(function (item) { %>
               <tr>
@@ -21,47 +21,91 @@
             <% }); %>
           </tbody>
           <tfoot>
-            <tr><td colspan="3" class="text-end">সাবটোটাল</td><td><%= currency(order.subtotal) %></td></tr>
-            <tr><td colspan="3" class="text-end">ডেলিভারি চার্জ</td><td><%= currency(order.shippingFee) %></td></tr>
-            <tr><td colspan="3" class="text-end fw-bold">সর্বমোট</td><td class="fw-bold"><%= currency(order.total) %></td></tr>
+            <tr><td colspan="3" class="text-end">Subtotal</td><td><%= currency(order.subtotal) %></td></tr>
+            <tr><td colspan="3" class="text-end">Delivery Charge</td><td><%= currency(order.shippingFee) %></td></tr>
+            <tr><td colspan="3" class="text-end fw-bold">Grand Total</td><td class="fw-bold"><%= currency(order.total) %></td></tr>
           </tfoot>
         </table>
       </div>
+    </div>
+
+    <div class="admin-card mt-4">
+      <h5>Activity Log</h5>
+      <% if (order.activityLog && order.activityLog.length) { %>
+        <ul class="list-unstyled mb-0">
+          <% order.activityLog.slice().reverse().forEach(function (a) { %>
+            <li class="mb-2 pb-2 border-bottom">
+              <div><%= a.message %></div>
+              <small class="text-muted"><%= new Date(a.at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></small>
+            </li>
+          <% }); %>
+        </ul>
+      <% } else { %>
+        <p class="text-muted mb-0">No activity recorded yet.</p>
+      <% } %>
     </div>
   </div>
 
   <div class="col-lg-4">
     <div class="admin-card">
-      <h5>কাস্টমার তথ্য</h5>
+      <h5>Customer Info</h5>
       <p class="mb-1"><strong><%= order.customerName %></strong></p>
       <p class="mb-1"><i class="bi bi-telephone"></i> <%= order.customerPhone %></p>
       <% if (order.customerEmail) { %><p class="mb-1"><i class="bi bi-envelope"></i> <%= order.customerEmail %></p><% } %>
       <p class="mb-1"><i class="bi bi-geo-alt"></i> <%= order.shippingAddress %>, <%= order.shippingCity %></p>
-      <% if (order.notes) { %><p class="mb-0"><strong>নোট:</strong> <%= order.notes %></p><% } %>
+      <% if (order.notes) { %><p class="mb-0"><strong>Note:</strong> <%= order.notes %></p><% } %>
+      <p class="mb-0 mt-2"><span class="badge bg-light text-dark border"><%= order.source === 'manual' ? 'Manual Order' : 'Website Order' %></span></p>
     </div>
 
     <div class="admin-card mt-4">
-      <h5>স্ট্যাটাস আপডেট</h5>
+      <h5>Update Order</h5>
       <form method="post" action="/admin/orders/<%= order._id %>">
         <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
         <div class="mb-3">
-          <label class="form-label">অর্ডার স্ট্যাটাস</label>
+          <label class="form-label">Order Status</label>
           <select name="status" class="form-select">
-            <% ['pending', 'processing', 'shipped', 'delivered', 'cancelled'].forEach(function (s) { %>
-              <option value="<%= s %>" <%= order.status === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option>
+            <% ORDER_STATUSES.forEach(function (s) { %>
+              <option value="<%= s.value %>" <%= order.status === s.value ? 'selected' : '' %>><%= s.label %></option>
             <% }); %>
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label">পেমেন্ট স্ট্যাটাস</label>
+          <label class="form-label">Payment Status</label>
           <select name="paymentStatus" class="form-select">
             <% ['unpaid', 'pending', 'paid', 'failed', 'cancelled'].forEach(function (s) { %>
               <option value="<%= s %>" <%= order.paymentStatus === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option>
             <% }); %>
           </select>
         </div>
-        <p class="small text-muted mb-3">পেমেন্ট মেথড: <strong><%= order.paymentMethod.toUpperCase() %></strong><% if (order.transactionId) { %><br>Transaction ID: <code><%= order.transactionId %></code><% } %></p>
-        <button type="submit" class="btn btn-brand w-100">আপডেট করুন</button>
+        <p class="small text-muted mb-3">Payment Method: <strong><%= order.paymentMethod.toUpperCase() %></strong><% if (order.transactionId) { %><br>Transaction ID: <code><%= order.transactionId %></code><% } %></p>
+
+        <div class="mb-3">
+          <label class="form-label">Courier</label>
+          <select name="courier" class="form-select">
+            <% COURIERS.forEach(function (c) { %>
+              <option value="<%= c.value %>" <%= order.courier === c.value ? 'selected' : '' %>><%= c.label %></option>
+            <% }); %>
+          </select>
+          <div class="form-text">Add a Pathao / Steadfast courier account (Manage Delivery — coming soon) before this can push tracking automatically.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Courier Tracking ID</label>
+          <input type="text" name="courierTrackingId" class="form-control" value="<%= order.courierTrackingId || '' %>">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Assigned Employee</label>
+          <select name="assignedEmployee" class="form-select">
+            <option value="">-- Unassigned --</option>
+            <% employees.forEach(function (e) { %>
+              <option value="<%= e._id %>" <%= order.assignedEmployee && String(order.assignedEmployee._id) === String(e._id) ? 'selected' : '' %>><%= e.fullName || e.username %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Admin Note</label>
+          <textarea name="adminNote" class="form-control" rows="3"><%= order.adminNote || '' %></textarea>
+        </div>
+        <button type="submit" class="btn btn-brand w-100">Update</button>
       </form>
     </div>
   </div>

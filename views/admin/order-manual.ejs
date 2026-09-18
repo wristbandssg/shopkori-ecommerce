@@ -1,0 +1,100 @@
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger">
+    <ul class="mb-0">
+      <% errors.forEach(function (e) { %><li><%= e %></li><% }); %>
+    </ul>
+  </div>
+<% } %>
+
+<form method="post" action="/admin/orders/manual">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="admin-card">
+        <h5>Select Products</h5>
+        <div class="table-responsive" style="max-height:480px; overflow-y:auto;">
+          <table class="table align-middle">
+            <thead><tr><th></th><th>Product</th><th>Price</th><th>Stock</th><th style="width:100px">Qty</th></tr></thead>
+            <tbody>
+              <% products.forEach(function (p) { %>
+                <% var price = p.salePrice && p.salePrice < p.price ? p.salePrice : p.price; %>
+                <tr>
+                  <td><img src="<%= productImageUrl(p.image) %>" class="admin-thumb"></td>
+                  <td>
+                    <%= p.name %>
+                    <% if (p.category) { %><br><small class="text-muted"><%= p.category.name %></small><% } %>
+                  </td>
+                  <td><%= currency(price) %></td>
+                  <td><%= p.stock %></td>
+                  <td><input type="number" name="qty[<%= p._id %>]" class="form-control form-control-sm" min="0" max="<%= p.stock %>" value="<%= (formData.qty && formData.qty[p._id]) || 0 %>"></td>
+                </tr>
+              <% }); %>
+              <% if (!products.length) { %><tr><td colspan="5" class="text-center text-muted">No active products found.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="admin-card">
+        <h5>Customer & Order Info</h5>
+        <div class="mb-3">
+          <label class="form-label">Customer Name *</label>
+          <input type="text" name="name" class="form-control" value="<%= formData.name || '' %>" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Phone *</label>
+          <input type="text" name="phone" class="form-control" value="<%= formData.phone || '' %>" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control" value="<%= formData.email || '' %>">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Delivery Address *</label>
+          <textarea name="address" class="form-control" rows="2" required><%= formData.address || '' %></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">City</label>
+          <input type="text" name="city" class="form-control" value="<%= formData.city || '' %>">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Note</label>
+          <textarea name="notes" class="form-control" rows="2"><%= formData.notes || '' %></textarea>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label">Payment Method</label>
+            <select name="paymentMethod" class="form-select">
+              <option value="cod" <%= formData.paymentMethod === 'cod' || !formData.paymentMethod ? 'selected' : '' %>>Cash on Delivery</option>
+              <option value="bkash" <%= formData.paymentMethod === 'bkash' ? 'selected' : '' %>>bKash</option>
+              <option value="sslcommerz" <%= formData.paymentMethod === 'sslcommerz' ? 'selected' : '' %>>SSLCommerz</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label">Payment Status</label>
+            <select name="paymentStatus" class="form-select">
+              <% ['unpaid', 'pending', 'paid'].forEach(function (s) { %>
+                <option value="<%= s %>" <%= formData.paymentStatus === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option>
+              <% }); %>
+            </select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Order Status</label>
+          <select name="status" class="form-select">
+            <% ORDER_STATUSES.forEach(function (s) { %>
+              <option value="<%= s.value %>" <%= formData.status === s.value || (!formData.status && s.value === 'confirmed') ? 'selected' : '' %>><%= s.label %></option>
+            <% }); %>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-brand w-100">Create Order</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<%- include('partials/admin-footer') %>

@@ -2,27 +2,27 @@
 
 <div class="admin-card">
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-    <h5 class="mb-0">সকল ব্লগ পোস্ট</h5>
-    <a href="/admin/blog/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> নতুন পোস্ট লিখুন</a>
+    <h5 class="mb-0">All Blog Posts</h5>
+    <a href="/admin/blog/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> Write New Post</a>
   </div>
 
   <div class="table-responsive">
     <table class="table align-middle">
-      <thead><tr><th>ছবি</th><th>শিরোনাম</th><th>তারিখ</th><th>স্ট্যাটাস</th><th>একশন</th></tr></thead>
+      <thead><tr><th>Image</th><th>Title</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
       <tbody>
         <% posts.forEach(function (p) { %>
           <tr>
             <td><img src="<%= p.coverImage ? productImageUrl(p.coverImage) : '/images/product-placeholder.svg' %>" class="admin-thumb"></td>
             <td><%= p.title %><br><small class="text-muted">/blog/<%= p.slug %></small></td>
-            <td><%= p.createdAt.toLocaleDateString('bn-BD') %></td>
+            <td><%= p.createdAt.toLocaleDateString('en-GB') %></td>
             <td><span class="badge bg-<%= p.status ? 'success' : 'secondary' %>"><%= p.status ? 'Published' : 'Draft' %></span></td>
             <td class="text-nowrap">
               <a href="/admin/blog/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-              <a href="/admin/blog/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('আপনি কি নিশ্চিত এই পোস্টটি ডিলিট করতে চান?')"><i class="bi bi-trash"></i></a>
+              <a href="/admin/blog/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this post?')"><i class="bi bi-trash"></i></a>
             </td>
           </tr>
         <% }); %>
-        <% if (!posts.length) { %><tr><td colspan="5" class="text-center text-muted">এখনো কোনো ব্লগ পোস্ট লেখা হয়নি।</td></tr><% } %>
+        <% if (!posts.length) { %><tr><td colspan="5" class="text-center text-muted">No blog posts yet.</td></tr><% } %>
       </tbody>
     </table>
   </div>

@@ -165,6 +165,53 @@ body { font-family: 'Poppins', sans-serif; background: var(--admin-bg); margin: 
 .status-badge.status-delivered { background: #2e9e5b; }
 .status-badge.status-cancelled { background: #d9534f; }
 
+/* ---------- Sidebar submenu badge counts ---------- */
+.submenu-count {
+  margin-left: auto;
+  background: #eee;
+  color: #777;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+.admin-submenu a.active .submenu-count { background: rgba(255,255,255,0.35); color: #fff; }
+
+/* ---------- Orders: status tab pills (All Orders, Incomplete, etc.) ---------- */
+.order-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.order-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--admin-text);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 500;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid transparent;
+}
+.order-tab:hover { color: var(--admin-pink); border-color: var(--admin-pink-soft); }
+.order-tab.active { background: var(--admin-pink); color: #fff; box-shadow: 0 4px 10px rgba(236,14,140,0.28); }
+.order-tab-count {
+  background: rgba(0,0,0,0.08);
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.order-tab.active .order-tab-count { background: rgba(255,255,255,0.3); }
+
+/* ---------- Order Setting cards ---------- */
+.order-setting-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+.order-setting-card h6 { color: var(--admin-navy); font-weight: 700; }
+
 /* ---------- Login page ---------- */
 .admin-login-body {
   background: linear-gradient(135deg, var(--admin-navy) 0%, var(--admin-navy-dark) 100%);

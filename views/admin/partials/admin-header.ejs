@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="bn">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,22 +18,22 @@
       <span>Admin Panel</span>
     </div>
     <nav class="admin-nav">
-      <a href="/admin" class="<%= currentPage === 'dashboard' ? 'active' : '' %>"><i class="bi bi-speedometer2"></i> ড্যাশবোর্ড</a>
+      <a href="/admin" class="<%= currentPage === 'dashboard' ? 'active' : '' %>"><i class="bi bi-speedometer2"></i> Dashboard</a>
 
       <button class="admin-nav-toggle <%= currentPage === 'orders' ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navOrders" aria-expanded="<%= currentPage === 'orders' ? 'true' : 'false' %>">
-        <i class="bi bi-bag-check"></i> অর্ডার <i class="bi bi-chevron-down chevron"></i>
+        <i class="bi bi-bag-check"></i> Orders <i class="bi bi-chevron-down chevron"></i>
       </button>
       <div class="collapse admin-submenu <%= currentPage === 'orders' ? 'show' : '' %>" id="navOrders">
-        <a href="/admin/orders" class="<%= currentSubPath === '/orders' ? 'active' : '' %>">All Orders</a>
-        <a href="/admin/orders/incomplete" class="<%= currentSubPath === '/orders/incomplete' ? 'active' : '' %>">Incomplete</a>
-        <a href="/admin/orders?status=delivered" class="<%= (currentSubPath === '/orders' && currentQueryStatus === 'delivered') ? 'active' : '' %>">Delivered</a>
-        <a href="/admin/orders/returned" class="<%= currentSubPath === '/orders/returned' ? 'active' : '' %>">Returned</a>
-        <a href="/admin/orders/delivery-issue" class="<%= currentSubPath === '/orders/delivery-issue' ? 'active' : '' %>">Delivery Issue</a>
+        <a href="/admin/orders" class="<%= currentSubPath === '/orders' ? 'active' : '' %>">All Orders <span class="submenu-count"><%= orderCounts.all %></span></a>
+        <a href="/admin/orders/incomplete" class="<%= currentSubPath === '/orders/incomplete' ? 'active' : '' %>">Incomplete <span class="submenu-count"><%= orderCounts.incomplete %></span></a>
+        <a href="/admin/orders?status=delivered" class="<%= (currentSubPath === '/orders' && currentQueryStatus === 'delivered') ? 'active' : '' %>">Delivered <span class="submenu-count"><%= orderCounts.delivered %></span></a>
+        <a href="/admin/orders/returned" class="<%= currentSubPath === '/orders/returned' ? 'active' : '' %>">Returned <span class="submenu-count"><%= orderCounts.returned %></span></a>
+        <a href="/admin/orders/delivery-issue" class="<%= currentSubPath === '/orders/delivery-issue' ? 'active' : '' %>">Delivery Issue <span class="submenu-count"><%= orderCounts.deliveryIssue %></span></a>
         <a href="/admin/orders/follow-up" class="<%= currentSubPath === '/orders/follow-up' ? 'active' : '' %>">Follow Up</a>
         <a href="/admin/orders/user-activity" class="<%= currentSubPath === '/orders/user-activity' ? 'active' : '' %>">User Activity</a>
         <a href="/admin/orders/near-by" class="<%= currentSubPath === '/orders/near-by' ? 'active' : '' %>">Near By Orders</a>
         <a href="/admin/orders/blocked" class="<%= currentSubPath === '/orders/blocked' ? 'active' : '' %>">Order Block</a>
-        <a href="/admin/orders/deleted" class="<%= currentSubPath === '/orders/deleted' ? 'active' : '' %>">Deleted Orders</a>
+        <a href="/admin/orders/deleted" class="<%= currentSubPath === '/orders/deleted' ? 'active' : '' %>">Deleted Orders <span class="submenu-count"><%= orderCounts.deleted %></span></a>
         <a href="/admin/orders/setting" class="<%= currentSubPath === '/orders/setting' ? 'active' : '' %>">Order Setting</a>
         <a href="/admin/orders/missed" class="<%= currentSubPath === '/orders/missed' ? 'active' : '' %>">Missed Orders</a>
         <a href="/admin/orders/after-confirm" class="<%= currentSubPath === '/orders/after-confirm' ? 'active' : '' %>">After Confirm</a>
@@ -78,8 +78,8 @@
         <a href="/admin/landing-page/advance" class="<%= currentSubPath === '/landing-page/advance' ? 'active' : '' %>">Advance Landing</a>
       </div>
 
-      <a href="/admin/blog" class="<%= currentPage === 'blog' ? 'active' : '' %>"><i class="bi bi-journal-richtext"></i> ব্লগ</a>
-      <a href="/admin/pages" class="<%= currentPage === 'pages' ? 'active' : '' %>"><i class="bi bi-file-earmark-text"></i> পেজ ম্যানেজমেন্ট</a>
+      <a href="/admin/blog" class="<%= currentPage === 'blog' ? 'active' : '' %>"><i class="bi bi-journal-richtext"></i> Blog</a>
+      <a href="/admin/pages" class="<%= currentPage === 'pages' ? 'active' : '' %>"><i class="bi bi-file-earmark-text"></i> Pages</a>
 
       <a href="/admin/settings" class="<%= currentPage === 'settings' ? 'active' : '' %>"><i class="bi bi-gear"></i> Setting</a>
       <a href="/admin/customization" class="<%= currentPage === 'customization' ? 'active' : '' %>"><i class="bi bi-sliders"></i> Customization</a>
@@ -128,11 +128,11 @@
       <a href="/admin/referral-program" class="<%= currentPage === 'referral-program' ? 'active' : '' %>"><i class="bi bi-share"></i> Referral Program</a>
       <a href="/admin/our-service" class="<%= currentPage === 'our-service' ? 'active' : '' %>"><i class="bi bi-award"></i> Our Service</a>
       <a href="/admin/help-support" class="<%= currentPage === 'help-support' ? 'active' : '' %>"><i class="bi bi-question-circle"></i> Help & Support</a>
-      <a href="/admin/reports" class="<%= currentPage === 'reports' ? 'active' : '' %>"><i class="bi bi-graph-up-arrow"></i> সেলস রিপোর্ট</a>
+      <a href="/admin/reports" class="<%= currentPage === 'reports' ? 'active' : '' %>"><i class="bi bi-graph-up-arrow"></i> Sales Report</a>
 
       <hr>
-      <a href="/" target="_blank"><i class="bi bi-eye"></i> স্টোর দেখুন</a>
-      <a href="/admin/logout"><i class="bi bi-box-arrow-right"></i> লগআউট</a>
+      <a href="/" target="_blank"><i class="bi bi-eye"></i> View Store</a>
+      <a href="/admin/logout"><i class="bi bi-box-arrow-right"></i> Logout</a>
     </nav>
   </aside>
 
