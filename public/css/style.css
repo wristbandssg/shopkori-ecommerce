@@ -1,16 +1,16 @@
 /* =========================================================
    ShopKori Storefront Styles
-   Brand palette: Navy Blue (#1e3a5f) + Gold accent (#d4a537)
+   Brand palette: Cream/Off-white + Baby Pink + White + Dark Brown/Charcoal
    ========================================================= */
 
 :root {
-  --brand-navy: #1e3a5f;
-  --brand-navy-dark: #122744;
-  --brand-gold: #d4a537;
-  --brand-gold-dark: #b8891f;
-  --brand-red: #d94f4f;
-  --text-dark: #222;
-  --bg-light: #f7f8fa;
+  --brand-navy: #D9789A;       /* Primary accent (Baby Pink) - was navy */
+  --brand-navy-dark: #8C4A5E;  /* Darker rose-brown (was navy-dark) */
+  --brand-gold: #F7CBDA;       /* Secondary accent (Soft Pink) - was gold */
+  --brand-gold-dark: #EDA9C0;  /* Darker soft pink for hover (was gold-dark) */
+  --brand-red: #D6336C;        /* Rose-red for sale/alert badges */
+  --text-dark: #3B2A2A;        /* Dark Brown / Charcoal text */
+  --bg-light: #FBF3EF;         /* Cream / Off-white section background */
   --radius: 8px;
 }
 
@@ -19,7 +19,7 @@
 body {
   font-family: 'Hind Siliguri', 'Poppins', sans-serif;
   color: var(--text-dark);
-  background: #fff;
+  background: var(--bg-light);
 }
 
 a { text-decoration: none; color: inherit; }
