@@ -3,6 +3,13 @@
   const hasVariants = !!(product.hasVariants && product.variants && product.variants.length);
   const showPurchaseBlock = hasVariants || product.stock > 0;
   const currencySymbol = settings.currency_symbol || '৳';
+  const minOrderQty = Math.max(1, product.minOrderQty || 1);
+  const maxOrderQty = product.maxOrderQty || null;
+  const qtyCap = (stock) => {
+    let cap = product.overselling ? 99999 : Math.max(stock, minOrderQty);
+    if (maxOrderQty) cap = Math.min(cap, maxOrderQty);
+    return cap;
+  };
 %>
 <%- include('partials/header') %>
 
@@ -37,7 +44,7 @@
         <% for (let i = 1; i <= 5; i++) { %>
           <% if (i <= Math.round(rating)) { %><i class="bi bi-star-fill"></i><% } else { %><i class="bi bi-star"></i><% } %>
         <% } %>
-        <span class="rating-num">(<%= rating.toFixed(1) %>) · SKU: <%= product.sku || 'N/A' %></span>
+        <span class="rating-num">(<%= rating.toFixed(1) %>) · SKU: <%= product.sku || 'N/A' %><% if (product.weight) { %> · ওজন: <%= product.weight %> কেজি<% } %></span>
         <% if (product.condition && product.condition !== 'new') { %>
           <span class="badge bg-secondary ms-2"><%= product.condition === 'used' ? 'ব্যবহৃত' : 'রিফার্বিশড' %></span>
         <% } %>
@@ -115,9 +122,16 @@
       <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
         <div class="qty-input">
           <button type="button" class="qty-btn" data-qty-minus>-</button>
-          <input type="number" id="qtyInput" value="1" min="1" max="<%= hasVariants ? 1 : product.stock %>">
+          <input type="number" id="qtyInput" value="<%= minOrderQty %>" min="<%= minOrderQty %>" max="<%= hasVariants ? minOrderQty : qtyCap(product.stock) %>">
           <button type="button" class="qty-btn" data-qty-plus>+</button>
         </div>
+        <% if (minOrderQty > 1 || maxOrderQty) { %>
+          <small class="text-muted d-block w-100">
+            <% if (minOrderQty > 1) { %>সর্বনিম্ন <%= minOrderQty %> টি<% } %>
+            <% if (minOrderQty > 1 && maxOrderQty) { %>, <% } %>
+            <% if (maxOrderQty) { %>সর্বোচ্চ <%= maxOrderQty %> টি<% } %>
+          </small>
+        <% } %>
         <button class="btn btn-add-cart px-4" id="addCartBtn" data-add-cart data-id="<%= product._id %>" data-variant-id="" data-qty-source="qtyInput" <%= (hasVariants && product.variantMandatory) ? 'disabled' : '' %>>
           <i class="bi bi-cart-plus"></i> কার্টে যোগ করুন
         </button>
@@ -130,6 +144,14 @@
         <div><i class="bi bi-shield-check"></i> ১০০% অরিজিনাল প্রোডাক্টের নিশ্চয়তা</div>
         <div><i class="bi bi-cash-coin"></i> ক্যাশ অন ডেলিভারি সুবিধা আছে</div>
       </div>
+
+      <% if (product.tags && product.tags.length) { %>
+        <div class="product-tags mt-3">
+          <% product.tags.forEach(function (t) { %>
+            <a href="/search?q=<%= encodeURIComponent(t) %>" class="tag-pill">#<%= t %></a>
+          <% }); %>
+        </div>
+      <% } %>
     </div>
   </div>
 
@@ -178,6 +200,8 @@
   var overselling = <%= product.overselling ? 'true' : 'false' %>;
   var productId = '<%= product._id %>';
   var currencySymbol = '<%= currencySymbol %>';
+  var minQty = <%= minOrderQty %>;
+  var maxQty = <%= maxOrderQty || 'null' %>;
 
   function formatCurrency(n) {
     return currencySymbol + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -219,8 +243,13 @@
     }
 
     if (qtyInput) {
-      qtyInput.max = overselling ? 99999 : Math.max(stock, 1);
-      if (parseInt(qtyInput.value, 10) > parseInt(qtyInput.max, 10)) qtyInput.value = qtyInput.max;
+      var cap = overselling ? 99999 : Math.max(stock, minQty);
+      if (maxQty) cap = Math.min(cap, maxQty);
+      qtyInput.min = minQty;
+      qtyInput.max = cap;
+      var curVal = parseInt(qtyInput.value, 10) || minQty;
+      if (curVal > cap) qtyInput.value = cap;
+      else if (curVal < minQty) qtyInput.value = minQty;
     }
     if (addCartBtn) {
       addCartBtn.setAttribute('data-variant-id', variantId);

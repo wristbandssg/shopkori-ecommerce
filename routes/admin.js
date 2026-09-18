@@ -804,13 +804,13 @@ function generateSku() {
   return `SKU-${Math.floor(10000 + Math.random() * 90000)}`;
 }
 
-// Cover image, secondary gallery image, and an optional size/variant chart
-// image are three independent uploads on the same form.
-const productUpload = upload.fields([
-  { name: 'image', maxCount: 1 },
-  { name: 'galleryImage', maxCount: 1 },
-  { name: 'variantsChartImage', maxCount: 1 },
-]);
+// Cover image, secondary gallery image, an optional size/variant chart
+// image, AND a per-row variant image ("variantImage[0]", "variantImage[1]",
+// ...) all live on this one form. The variant row count is dynamic (rows
+// are added/removed in the browser), so multer's .fields() — which needs a
+// fixed field list up front — can't be used; .any() accepts every field
+// name and the handler below sorts the files out by fieldname instead.
+const productUpload = upload.any();
 
 router.get('/products', async (req, res, next) => {
   try {
@@ -923,12 +923,12 @@ async function saveProduct(req, res, next, existingId) {
     const existing = existingId ? await Product.findById(existingId) : null;
 
     const {
-      name, categoryId, brandId, supplierId, sku, slug: slugInput,
+      name, categoryId, brandId, supplierId, sku, slug: slugInput, tags: tagsInput,
       videoEmbed, videoPosition,
       shortDescription, description,
-      condition, availability, buyingPrice,
+      condition, availability, buyingPrice, weight,
       price, discountType, discountValue, salePrice,
-      stock, stockAlert,
+      stock, stockAlert, minOrderQty, maxOrderQty,
       offerDescriptionType, offerDescriptionText,
       deliveryType, deliveryFlatRate,
       afterConfirmOfferDescription,
@@ -946,23 +946,45 @@ async function saveProduct(req, res, next, existingId) {
     } else if (priceNum && salePriceNum >= priceNum) {
       errors.push('Sale price must be lower than the regular price.');
     }
+    const minOrderQtyNum = Math.max(1, parseInt(minOrderQty, 10) || 1);
+    const maxOrderQtyNum = maxOrderQty !== undefined && maxOrderQty !== '' ? parseInt(maxOrderQty, 10) : null;
+    if (maxOrderQtyNum !== null && maxOrderQtyNum < minOrderQtyNum) {
+      errors.push('Max Order Quantity must be greater than or equal to Min Order Quantity.');
+    }
+
+    // upload.any() gives req.files as a flat array (not grouped by field
+    // name like .fields() would) — regroup it so the rest of this function
+    // can look files up by field name same as before.
+    const filesByField = {};
+    (req.files || []).forEach((f) => {
+      (filesByField[f.fieldname] = filesByField[f.fieldname] || []).push(f);
+    });
 
     // Variant rows: req.body.variants arrives as an object keyed by row
     // index (e.g. { '0': { label, sku, price, salePrice, stock }, ... })
     // because express.urlencoded({extended:true}) parses bracketed field
-    // names like "variants[0][label]" that way.
+    // names like "variants[0][label]" that way. Each row's own image, if
+    // one was uploaded, arrives as a same-indexed file field
+    // "variantImage[<index>]"; a row without a new upload keeps the
+    // existing variant image at that same row position (best-effort, since
+    // rows aren't tracked by a stable id in this simple table UI).
     const hasVariants = !!req.body.hasVariants;
     let variants = [];
     if (hasVariants && req.body.variants && typeof req.body.variants === 'object') {
-      variants = Object.values(req.body.variants)
-        .filter((v) => v && v.label && v.label.trim())
-        .map((v) => ({
-          label: v.label.trim(),
-          sku: (v.sku || '').trim(),
-          price: v.price !== '' && v.price !== undefined ? parseFloat(v.price) : null,
-          salePrice: v.salePrice !== '' && v.salePrice !== undefined ? parseFloat(v.salePrice) : null,
-          stock: parseInt(v.stock, 10) || 0,
-        }));
+      variants = Object.entries(req.body.variants)
+        .filter(([, v]) => v && v.label && v.label.trim())
+        .map(([idx, v], position) => {
+          const uploadedImage = filesByField[`variantImage[${idx}]`];
+          const existingVariant = existing && existing.variants ? existing.variants[position] : null;
+          return {
+            label: v.label.trim(),
+            sku: (v.sku || '').trim(),
+            price: v.price !== '' && v.price !== undefined ? parseFloat(v.price) : null,
+            salePrice: v.salePrice !== '' && v.salePrice !== undefined ? parseFloat(v.salePrice) : null,
+            stock: parseInt(v.stock, 10) || 0,
+            image: uploadedImage && uploadedImage[0] ? uploadedImage[0].filename : (existingVariant ? existingVariant.image : null),
+          };
+        });
       if (!variants.length) errors.push('Add at least one variant row, or turn Add Variant off.');
     }
 
@@ -974,13 +996,24 @@ async function saveProduct(req, res, next, existingId) {
     if (!Array.isArray(afterConfirmProductIds)) afterConfirmProductIds = [afterConfirmProductIds];
     afterConfirmProductIds = afterConfirmProductIds.filter(Boolean);
 
-    const files = req.files || {};
+    // Additional/secondary categories (checkboxes) — the primary category
+    // is excluded so it's never duplicated between the two.
+    let additionalCategoryIds = req.body.categories || [];
+    if (!Array.isArray(additionalCategoryIds)) additionalCategoryIds = [additionalCategoryIds];
+    additionalCategoryIds = additionalCategoryIds.filter((id) => id && id !== categoryId);
+
+    const tagsList = (tagsInput || '')
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .filter((t, i, arr) => arr.indexOf(t) === i);
+
     let imageName = existing ? existing.image : null;
-    if (files.image && files.image[0]) imageName = files.image[0].filename;
+    if (filesByField.image && filesByField.image[0]) imageName = filesByField.image[0].filename;
     let galleryImageName = existing ? existing.galleryImage : null;
-    if (files.galleryImage && files.galleryImage[0]) galleryImageName = files.galleryImage[0].filename;
+    if (filesByField.galleryImage && filesByField.galleryImage[0]) galleryImageName = filesByField.galleryImage[0].filename;
     let variantsChartImageName = existing ? existing.variantsChartImage : null;
-    if (files.variantsChartImage && files.variantsChartImage[0]) variantsChartImageName = files.variantsChartImage[0].filename;
+    if (filesByField.variantsChartImage && filesByField.variantsChartImage[0]) variantsChartImageName = filesByField.variantsChartImage[0].filename;
 
     if (errors.length) {
       return res.render('admin/product-form', {
@@ -989,10 +1022,14 @@ async function saveProduct(req, res, next, existingId) {
           ...(existing ? existing.toObject() : {}),
           ...req.body,
           categoryId, brandId, supplierId,
+          categories: additionalCategoryIds,
+          tags: tagsList,
           hasVariants,
           variants,
           deliveryMethods,
           afterConfirmProducts: afterConfirmProductIds,
+          minOrderQty: minOrderQtyNum,
+          maxOrderQty: maxOrderQtyNum,
           image: imageName,
           galleryImage: galleryImageName,
           variantsChartImage: variantsChartImageName,
@@ -1008,11 +1045,13 @@ async function saveProduct(req, res, next, existingId) {
 
     const data = {
       category: categoryId || null,
+      categories: additionalCategoryIds,
       brand: brandId || null,
       supplier: supplierId || null,
       name: name.trim(),
       slug,
       sku: (sku || '').trim(),
+      tags: tagsList,
       videoEmbed: (videoEmbed || '').trim(),
       videoPosition: ['top', 'bottom'].includes(videoPosition) ? videoPosition : '',
       shortDescription: (shortDescription || '').trim(),
@@ -1020,12 +1059,15 @@ async function saveProduct(req, res, next, existingId) {
       condition: ['new', 'used', 'refurbished'].includes(condition) ? condition : 'new',
       availability: ['in_stock', 'out_of_stock', 'pre_order'].includes(availability) ? availability : 'in_stock',
       buyingPrice: parseFloat(buyingPrice) || 0,
+      weight: parseFloat(weight) || 0,
       price: priceNum,
       discountType: discountType === 'percent' ? 'percent' : 'flat',
       discountValue: parseFloat(discountValue) || 0,
       salePrice: salePriceNum,
       stock: parseInt(stock, 10) || 0,
       stockAlert: parseInt(stockAlert, 10) || 0,
+      minOrderQty: minOrderQtyNum,
+      maxOrderQty: maxOrderQtyNum,
       overselling: !!req.body.overselling,
       hasVariants,
       variantMandatory: !!req.body.variantMandatory,

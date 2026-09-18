@@ -18,7 +18,11 @@
   const afterConfirmSelectedIds = (d.afterConfirmProducts || []).map(function (x) { return String(x && x._id ? x._id : x); });
   const offerType = (d.offerDescription && d.offerDescription.type) || d.offerDescriptionType || 'fixed';
   const offerText = (d.offerDescription && d.offerDescription.text) || d.offerDescriptionText || '';
-  const extraHead = '<link href="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.snow.css" rel="stylesheet">';
+  const tagsValue = Array.isArray(d.tags) ? d.tags.join(', ') : (d.tags || '');
+  const selectedCategoryIds = (d.categories || []).map(function (x) { return String(x && x._id ? x._id : x); });
+  const weightValue = d.weight || '';
+  const minOrderQtyValue = d.minOrderQty !== undefined && d.minOrderQty !== null ? d.minOrderQty : 1;
+  const maxOrderQtyValue = d.maxOrderQty !== undefined && d.maxOrderQty !== null ? d.maxOrderQty : '';
 %>
 <%- include('partials/admin-header') %>
 
@@ -82,6 +86,25 @@
           <% }); %>
         </select>
         <div class="form-text">No supplier yet? <a href="/admin/products/supplier" target="_blank">Add one</a>.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Tags</label>
+        <input type="text" name="tags" class="form-control" placeholder="e.g. birthday, gift, cake" value="<%= tagsValue %>">
+        <div class="form-text">Comma-separated. Used to help customers find this product in search.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Additional Categories <small class="text-muted">(also list this product under)</small></label>
+        <div class="border rounded p-2" style="max-height:120px; overflow-y:auto;">
+          <% categories.forEach(function (c) { %>
+            <% if (String(c._id) !== selectedCategoryId) { %>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="categories" value="<%= c._id %>" id="cat<%= c._id %>" <%= selectedCategoryIds.includes(String(c._id)) ? 'checked' : '' %>>
+                <label class="form-check-label" for="cat<%= c._id %>"><%= c.name %></label>
+              </div>
+            <% } %>
+          <% }); %>
+          <% if (!categories.length) { %><p class="text-muted small mb-0">No other categories.</p><% } %>
+        </div>
       </div>
     </div>
   </div>
@@ -155,6 +178,19 @@
           <option value="pre_order" <%= d.availability === 'pre_order' ? 'selected' : '' %>>Pre-order</option>
         </select>
       </div>
+      <div class="col-md-3">
+        <label class="form-label">Weight (kg)</label>
+        <input type="number" step="0.01" name="weight" class="form-control" value="<%= weightValue %>">
+        <div class="form-text">Shown as product info — not yet used to calculate shipping cost.</div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Min Order Quantity</label>
+        <input type="number" min="1" name="minOrderQty" class="form-control" value="<%= minOrderQtyValue %>">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Max Order Quantity</label>
+        <input type="number" min="1" name="maxOrderQty" class="form-control" placeholder="No limit" value="<%= maxOrderQtyValue %>">
+      </div>
 
       <div class="col-md-3">
         <label class="form-label">Buying Price</label>
@@ -202,10 +238,14 @@
         <label class="form-label">Variants <small class="text-muted">— each row is its own SKU / price / stock</small></label>
         <div class="table-responsive">
           <table class="table table-sm align-middle" id="variantTable">
-            <thead><tr><th>Label</th><th>SKU</th><th>Price</th><th>Sale Price</th><th>Stock</th><th></th></tr></thead>
+            <thead><tr><th>Image</th><th>Label</th><th>SKU</th><th>Price</th><th>Sale Price</th><th>Stock</th><th></th></tr></thead>
             <tbody id="variantRows">
               <% variantsInitial.forEach(function (v, i) { %>
                 <tr>
+                  <td style="width:70px">
+                    <% if (v.image) { %><img src="<%= productImageUrl(v.image) %>" class="admin-thumb mb-1" style="width:32px;height:32px"><% } %>
+                    <input type="file" name="variantImage[<%= i %>]" class="form-control form-control-sm" accept="image/*">
+                  </td>
                   <td><input type="text" name="variants[<%= i %>][label]" class="form-control form-control-sm" placeholder="e.g. Red / Large" value="<%= v.label || '' %>"></td>
                   <td><input type="text" name="variants[<%= i %>][sku]" class="form-control form-control-sm" value="<%= v.sku || '' %>"></td>
                   <td><input type="number" step="0.01" name="variants[<%= i %>][price]" class="form-control form-control-sm" placeholder="Regular price" value="<%= v.price != null ? v.price : '' %>"></td>
@@ -243,7 +283,28 @@
       </div>
       <div class="col-12">
         <label class="form-label">Long Description *</label>
-        <div id="descEditor" style="min-height:180px; background:#fff;"><%- d.description || '' %></div>
+        <div class="custom-editor" id="descEditorWrap">
+          <div class="custom-editor-toolbar" id="descToolbar">
+            <button type="button" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+            <button type="button" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+            <button type="button" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
+            <button type="button" data-cmd="strikeThrough" title="Strikethrough"><i class="bi bi-type-strikethrough"></i></button>
+            <span class="custom-editor-sep"></span>
+            <button type="button" data-cmd="formatBlock" data-value="H2" title="Heading"><i class="bi bi-type-h2"></i></button>
+            <button type="button" data-cmd="formatBlock" data-value="H3" title="Subheading"><i class="bi bi-type-h3"></i></button>
+            <button type="button" data-cmd="formatBlock" data-value="P" title="Paragraph">¶</button>
+            <span class="custom-editor-sep"></span>
+            <button type="button" data-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+            <button type="button" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
+            <button type="button" data-cmd="formatBlock" data-value="BLOCKQUOTE" title="Quote"><i class="bi bi-quote"></i></button>
+            <span class="custom-editor-sep"></span>
+            <button type="button" id="descLinkBtn" title="Insert link"><i class="bi bi-link-45deg"></i></button>
+            <button type="button" data-cmd="unlink" title="Remove link"><i class="bi bi-link"></i></button>
+            <span class="custom-editor-sep"></span>
+            <button type="button" data-cmd="removeFormat" title="Clear formatting"><i class="bi bi-eraser"></i></button>
+          </div>
+          <div class="custom-editor-body" id="descEditor" contenteditable="true"><%- d.description || '' %></div>
+        </div>
         <textarea name="description" id="description" style="display:none"><%= d.description || '' %></textarea>
       </div>
     </div>
@@ -348,15 +409,40 @@
   </div>
 </form>
 
-<script src="https://cdn.jsdelivr.net/npm/quill@2/dist/quill.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // ---- Rich text editor for Long Description ----
-  var quill = new Quill('#descEditor', { theme: 'snow' });
-  var hiddenDesc = document.getElementById('description');
-  document.getElementById('productForm').addEventListener('submit', function () {
-    hiddenDesc.value = quill.root.innerHTML;
-  });
+  // ---- Custom rich text editor for Long Description ----
+  // Self-contained (contenteditable + document.execCommand) — no external
+  // script/CSS to load, so it can never render broken.
+  (function () {
+    var toolbar = document.getElementById('descToolbar');
+    var editor = document.getElementById('descEditor');
+    var hiddenDesc = document.getElementById('description');
+    var linkBtn = document.getElementById('descLinkBtn');
+
+    function exec(cmd, value) {
+      editor.focus();
+      // Firefox wants the tag wrapped in angle brackets ("<h2>"); Chrome/Edge
+      // accept either — wrapping it works everywhere.
+      var v = (cmd === 'formatBlock' && value) ? '<' + value + '>' : (value || null);
+      document.execCommand(cmd, false, v);
+    }
+
+    toolbar.querySelectorAll('button[data-cmd]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        exec(btn.getAttribute('data-cmd'), btn.getAttribute('data-value'));
+      });
+    });
+
+    linkBtn.addEventListener('click', function () {
+      var url = window.prompt('লিংকের URL দিন (উদাহরণ: https://example.com):');
+      if (url) exec('createLink', url);
+    });
+
+    document.getElementById('productForm').addEventListener('submit', function () {
+      hiddenDesc.value = editor.innerHTML;
+    });
+  })();
 
   // ---- Discount -> Sale Price auto-calc (still editable afterward) ----
   function recalcSalePrice() {
@@ -387,6 +473,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var i = variantRowIndex++;
     var tr = document.createElement('tr');
     tr.innerHTML =
+      '<td style="width:70px"><input type="file" name="variantImage[' + i + ']" class="form-control form-control-sm" accept="image/*"></td>' +
       '<td><input type="text" name="variants[' + i + '][label]" class="form-control form-control-sm" placeholder="e.g. Red / Large"></td>' +
       '<td><input type="text" name="variants[' + i + '][sku]" class="form-control form-control-sm"></td>' +
       '<td><input type="number" step="0.01" name="variants[' + i + '][price]" class="form-control form-control-sm" placeholder="Regular price"></td>' +

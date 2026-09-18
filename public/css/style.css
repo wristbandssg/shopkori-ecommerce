@@ -528,3 +528,10 @@ a { text-decoration: none; color: inherit; }
   border-radius: 6px; border: 2px solid transparent; cursor: pointer;
 }
 .product-thumb-item.active { border-color: var(--brand-pink); }
+
+.product-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-pill {
+  background: var(--bg-light); color: #666; font-size: 12px;
+  padding: 4px 10px; border-radius: 20px; border: 1px solid #eee;
+}
+.tag-pill:hover { background: var(--brand-pink); color: #fff; border-color: var(--brand-pink); }

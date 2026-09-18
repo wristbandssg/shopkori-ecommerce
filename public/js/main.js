@@ -64,12 +64,16 @@ document.addEventListener('DOMContentLoaded', function () {
   if (qtyInput) {
     document.querySelectorAll('[data-qty-plus]').forEach(function (b) {
       b.addEventListener('click', function () {
-        qtyInput.value = Math.max(1, (parseInt(qtyInput.value, 10) || 1) + 1);
+        var min = parseInt(qtyInput.min, 10) || 1;
+        var max = qtyInput.max !== '' ? parseInt(qtyInput.max, 10) : Infinity;
+        qtyInput.value = Math.min(max, Math.max(min, (parseInt(qtyInput.value, 10) || min) + 1));
       });
     });
     document.querySelectorAll('[data-qty-minus]').forEach(function (b) {
       b.addEventListener('click', function () {
-        qtyInput.value = Math.max(1, (parseInt(qtyInput.value, 10) || 1) - 1);
+        var min = parseInt(qtyInput.min, 10) || 1;
+        var max = qtyInput.max !== '' ? parseInt(qtyInput.max, 10) : Infinity;
+        qtyInput.value = Math.min(max, Math.max(min, (parseInt(qtyInput.value, 10) || min) - 1));
       });
     });
   }

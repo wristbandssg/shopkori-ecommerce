@@ -233,3 +233,32 @@ body { font-family: 'Poppins', sans-serif; background: var(--admin-bg); margin: 
   .admin-sidebar { position: fixed; left: -270px; z-index: 1000; transition: 0.3s; }
   .admin-sidebar.open { left: 0; }
 }
+
+/* =========================================================
+   Custom rich-text editor (Product > Long Description).
+   Self-contained (contenteditable + document.execCommand) —
+   no external CDN/script dependency, so it always renders.
+   ========================================================= */
+.custom-editor { border: 1px solid #ced4da; border-radius: 8px; overflow: hidden; background: #fff; }
+.custom-editor-toolbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+  padding: 6px 8px; background: #f8f9fa; border-bottom: 1px solid #ced4da;
+}
+.custom-editor-toolbar button {
+  border: 1px solid transparent; background: transparent;
+  min-width: 32px; height: 32px; padding: 0 6px; border-radius: 5px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; color: var(--admin-text); cursor: pointer;
+}
+.custom-editor-toolbar button:hover { background: #e9ecef; border-color: #ced4da; }
+.custom-editor-toolbar button.active { background: var(--admin-pink-soft); border-color: var(--admin-pink); color: var(--admin-pink); }
+.custom-editor-sep { width: 1px; align-self: stretch; background: #dcdde0; margin: 2px 4px; }
+.custom-editor-body {
+  min-height: 220px; max-height: 520px; overflow-y: auto;
+  padding: 12px 14px; outline: none; font-size: 14px; line-height: 1.7; color: var(--admin-text);
+}
+.custom-editor-body:focus { box-shadow: inset 0 0 0 2px var(--admin-pink-soft); }
+.custom-editor-body a { color: var(--admin-pink); text-decoration: underline; }
+.custom-editor-body blockquote { border-left: 3px solid #ddd; margin: 8px 0; padding: 2px 14px; color: #777; }
+.custom-editor-body ul, .custom-editor-body ol { padding-left: 22px; }
+.custom-editor-body h2, .custom-editor-body h3 { font-weight: 700; margin: 10px 0; }

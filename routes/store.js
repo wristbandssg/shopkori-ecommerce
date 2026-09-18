@@ -78,18 +78,20 @@ function computeAllowedPaymentMethods(items) {
 
 // Resolves a buy-now line item (product + optional variant), respecting
 // variantMandatory — returns null when a mandatory variant wasn't chosen.
+// Starting quantity honours this product's Min Order Quantity.
 function resolveBuyNowItem(product, variantId) {
   if (product.hasVariants && product.variantMandatory && !variantId) return null;
   const resolved = product.resolveVariant(variantId);
   if (!resolved) return null;
+  const qty = Math.max(product.minOrderQty || 1, 1);
   return {
     product,
     variant: resolved.variant,
     variantLabel: resolved.label,
-    qty: 1,
+    qty,
     price: resolved.price,
     stock: resolved.stock,
-    lineTotal: resolved.price,
+    lineTotal: resolved.price * qty,
   };
 }
 
@@ -133,7 +135,9 @@ router.get(['/category', '/category/:slug'], async (req, res, next) => {
     };
 
     const filter = { status: true };
-    if (category) filter.category = category._id;
+    // Match a product listed under this category either as its primary
+    // category, or as one of its additional/secondary categories.
+    if (category) filter.$or = [{ category: category._id }, { categories: category._id }];
 
     const [total, products, allCategories] = await Promise.all([
       Product.countDocuments(filter),
@@ -209,7 +213,10 @@ router.post('/cart/action', async (req, res) => {
       if (variantId && !product.variants.id(variantId)) {
         return res.status(400).json({ success: false, message: 'ভ্যারিয়েন্টটি পাওয়া যায়নি।' });
       }
-      cart.cartAdd(req, productId, Math.max(1, q), variantId || null);
+      // Clamp to this product's Min/Max Order Quantity (Admin > Products).
+      let clampedQty = Math.max(product.minOrderQty || 1, q);
+      if (product.maxOrderQty) clampedQty = Math.min(clampedQty, product.maxOrderQty);
+      cart.cartAdd(req, productId, clampedQty, variantId || null);
     } else if (action === 'update') cart.cartSet(req, productId, Math.max(0, q), variantId || null);
     else if (action === 'remove') cart.cartRemove(req, productId, variantId || null);
     else if (action === 'clear') cart.cartClear(req);
@@ -359,9 +366,16 @@ router.post('/checkout', async (req, res, next) => {
     else if (!allowedMethods.includes(paymentMethod)) errors.push('এই প্রোডাক্ট(গুলো)-র জন্য এই পেমেন্ট মেথডটি সমর্থিত নয়। অনুগ্রহ করে অন্য একটি মেথড বেছে নিন।');
     if (paymentMethod === 'bkash' && (!bkashTrxId || !bkashTrxId.trim())) errors.push('bKash Transaction ID আবশ্যক।');
     items.forEach((item) => {
+      const label = item.variantLabel ? `${item.product.name} (${item.variantLabel})` : item.product.name;
       if (!item.product.overselling && item.qty > item.stock) {
-        const label = item.variantLabel ? `${item.product.name} (${item.variantLabel})` : item.product.name;
         errors.push(`${label} — পর্যাপ্ত স্টক নেই (আছে ${item.stock} টি)।`);
+      }
+      const minQty = item.product.minOrderQty || 1;
+      const maxQty = item.product.maxOrderQty;
+      if (item.qty < minQty) {
+        errors.push(`${label} — সর্বনিম্ন ${minQty} টি অর্ডার করতে হবে।`);
+      } else if (maxQty && item.qty > maxQty) {
+        errors.push(`${label} — সর্বোচ্চ ${maxQty} টি অর্ডার করা যাবে।`);
       }
     });
 
@@ -702,7 +716,7 @@ router.get('/search', async (req, res, next) => {
     if (q) {
       products = await Product.find({
         status: true,
-        $or: [{ name: new RegExp(q, 'i') }, { shortDescription: new RegExp(q, 'i') }],
+        $or: [{ name: new RegExp(q, 'i') }, { shortDescription: new RegExp(q, 'i') }, { tags: new RegExp(q, 'i') }],
       })
         .sort({ createdAt: -1 })
         .limit(40);

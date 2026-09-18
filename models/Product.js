@@ -24,12 +24,17 @@ const variantSchema = new mongoose.Schema(
 const productSchema = new mongoose.Schema(
   {
     category: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', default: null },
+    // Secondary/additional categories a product also shows up under, on top
+    // of its required primary `category` (used for the breadcrumb and
+    // related-products lookup). Category listing pages match either.
+    categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', default: null },
     supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', default: null },
 
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, index: true },
     sku: { type: String, default: '' },
+    tags: [{ type: String, trim: true }],
     shortDescription: { type: String, default: '' },
     description: { type: String, default: '' },
 
@@ -51,6 +56,9 @@ const productSchema = new mongoose.Schema(
     stock: { type: Number, default: 0 },
     stockAlert: { type: Number, default: 5 },
     overselling: { type: Boolean, default: false }, // allow checkout to proceed past zero stock
+    weight: { type: Number, default: 0 }, // kg — shown as product info; not yet used to compute shipping cost
+    minOrderQty: { type: Number, default: 1 },
+    maxOrderQty: { type: Number, default: null }, // null = no upper limit
 
     // -- Variants --
     hasVariants: { type: Boolean, default: false },

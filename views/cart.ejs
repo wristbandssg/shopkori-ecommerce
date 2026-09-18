@@ -24,17 +24,25 @@
             </tr>
           </thead>
           <tbody>
-            <% items.forEach(function (item) { const p = item.product; %>
+            <% items.forEach(function (item) {
+                 const p = item.product;
+                 const minQty = Math.max(1, p.minOrderQty || 1);
+                 let maxQty = p.overselling ? 99999 : item.stock;
+                 if (p.maxOrderQty) maxQty = Math.min(maxQty, p.maxOrderQty);
+            %>
               <tr>
                 <td class="cart-product-cell">
                   <img src="<%= productImageUrl(p.image) %>" alt="<%= p.name %>">
                   <div>
                     <a href="/product/<%= p.slug %>"><%= p.name %></a>
                     <% if (item.variantLabel) { %><br><small class="text-muted">ভ্যারিয়েন্ট: <%= item.variantLabel %></small><% } %>
+                    <% if (minQty > 1 || p.maxOrderQty) { %>
+                      <br><small class="text-muted"><% if (minQty > 1) { %>সর্বনিম্ন <%= minQty %><% } %><% if (minQty > 1 && p.maxOrderQty) { %>, <% } %><% if (p.maxOrderQty) { %>সর্বোচ্চ <%= p.maxOrderQty %><% } %></small>
+                    <% } %>
                   </div>
                 </td>
                 <td><%= currency(item.price) %></td>
-                <td><input type="number" name="qty[<%= item.cartKey %>]" value="<%= item.qty %>" min="1" max="<%= p.overselling ? 99999 : item.stock %>" class="form-control cart-qty-input"></td>
+                <td><input type="number" name="qty[<%= item.cartKey %>]" value="<%= item.qty %>" min="<%= minQty %>" max="<%= maxQty %>" class="form-control cart-qty-input"></td>
                 <td><%= currency(item.lineTotal) %></td>
                 <td>
                   <button type="submit" name="removeId" value="<%= item.cartKey %>" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
