@@ -75,13 +75,49 @@
     </div>
   </div>
 
-  <!-- Category nav -->
+  <!-- Category nav (mega menu, giftallbd.com style) -->
   <nav class="category-nav">
     <div class="container">
       <ul class="nav-list">
-        <li class="nav-toggle"><i class="bi bi-list"></i> সকল ক্যাটাগরি</li>
+        <li class="mega-parent" id="allCatToggle">
+          <span class="nav-toggle"><i class="bi bi-list"></i> সকল ক্যাটাগরি <i class="bi bi-chevron-down mega-caret"></i></span>
+          <div class="mega-panel all-cat-panel">
+            <div class="mega-panel-grid">
+              <% navCategories.forEach(function (cat) { %>
+                <div class="mega-col">
+                  <a href="/category/<%= cat.slug %>" class="mega-col-title"><%= cat.name %></a>
+                  <% if (cat.children && cat.children.length) { %>
+                    <ul>
+                      <% cat.children.forEach(function (sub) { %>
+                        <li><a href="/category/<%= sub.slug %>"><%= sub.name %></a></li>
+                      <% }); %>
+                    </ul>
+                  <% } %>
+                </div>
+              <% }); %>
+            </div>
+          </div>
+        </li>
+
         <% navCategories.forEach(function (cat) { %>
-          <li><a href="/category/<%= cat.slug %>"><%= cat.name %></a></li>
+          <% if (cat.children && cat.children.length) { %>
+            <li class="mega-parent">
+              <a href="/category/<%= cat.slug %>"><%= cat.name %></a>
+              <span class="mega-toggle"><i class="bi bi-chevron-down"></i></span>
+              <div class="mega-panel">
+                <div class="mega-panel-flat">
+                  <% cat.children.forEach(function (sub) { %>
+                    <a class="mega-sub-item" href="/category/<%= sub.slug %>">
+                      <img src="<%= categoryImageUrl(sub.image) %>" alt="<%= sub.name %>">
+                      <span><%= sub.name %></span>
+                    </a>
+                  <% }); %>
+                </div>
+              </div>
+            </li>
+          <% } else { %>
+            <li><a href="/category/<%= cat.slug %>"><%= cat.name %></a></li>
+          <% } %>
         <% }); %>
       </ul>
     </div>

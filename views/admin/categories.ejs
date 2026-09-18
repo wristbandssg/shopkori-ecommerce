@@ -4,11 +4,25 @@
   <div class="col-lg-4">
     <div class="admin-card">
       <h5>নতুন ক্যাটাগরি যোগ করুন</h5>
-      <form method="post" action="/admin/categories">
+      <form method="post" action="/admin/categories" enctype="multipart/form-data">
         <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
         <div class="mb-3">
           <label class="form-label">নাম</label>
           <input type="text" name="name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">প্যারেন্ট ক্যাটাগরি (অপশনাল)</label>
+          <select name="parent" class="form-select">
+            <option value="">— কোনো প্যারেন্ট নেই (মেনুতে আলাদা ক্যাটাগরি হিসেবে দেখাবে) —</option>
+            <% parentOptions.forEach(function (p) { %>
+              <option value="<%= p._id %>"><%= p.name %></option>
+            <% }); %>
+          </select>
+          <small class="text-muted">প্যারেন্ট বাছাই করলে এটি সাব-ক্যাটাগরি হিসেবে মেগা মেনুতে দেখাবে।</small>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">ছবি (সাব-ক্যাটাগরির আইকন হিসেবে মেগা মেনুতে দেখাবে)</label>
+          <input type="file" name="image" class="form-control" accept="image/*">
         </div>
         <div class="mb-3">
           <label class="form-label">সর্ট অর্ডার</label>
@@ -28,12 +42,21 @@
       <h5>সকল ক্যাটাগরি</h5>
       <div class="table-responsive">
         <table class="table align-middle">
-          <thead><tr><th>নাম</th><th>স্লাগ</th><th>ক্রম</th><th>স্ট্যাটাস</th><th>একশন</th></tr></thead>
+          <thead><tr><th>ছবি</th><th>নাম</th><th>স্লাগ</th><th>প্যারেন্ট</th><th>ক্রম</th><th>স্ট্যাটাস</th><th>একশন</th></tr></thead>
           <tbody>
             <% categories.forEach(function (c) { %>
               <tr>
+                <td><img src="<%= categoryImageUrl(c.image) %>" class="admin-thumb"></td>
                 <td><%= c.name %></td>
                 <td><code><%= c.slug %></code></td>
+                <td>
+                  <% if (c.parent) { %>
+                    <% const p = categories.find(function (x) { return String(x._id) === String(c.parent); }); %>
+                    <span class="badge bg-light text-dark border"><%= p ? p.name : '—' %>-এর সাব</span>
+                  <% } else { %>
+                    <span class="text-muted">—</span>
+                  <% } %>
+                </td>
                 <td><%= c.sortOrder %></td>
                 <td><span class="badge bg-<%= c.status ? 'success' : 'secondary' %>"><%= c.status ? 'Active' : 'Hidden' %></span></td>
                 <td class="text-nowrap">
@@ -45,12 +68,28 @@
               <div class="modal fade" id="editModal<%= c._id %>" tabindex="-1">
                 <div class="modal-dialog">
                   <div class="modal-content">
-                    <form method="post" action="/admin/categories">
+                    <form method="post" action="/admin/categories" enctype="multipart/form-data">
                       <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                       <input type="hidden" name="id" value="<%= c._id %>">
                       <div class="modal-header"><h5 class="modal-title">ক্যাটাগরি এডিট করুন</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                       <div class="modal-body">
                         <div class="mb-3"><label class="form-label">নাম</label><input type="text" name="name" class="form-control" value="<%= c.name %>" required></div>
+                        <div class="mb-3">
+                          <label class="form-label">প্যারেন্ট ক্যাটাগরি (অপশনাল)</label>
+                          <select name="parent" class="form-select">
+                            <option value="">— কোনো প্যারেন্ট নেই —</option>
+                            <% parentOptions.forEach(function (p) { %>
+                              <% if (String(p._id) !== String(c._id)) { %>
+                                <option value="<%= p._id %>" <%= (c.parent && String(c.parent) === String(p._id)) ? 'selected' : '' %>><%= p.name %></option>
+                              <% } %>
+                            <% }); %>
+                          </select>
+                        </div>
+                        <div class="mb-3">
+                          <label class="form-label">ছবি</label>
+                          <input type="file" name="image" class="form-control" accept="image/*">
+                          <% if (c.image) { %><img src="<%= categoryImageUrl(c.image) %>" class="admin-thumb mt-2"><% } %>
+                        </div>
                         <div class="mb-3"><label class="form-label">সর্ট অর্ডার</label><input type="number" name="sortOrder" class="form-control" value="<%= c.sortOrder %>"></div>
                         <div class="form-check"><input class="form-check-input" type="checkbox" name="status" <%= c.status ? 'checked' : '' %>><label class="form-check-label">Active</label></div>
                       </div>

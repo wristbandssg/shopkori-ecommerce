@@ -240,24 +240,40 @@ router.post('/products/:id/edit', upload.single('image'), (req, res, next) => sa
 router.get('/categories', async (req, res, next) => {
   try {
     const categories = await Category.find().sort({ sortOrder: 1, name: 1 });
-    res.render('admin/categories', { adminPageTitle: 'ক্যাটাগরি ম্যানেজমেন্ট', categories });
+    // Only top-level categories can be picked as a "parent" — the storefront
+    // mega menu only nests 2 levels deep (category -> subcategory).
+    const parentOptions = categories.filter((c) => !c.parent);
+    res.render('admin/categories', { adminPageTitle: 'ক্যাটাগরি ম্যানেজমেন্ট', categories, parentOptions });
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/categories', verifyCsrf, async (req, res, next) => {
+// upload.single runs before verifyCsrf here because multer is what parses
+// multipart/form-data — req.body (and so req.body.csrfToken) isn't populated
+// until after it runs.
+router.post('/categories', upload.single('image'), verifyCsrf, async (req, res, next) => {
   try {
-    const { id, name, sortOrder } = req.body;
+    const { id, name, sortOrder, parent } = req.body;
     if (!name || !name.trim()) return res.redirect('/admin/categories');
+
+    // A category can't be its own parent, and we only support 2 levels deep.
+    const parentId = parent && parent !== id ? parent : null;
+
+    const existing = id ? await Category.findById(id) : null;
+    let imageName = existing ? existing.image : null;
+    if (req.file) imageName = req.file.filename;
 
     if (id) {
       const slug = await ensureUniqueSlug(Category, slugify(name), id);
-      await Category.updateOne({ _id: id }, { name, slug, sortOrder: parseInt(sortOrder, 10) || 0, status: !!req.body.status });
+      await Category.updateOne(
+        { _id: id },
+        { name, slug, sortOrder: parseInt(sortOrder, 10) || 0, status: !!req.body.status, parent: parentId, image: imageName }
+      );
       req.flash('success', 'ক্যাটাগরি আপডেট হয়েছে।');
     } else {
       const slug = await ensureUniqueSlug(Category, slugify(name), null);
-      await Category.create({ name, slug, sortOrder: parseInt(sortOrder, 10) || 0, status: !!req.body.status });
+      await Category.create({ name, slug, sortOrder: parseInt(sortOrder, 10) || 0, status: !!req.body.status, parent: parentId, image: imageName });
       req.flash('success', 'নতুন ক্যাটাগরি যোগ করা হয়েছে।');
     }
     res.redirect('/admin/categories');

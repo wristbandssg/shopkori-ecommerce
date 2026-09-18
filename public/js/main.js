@@ -36,6 +36,25 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   });
 
+  // Mega menu (category nav): hover opens it on desktop via CSS; this click
+  // handler is the fallback for touch devices (and a11y) where hover doesn't fire.
+  document.querySelectorAll('.mega-toggle, #allCatToggle .nav-toggle').forEach(function (toggle) {
+    toggle.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var parent = toggle.closest('.mega-parent');
+      if (!parent) return;
+      var wasOpen = parent.classList.contains('open');
+      document.querySelectorAll('.mega-parent.open').forEach(function (p) { p.classList.remove('open'); });
+      if (!wasOpen) parent.classList.add('open');
+    });
+  });
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest('.mega-parent')) {
+      document.querySelectorAll('.mega-parent.open').forEach(function (p) { p.classList.remove('open'); });
+    }
+  });
+
   // Quantity stepper on product detail page
   const qtyInput = document.getElementById('qtyInput');
   if (qtyInput) {

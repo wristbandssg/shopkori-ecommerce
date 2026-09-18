@@ -11,14 +11,30 @@ const { cartCount } = require('./cart');
  */
 async function storeLocals(req, res, next) {
   try {
-    const [settings, categories] = await Promise.all([
+    const [settings, allCategories] = await Promise.all([
       getSettings(),
-      Category.find({ status: true }).sort({ sortOrder: 1, name: 1 }),
+      Category.find({ status: true }).sort({ sortOrder: 1, name: 1 }).lean(),
     ]);
+
+    // Build a 2-level tree (parent -> children) so the header can render a
+    // giftallbd.com-style mega menu: each top-level category's subcategories
+    // show up as columns/items in its flyout panel.
+    const childrenByParent = {};
+    allCategories.forEach(function (cat) {
+      if (cat.parent) {
+        const key = String(cat.parent);
+        (childrenByParent[key] = childrenByParent[key] || []).push(cat);
+      }
+    });
+    const navCategories = allCategories
+      .filter(function (cat) { return !cat.parent; })
+      .map(function (cat) {
+        return Object.assign({}, cat, { children: childrenByParent[String(cat._id)] || [] });
+      });
 
     res.locals.settings = settings;
     res.locals.currency = currencyFormatter(settings.currency_symbol || '৳');
-    res.locals.navCategories = categories;
+    res.locals.navCategories = navCategories;
     res.locals.cartCount = cartCount(req);
     res.locals.productImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/product-placeholder.svg');
     res.locals.categoryImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/category-placeholder.svg');
