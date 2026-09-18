@@ -2,21 +2,32 @@
 
 <div class="admin-card">
   <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-    <form method="get" class="d-flex gap-2">
-      <input type="text" name="q" class="form-control" placeholder="Search product name/SKU" value="<%= q %>">
-      <button class="btn btn-outline-secondary"><i class="bi bi-search"></i></button>
+    <form method="get" class="d-flex align-items-center gap-2">
+      <select name="perPage" class="form-select form-select-sm" style="width:auto" onchange="this.form.submit()">
+        <% [10, 25, 50, 100].forEach(function (n) { %>
+          <option value="<%= n %>" <%= perPage === n ? 'selected' : '' %>><%= n %></option>
+        <% }); %>
+      </select>
+      <span class="text-muted small">entries per page</span>
+      <input type="text" name="q" class="form-control form-control-sm ms-2" placeholder="Search product name/SKU" value="<%= q %>">
+      <button class="btn btn-outline-secondary btn-sm"><i class="bi bi-search"></i></button>
     </form>
     <a href="/admin/products/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> New Product</a>
   </div>
 
   <div class="table-responsive">
     <table class="table align-middle">
-      <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th>Action</th></tr></thead>
+      <thead><tr><th>Products</th><th>Category</th><th>Price</th><th>Quantity</th><th>Stock</th><th>Overselling</th><th>Created At</th><th>Action</th></tr></thead>
       <tbody>
         <% products.forEach(function (p) { %>
           <tr>
-            <td><img src="<%= productImageUrl(p.image) %>" class="admin-thumb"></td>
-            <td><%= p.name %><br><small class="text-muted">SKU: <%= p.sku %></small></td>
+            <td class="d-flex align-items-center gap-2">
+              <img src="<%= productImageUrl(p.image) %>" class="admin-thumb">
+              <div>
+                <div><%= p.name %></div>
+                <small class="text-muted">SKU: <%= p.sku || '—' %></small>
+              </div>
+            </td>
             <td><%= p.category ? p.category.name : '-' %></td>
             <td>
               <% if (p.salePrice) { %>
@@ -26,18 +37,35 @@
                 <%= currency(p.price) %>
               <% } %>
             </td>
-            <td><% if (p.stock <= 5) { %><span class="text-danger fw-bold"><%= p.stock %></span><% } else { %><%= p.stock %><% } %></td>
-            <td><span class="badge bg-<%= p.status ? 'success' : 'secondary' %>"><%= p.status ? 'Active' : 'Hidden' %></span></td>
+            <td><% if (p.stock <= (p.stockAlert || 0)) { %><span class="text-danger fw-bold"><%= p.stock %></span><% } else { %><%= p.stock %><% } %></td>
+            <td>
+              <span class="badge bg-<%= p.stockStatus === 'In Stock' ? 'success' : (p.stockStatus === 'Low Stock' ? 'warning' : (p.stockStatus === 'Pre-order' ? 'info' : 'danger')) %>"><%= p.stockStatus %></span>
+            </td>
+            <td><span class="badge bg-<%= p.overselling ? 'success' : 'secondary' %>"><%= p.overselling ? 'ON' : 'OFF' %></span></td>
+            <td><small class="text-muted"><%= new Date(p.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
             <td class="text-nowrap">
               <a href="/admin/products/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
               <a href="/admin/products/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this product?')"><i class="bi bi-trash"></i></a>
             </td>
           </tr>
         <% }); %>
-        <% if (!products.length) { %><tr><td colspan="7" class="text-center text-muted">No products found.</td></tr><% } %>
+        <% if (!products.length) { %><tr><td colspan="8" class="text-center text-muted">No entries found.</td></tr><% } %>
       </tbody>
     </table>
   </div>
+
+  <% if (totalPages > 1) { %>
+    <nav class="d-flex justify-content-between align-items-center mt-3">
+      <small class="text-muted"><%= total %> total product<%= total === 1 ? '' : 's' %></small>
+      <ul class="pagination pagination-sm mb-0">
+        <li class="page-item <%= page <= 1 ? 'disabled' : '' %>"><a class="page-link" href="?page=<%= page - 1 %>&perPage=<%= perPage %>&q=<%= encodeURIComponent(q) %>">Prev</a></li>
+        <% for (let i = 1; i <= totalPages; i++) { %>
+          <li class="page-item <%= i === page ? 'active' : '' %>"><a class="page-link" href="?page=<%= i %>&perPage=<%= perPage %>&q=<%= encodeURIComponent(q) %>"><%= i %></a></li>
+        <% } %>
+        <li class="page-item <%= page >= totalPages ? 'disabled' : '' %>"><a class="page-link" href="?page=<%= page + 1 %>&perPage=<%= perPage %>&q=<%= encodeURIComponent(q) %>">Next</a></li>
+      </ul>
+    </nav>
+  <% } %>
 </div>
 
 <%- include('partials/admin-footer') %>

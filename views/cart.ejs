@@ -28,13 +28,16 @@
               <tr>
                 <td class="cart-product-cell">
                   <img src="<%= productImageUrl(p.image) %>" alt="<%= p.name %>">
-                  <a href="/product/<%= p.slug %>"><%= p.name %></a>
+                  <div>
+                    <a href="/product/<%= p.slug %>"><%= p.name %></a>
+                    <% if (item.variantLabel) { %><br><small class="text-muted">ভ্যারিয়েন্ট: <%= item.variantLabel %></small><% } %>
+                  </div>
                 </td>
                 <td><%= currency(item.price) %></td>
-                <td><input type="number" name="qty[<%= p._id %>]" value="<%= item.qty %>" min="1" max="<%= p.stock %>" class="form-control cart-qty-input"></td>
+                <td><input type="number" name="qty[<%= item.cartKey %>]" value="<%= item.qty %>" min="1" max="<%= p.overselling ? 99999 : item.stock %>" class="form-control cart-qty-input"></td>
                 <td><%= currency(item.lineTotal) %></td>
                 <td>
-                  <button type="submit" name="removeId" value="<%= p._id %>" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                  <button type="submit" name="removeId" value="<%= item.cartKey %>" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
                 </td>
               </tr>
             <% }); %>

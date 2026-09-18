@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function () {
   document.querySelectorAll('[data-add-cart]').forEach(function (btn) {
     btn.addEventListener('click', function () {
       const productId = btn.getAttribute('data-id');
+      const variantId = btn.getAttribute('data-variant-id') || '';
       const qtySource = btn.getAttribute('data-qty-source');
       const qty = qtySource ? (parseInt(document.getElementById(qtySource).value, 10) || 1) : 1;
 
@@ -12,10 +13,13 @@ document.addEventListener('DOMContentLoaded', function () {
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> যোগ হচ্ছে...';
 
+      let body = 'action=add&productId=' + encodeURIComponent(productId) + '&qty=' + encodeURIComponent(qty);
+      if (variantId) body += '&variantId=' + encodeURIComponent(variantId);
+
       fetch('/cart/action', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'action=add&productId=' + encodeURIComponent(productId) + '&qty=' + encodeURIComponent(qty),
+        body: body,
       })
         .then(function (res) { return res.json(); })
         .then(function (data) {

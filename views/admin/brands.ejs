@@ -1,0 +1,75 @@
+<%- include('partials/admin-header') %>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="admin-card">
+      <h5>Add New Brand</h5>
+      <form method="post" action="/admin/products/brands" enctype="multipart/form-data">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input type="text" name="name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Logo / Image</label>
+          <input type="file" name="image" class="form-control" accept="image/*">
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="status" id="brandStatus" checked>
+          <label class="form-check-label" for="brandStatus">Active</label>
+        </div>
+        <button type="submit" class="btn btn-brand w-100">Add</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <h5>All Brands</h5>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Image</th><th>Name</th><th>Slug</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            <% brands.forEach(function (b) { %>
+              <tr>
+                <td><img src="<%= categoryImageUrl(b.image) %>" class="admin-thumb"></td>
+                <td><%= b.name %></td>
+                <td><code><%= b.slug %></code></td>
+                <td><span class="badge bg-<%= b.status ? 'success' : 'secondary' %>"><%= b.status ? 'Active' : 'Hidden' %></span></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editBrand<%= b._id %>"><i class="bi bi-pencil"></i></button>
+                  <a href="/admin/products/brands/delete/<%= b._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this brand?')"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+
+              <div class="modal fade" id="editBrand<%= b._id %>" tabindex="-1">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form method="post" action="/admin/products/brands" enctype="multipart/form-data">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="id" value="<%= b._id %>">
+                      <div class="modal-header"><h5 class="modal-title">Edit Brand</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                      <div class="modal-body">
+                        <div class="mb-3"><label class="form-label">Name</label><input type="text" name="name" class="form-control" value="<%= b.name %>" required></div>
+                        <div class="mb-3">
+                          <label class="form-label">Logo / Image</label>
+                          <input type="file" name="image" class="form-control" accept="image/*">
+                          <% if (b.image) { %><img src="<%= categoryImageUrl(b.image) %>" class="admin-thumb mt-2"><% } %>
+                        </div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="status" <%= b.status ? 'checked' : '' %>><label class="form-check-label">Active</label></div>
+                      </div>
+                      <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+            <% if (!brands.length) { %><tr><td colspan="5" class="text-center text-muted">No brands yet.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

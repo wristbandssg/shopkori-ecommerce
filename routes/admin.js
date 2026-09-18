@@ -4,6 +4,8 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 
 const Category = require('../models/Category');
+const Brand = require('../models/Brand');
+const Supplier = require('../models/Supplier');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
@@ -81,8 +83,6 @@ const COMING_SOON_PAGES = {
   '/customization': 'Customization',
 
   '/products/variant': 'Variant',
-  '/products/brands': 'Brands',
-  '/products/supplier': 'Supplier',
 
   '/inventory': 'Inventory',
   '/inventory/purchase': 'Purchase',
@@ -699,14 +699,152 @@ router.get('/', async (req, res, next) => {
 });
 
 /* =====================================================================
+   BRANDS
+   ===================================================================== */
+router.get('/products/brands', async (req, res, next) => {
+  try {
+    const brands = await Brand.find().sort({ name: 1 });
+    res.render('admin/brands', { adminPageTitle: 'Brands', brands });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/products/brands', upload.single('image'), verifyCsrf, async (req, res, next) => {
+  try {
+    const { id, name } = req.body;
+    if (!name || !name.trim()) return res.redirect('/admin/products/brands');
+    const existing = id ? await Brand.findById(id) : null;
+    let imageName = existing ? existing.image : null;
+    if (req.file) imageName = req.file.filename;
+
+    if (id) {
+      const slug = await ensureUniqueSlug(Brand, slugify(name), id);
+      await Brand.updateOne({ _id: id }, { name: name.trim(), slug, status: !!req.body.status, image: imageName });
+      req.flash('success', 'Brand updated successfully.');
+    } else {
+      const slug = await ensureUniqueSlug(Brand, slugify(name), null);
+      await Brand.create({ name: name.trim(), slug, status: !!req.body.status, image: imageName });
+      req.flash('success', 'New brand added successfully.');
+    }
+    res.redirect('/admin/products/brands');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/products/brands/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/products/brands');
+    }
+    await Brand.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Brand deleted successfully.');
+    res.redirect('/admin/products/brands');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   SUPPLIER
+   ===================================================================== */
+router.get('/products/supplier', async (req, res, next) => {
+  try {
+    const suppliers = await Supplier.find().sort({ name: 1 });
+    res.render('admin/supplier', { adminPageTitle: 'Supplier', suppliers });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/products/supplier', verifyCsrf, async (req, res, next) => {
+  try {
+    const { id, name, phone, email, address } = req.body;
+    if (!name || !name.trim()) return res.redirect('/admin/products/supplier');
+    const data = {
+      name: name.trim(),
+      phone: (phone || '').trim(),
+      email: (email || '').trim(),
+      address: (address || '').trim(),
+      status: !!req.body.status,
+    };
+    if (id) {
+      await Supplier.updateOne({ _id: id }, data);
+      req.flash('success', 'Supplier updated successfully.');
+    } else {
+      await Supplier.create(data);
+      req.flash('success', 'New supplier added successfully.');
+    }
+    res.redirect('/admin/products/supplier');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/products/supplier/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/products/supplier');
+    }
+    await Supplier.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Supplier deleted successfully.');
+    res.redirect('/admin/products/supplier');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
    PRODUCTS
    ===================================================================== */
+function generateSku() {
+  return `SKU-${Math.floor(10000 + Math.random() * 90000)}`;
+}
+
+// Cover image, secondary gallery image, and an optional size/variant chart
+// image are three independent uploads on the same form.
+const productUpload = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'galleryImage', maxCount: 1 },
+  { name: 'variantsChartImage', maxCount: 1 },
+]);
+
 router.get('/products', async (req, res, next) => {
   try {
     const q = (req.query.q || '').trim();
+    const perPage = [10, 25, 50, 100].includes(parseInt(req.query.perPage, 10)) ? parseInt(req.query.perPage, 10) : 10;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
     const filter = q ? { $or: [{ name: new RegExp(q, 'i') }, { sku: new RegExp(q, 'i') }] } : {};
-    const products = await Product.find(filter).populate('category').sort({ createdAt: -1 });
-    res.render('admin/products', { adminPageTitle: 'Product Management', products, q });
+
+    const [total, products] = await Promise.all([
+      Product.countDocuments(filter),
+      Product.find(filter)
+        .populate('category')
+        .populate('brand')
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * perPage)
+        .limit(perPage),
+    ]);
+
+    products.forEach((p) => {
+      if (p.availability === 'pre_order') p.stockStatus = 'Pre-order';
+      else if (p.availability === 'out_of_stock' || p.stock <= 0) p.stockStatus = 'Out of Stock';
+      else if (p.stock <= (p.stockAlert || 0)) p.stockStatus = 'Low Stock';
+      else p.stockStatus = 'In Stock';
+    });
+
+    res.render('admin/products', {
+      adminPageTitle: 'Product Management',
+      products,
+      q,
+      perPage,
+      page,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / perPage)),
+    });
   } catch (err) {
     next(err);
   }
@@ -726,10 +864,28 @@ router.get('/products/delete/:id', async (req, res, next) => {
   }
 });
 
+async function loadProductFormLookups(excludeId) {
+  const productFilter = { status: true };
+  if (excludeId) productFilter._id = { $ne: excludeId };
+  const [categories, brands, suppliers, allProducts] = await Promise.all([
+    Category.find().sort({ name: 1 }),
+    Brand.find({ status: true }).sort({ name: 1 }),
+    Supplier.find({ status: true }).sort({ name: 1 }),
+    Product.find(productFilter).select('name image').sort({ name: 1 }),
+  ]);
+  return { categories, brands, suppliers, allProducts };
+}
+
 router.get('/products/new', async (req, res, next) => {
   try {
-    const categories = await Category.find().sort({ name: 1 });
-    res.render('admin/product-form', { adminPageTitle: 'Add New Product', product: null, categories, errors: [] });
+    const lookups = await loadProductFormLookups(null);
+    res.render('admin/product-form', {
+      adminPageTitle: 'Add New Product',
+      product: null,
+      ...lookups,
+      errors: [],
+      formData: { sku: generateSku() },
+    });
   } catch (err) {
     next(err);
   }
@@ -737,12 +893,21 @@ router.get('/products/new', async (req, res, next) => {
 
 router.get('/products/:id/edit', async (req, res, next) => {
   try {
-    const [product, categories] = await Promise.all([Product.findById(req.params.id), Category.find().sort({ name: 1 })]);
+    const [product, lookups] = await Promise.all([
+      Product.findById(req.params.id),
+      loadProductFormLookups(req.params.id),
+    ]);
     if (!product) {
       req.flash('danger', 'Product not found.');
       return res.redirect('/admin/products');
     }
-    res.render('admin/product-form', { adminPageTitle: 'Edit Product', product, categories, errors: [] });
+    res.render('admin/product-form', {
+      adminPageTitle: 'Edit Product',
+      product,
+      ...lookups,
+      errors: [],
+      formData: {},
+    });
   } catch (err) {
     next(err);
   }
@@ -754,45 +919,133 @@ async function saveProduct(req, res, next, existingId) {
       req.flash('danger', 'Form has expired.');
       return res.redirect('/admin/products');
     }
-    const categories = await Category.find().sort({ name: 1 });
+    const lookups = await loadProductFormLookups(existingId);
     const existing = existingId ? await Product.findById(existingId) : null;
 
-    const { name, categoryId, sku, shortDescription, description, price, salePrice, stock } = req.body;
+    const {
+      name, categoryId, brandId, supplierId, sku, slug: slugInput,
+      videoEmbed, videoPosition,
+      shortDescription, description,
+      condition, availability, buyingPrice,
+      price, discountType, discountValue, salePrice,
+      stock, stockAlert,
+      offerDescriptionType, offerDescriptionText,
+      deliveryType, deliveryFlatRate,
+      afterConfirmOfferDescription,
+      metaTitle, metaKeywords, metaDescription,
+    } = req.body;
+
     const errors = [];
     if (!name || !name.trim()) errors.push('Product name is required.');
+    if (!categoryId) errors.push('Category is required.');
     const priceNum = parseFloat(price);
-    const salePriceNum = salePrice ? parseFloat(salePrice) : null;
-    if (!priceNum || priceNum <= 0) errors.push('Please enter a valid price.');
-    if (salePriceNum !== null && salePriceNum >= priceNum) errors.push('Sale price must be lower than the regular price.');
-
-    let imageName = existing ? existing.image : null;
-    if (req.file) {
-      imageName = req.file.filename;
+    if (!priceNum || priceNum <= 0) errors.push('Please enter a valid regular price.');
+    const salePriceNum = salePrice !== undefined && salePrice !== '' ? parseFloat(salePrice) : NaN;
+    if (Number.isNaN(salePriceNum) || salePriceNum <= 0) {
+      errors.push('Sale price is required.');
+    } else if (priceNum && salePriceNum >= priceNum) {
+      errors.push('Sale price must be lower than the regular price.');
     }
+
+    // Variant rows: req.body.variants arrives as an object keyed by row
+    // index (e.g. { '0': { label, sku, price, salePrice, stock }, ... })
+    // because express.urlencoded({extended:true}) parses bracketed field
+    // names like "variants[0][label]" that way.
+    const hasVariants = !!req.body.hasVariants;
+    let variants = [];
+    if (hasVariants && req.body.variants && typeof req.body.variants === 'object') {
+      variants = Object.values(req.body.variants)
+        .filter((v) => v && v.label && v.label.trim())
+        .map((v) => ({
+          label: v.label.trim(),
+          sku: (v.sku || '').trim(),
+          price: v.price !== '' && v.price !== undefined ? parseFloat(v.price) : null,
+          salePrice: v.salePrice !== '' && v.salePrice !== undefined ? parseFloat(v.salePrice) : null,
+          stock: parseInt(v.stock, 10) || 0,
+        }));
+      if (!variants.length) errors.push('Add at least one variant row, or turn Add Variant off.');
+    }
+
+    let deliveryMethods = req.body.deliveryMethods || [];
+    if (!Array.isArray(deliveryMethods)) deliveryMethods = [deliveryMethods];
+    deliveryMethods = deliveryMethods.filter((m) => ['cod', 'bkash', 'sslcommerz'].includes(m));
+
+    let afterConfirmProductIds = req.body.afterConfirmProductIds || [];
+    if (!Array.isArray(afterConfirmProductIds)) afterConfirmProductIds = [afterConfirmProductIds];
+    afterConfirmProductIds = afterConfirmProductIds.filter(Boolean);
+
+    const files = req.files || {};
+    let imageName = existing ? existing.image : null;
+    if (files.image && files.image[0]) imageName = files.image[0].filename;
+    let galleryImageName = existing ? existing.galleryImage : null;
+    if (files.galleryImage && files.galleryImage[0]) galleryImageName = files.galleryImage[0].filename;
+    let variantsChartImageName = existing ? existing.variantsChartImage : null;
+    if (files.variantsChartImage && files.variantsChartImage[0]) variantsChartImageName = files.variantsChartImage[0].filename;
 
     if (errors.length) {
       return res.render('admin/product-form', {
         adminPageTitle: existing ? 'Edit Product' : 'Add New Product',
-        product: { ...(existing ? existing.toObject() : {}), ...req.body, image: imageName },
-        categories,
+        product: {
+          ...(existing ? existing.toObject() : {}),
+          ...req.body,
+          categoryId, brandId, supplierId,
+          hasVariants,
+          variants,
+          deliveryMethods,
+          afterConfirmProducts: afterConfirmProductIds,
+          image: imageName,
+          galleryImage: galleryImageName,
+          variantsChartImage: variantsChartImageName,
+        },
+        ...lookups,
         errors,
+        formData: req.body,
       });
     }
 
-    const baseSlug = slugify(name);
+    const baseSlug = slugify((slugInput && slugInput.trim()) || name);
     const slug = await ensureUniqueSlug(Product, baseSlug, existingId || null);
 
     const data = {
       category: categoryId || null,
+      brand: brandId || null,
+      supplier: supplierId || null,
       name: name.trim(),
       slug,
       sku: (sku || '').trim(),
+      videoEmbed: (videoEmbed || '').trim(),
+      videoPosition: ['top', 'bottom'].includes(videoPosition) ? videoPosition : '',
       shortDescription: (shortDescription || '').trim(),
-      description: (description || '').trim(),
+      description: description || '',
+      condition: ['new', 'used', 'refurbished'].includes(condition) ? condition : 'new',
+      availability: ['in_stock', 'out_of_stock', 'pre_order'].includes(availability) ? availability : 'in_stock',
+      buyingPrice: parseFloat(buyingPrice) || 0,
       price: priceNum,
+      discountType: discountType === 'percent' ? 'percent' : 'flat',
+      discountValue: parseFloat(discountValue) || 0,
       salePrice: salePriceNum,
       stock: parseInt(stock, 10) || 0,
+      stockAlert: parseInt(stockAlert, 10) || 0,
+      overselling: !!req.body.overselling,
+      hasVariants,
+      variantMandatory: !!req.body.variantMandatory,
+      variants,
+      offerDescription: {
+        type: offerDescriptionType === 'percent' ? 'percent' : 'fixed',
+        text: (offerDescriptionText || '').trim(),
+      },
       image: imageName || 'product-placeholder.svg',
+      galleryImage: galleryImageName,
+      variantsChartImage: variantsChartImageName,
+      deliveryType: ['manual', 'free_shipping', 'flat_rate'].includes(deliveryType) ? deliveryType : 'manual',
+      deliveryFlatRate: parseFloat(deliveryFlatRate) || 0,
+      deliveryMethods,
+      afterConfirmEnabled: !!req.body.afterConfirmEnabled,
+      afterConfirmOfferDescription: (afterConfirmOfferDescription || '').trim(),
+      afterConfirmProducts: afterConfirmProductIds,
+      metaTitle: (metaTitle || '').trim(),
+      metaKeywords: (metaKeywords || '').trim(),
+      metaDescription: (metaDescription || '').trim(),
       isFeatured: !!req.body.isFeatured,
       isFlashSale: !!req.body.isFlashSale,
       status: !!req.body.status,
@@ -811,8 +1064,8 @@ async function saveProduct(req, res, next, existingId) {
   }
 }
 
-router.post('/products/new', upload.single('image'), (req, res, next) => saveProduct(req, res, next, null));
-router.post('/products/:id/edit', upload.single('image'), (req, res, next) => saveProduct(req, res, next, req.params.id));
+router.post('/products/new', productUpload, (req, res, next) => saveProduct(req, res, next, null));
+router.post('/products/:id/edit', productUpload, (req, res, next) => saveProduct(req, res, next, req.params.id));
 
 /* =====================================================================
    CATEGORIES

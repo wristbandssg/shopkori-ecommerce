@@ -1,0 +1,82 @@
+<%- include('partials/admin-header') %>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="admin-card">
+      <h5>Add New Supplier</h5>
+      <form method="post" action="/admin/products/supplier">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-3">
+          <label class="form-label">Name</label>
+          <input type="text" name="name" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Phone</label>
+          <input type="text" name="phone" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Address</label>
+          <textarea name="address" class="form-control" rows="2"></textarea>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="status" id="supStatus" checked>
+          <label class="form-check-label" for="supStatus">Active</label>
+        </div>
+        <button type="submit" class="btn btn-brand w-100">Add</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <h5>All Suppliers</h5>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            <% suppliers.forEach(function (s) { %>
+              <tr>
+                <td><%= s.name %></td>
+                <td><%= s.phone || '—' %></td>
+                <td><%= s.email || '—' %></td>
+                <td><%= s.address || '—' %></td>
+                <td><span class="badge bg-<%= s.status ? 'success' : 'secondary' %>"><%= s.status ? 'Active' : 'Hidden' %></span></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editSup<%= s._id %>"><i class="bi bi-pencil"></i></button>
+                  <a href="/admin/products/supplier/delete/<%= s._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this supplier?')"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+
+              <div class="modal fade" id="editSup<%= s._id %>" tabindex="-1">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form method="post" action="/admin/products/supplier">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="id" value="<%= s._id %>">
+                      <div class="modal-header"><h5 class="modal-title">Edit Supplier</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                      <div class="modal-body">
+                        <div class="mb-3"><label class="form-label">Name</label><input type="text" name="name" class="form-control" value="<%= s.name %>" required></div>
+                        <div class="mb-3"><label class="form-label">Phone</label><input type="text" name="phone" class="form-control" value="<%= s.phone || '' %>"></div>
+                        <div class="mb-3"><label class="form-label">Email</label><input type="email" name="email" class="form-control" value="<%= s.email || '' %>"></div>
+                        <div class="mb-3"><label class="form-label">Address</label><textarea name="address" class="form-control" rows="2"><%= s.address || '' %></textarea></div>
+                        <div class="form-check"><input class="form-check-input" type="checkbox" name="status" <%= s.status ? 'checked' : '' %>><label class="form-check-label">Active</label></div>
+                      </div>
+                      <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+            <% if (!suppliers.length) { %><tr><td colspan="6" class="text-center text-muted">No suppliers yet.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

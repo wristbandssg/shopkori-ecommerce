@@ -39,6 +39,20 @@
       </div>
     </div>
   </div>
+
+  <% if (upsellProducts && upsellProducts.length) { %>
+    <div class="row justify-content-center mt-5">
+      <div class="col-lg-10">
+        <div class="section-heading">
+          <h2>আপনার জন্য বিশেষ অফার</h2>
+          <% if (offerText) { %><p class="text-muted mb-0"><%= offerText %></p><% } %>
+        </div>
+        <div class="product-grid">
+          <% upsellProducts.forEach(function (p) { %><%- include('partials/product-card', { p }) %><% }); %>
+        </div>
+      </div>
+    </div>
+  <% } %>
 </div>
 
 <%- include('partials/footer') %>

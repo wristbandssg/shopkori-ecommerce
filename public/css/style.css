@@ -477,6 +477,8 @@ a { text-decoration: none; color: inherit; }
   margin-bottom: 10px;
 }
 .payment-option label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; margin: 0; }
+.payment-option.disabled { opacity: 0.55; background: var(--bg-light); }
+.payment-option.disabled label { cursor: not-allowed; }
 .payment-extra { margin-top: 10px; padding-top: 10px; border-top: 1px dashed #ddd; }
 .checkout-item-list { list-style: none; padding: 0; margin: 0; }
 .checkout-item-list li { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -497,3 +499,32 @@ a { text-decoration: none; color: inherit; }
 
 /* ---------- Static pages ---------- */
 .static-page { max-width: 800px; line-height: 1.8; }
+
+/* ---------- Product variants ---------- */
+.variant-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.variant-chip {
+  border: 1.5px solid #ddd;
+  background: #fff;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: 0.2s;
+}
+.variant-chip:hover:not(:disabled) { border-color: var(--brand-pink); }
+.variant-chip.active { border-color: var(--brand-pink); background: var(--brand-pink); color: #fff; }
+.variant-chip:disabled, .variant-chip.disabled {
+  opacity: 0.5;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+.btn-add-cart:disabled, .btn-buy-now.disabled { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
+
+.product-thumbs { display: flex; gap: 8px; }
+.product-thumb-item {
+  width: 60px; height: 60px; object-fit: cover;
+  border-radius: 6px; border: 2px solid transparent; cursor: pointer;
+}
+.product-thumb-item.active { border-color: var(--brand-pink); }

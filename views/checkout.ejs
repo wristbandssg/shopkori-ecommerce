@@ -1,3 +1,11 @@
+<%
+  const paymentLabels = {
+    cod: { icon: 'bi-cash-coin', text: 'ক্যাশ অন ডেলিভারি (COD)' },
+    bkash: { icon: 'bi-phone', text: 'bKash' },
+    sslcommerz: { icon: 'bi-credit-card', text: 'কার্ড / মোবাইল ব্যাংকিং (SSLCommerz)' },
+  };
+  const defaultMethod = formData.paymentMethod || (allowedMethods.length ? allowedMethods[0] : 'cod');
+%>
 <%- include('partials/header') %>
 
 <div class="container py-4">
@@ -11,9 +19,14 @@
     </div>
   <% } %>
 
+  <% if (!allowedMethods.length) { %>
+    <div class="alert alert-warning">আপনার কার্টের প্রোডাক্টগুলোর জন্য কোনো পেমেন্ট মেথড সমর্থিত নয়। অনুগ্রহ করে কার্ট সম্পাদনা করুন।</div>
+  <% } %>
+
   <form method="post" action="/checkout" id="checkoutForm">
     <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
     <% if (buyNowId) { %><input type="hidden" name="buyNowId" value="<%= buyNowId %>"><% } %>
+    <% if (buyNowVariantId) { %><input type="hidden" name="buyNowVariantId" value="<%= buyNowVariantId %>"><% } %>
     <div class="row g-4">
       <div class="col-lg-7">
         <div class="checkout-box">
@@ -49,30 +62,24 @@
         <div class="checkout-box mt-4">
           <h5>পেমেন্ট মেথড</h5>
 
-          <div class="payment-option">
-            <label>
-              <input type="radio" name="paymentMethod" value="cod" checked>
-              <span><i class="bi bi-cash-coin"></i> ক্যাশ অন ডেলিভারি (COD)</span>
-            </label>
-          </div>
-
-          <div class="payment-option">
-            <label>
-              <input type="radio" name="paymentMethod" value="bkash" id="pmBkash">
-              <span><i class="bi bi-phone"></i> bKash (<%= settings.bkash_number ? 'Send Money' : '' %>)</span>
-            </label>
-            <div class="payment-extra" id="bkashExtra" style="display:none">
-              <p class="small mb-2"><strong><%= settings.bkash_number %></strong> নম্বরে <strong><%= currency(grandTotal) %></strong> "Send Money" করুন, তারপর নিচে Transaction ID দিন।</p>
-              <input type="text" name="bkashTrxId" class="form-control" placeholder="bKash Transaction ID">
+          <% ['cod', 'bkash', 'sslcommerz'].forEach(function (m) {
+               const allowed = allowedMethods.includes(m);
+               const label = paymentLabels[m];
+          %>
+            <div class="payment-option <%= allowed ? '' : 'disabled' %>">
+              <label>
+                <input type="radio" name="paymentMethod" value="<%= m %>" <%= !allowed ? 'disabled' : '' %> <%= (allowed && defaultMethod === m) ? 'checked' : '' %> <%= m === 'bkash' ? 'id="pmBkash"' : '' %>>
+                <span><i class="bi <%= label.icon %>"></i> <%= label.text %><% if (m === 'bkash' && settings.bkash_number) { %> (Send Money)<% } %></span>
+                <% if (!allowed) { %><small class="text-danger ms-2">এই প্রোডাক্টের জন্য উপলব্ধ নয়</small><% } %>
+              </label>
+              <% if (m === 'bkash') { %>
+                <div class="payment-extra" id="bkashExtra" style="display:<%= (allowed && defaultMethod === 'bkash') ? 'block' : 'none' %>">
+                  <p class="small mb-2"><strong><%= settings.bkash_number %></strong> নম্বরে <strong><%= currency(grandTotal) %></strong> "Send Money" করুন, তারপর নিচে Transaction ID দিন।</p>
+                  <input type="text" name="bkashTrxId" class="form-control" placeholder="bKash Transaction ID" value="<%= formData.bkashTrxId || '' %>">
+                </div>
+              <% } %>
             </div>
-          </div>
-
-          <div class="payment-option">
-            <label>
-              <input type="radio" name="paymentMethod" value="sslcommerz">
-              <span><i class="bi bi-credit-card"></i> কার্ড / মোবাইল ব্যাংকিং (SSLCommerz)</span>
-            </label>
-          </div>
+          <% }); %>
         </div>
       </div>
 
@@ -84,7 +91,7 @@
               <li>
                 <img src="<%= productImageUrl(item.product.image) %>" alt="">
                 <div class="flex-grow-1">
-                  <div><%= item.product.name %></div>
+                  <div><%= item.product.name %><% if (item.variantLabel) { %> <small class="text-muted">(<%= item.variantLabel %>)</small><% } %></div>
                   <small class="text-muted">Qty: <%= item.qty %></small>
                 </div>
                 <div><%= currency(item.lineTotal) %></div>
@@ -96,7 +103,7 @@
           <div class="d-flex justify-content-between"><span>ডেলিভারি চার্জ</span><span><%= currency(shippingFee) %></span></div>
           <hr>
           <div class="d-flex justify-content-between fw-bold fs-5"><span>মোট</span><span><%= currency(grandTotal) %></span></div>
-          <button type="submit" class="btn btn-buy-now w-100 mt-3">অর্ডার কনফার্ম করুন <i class="bi bi-check2-circle"></i></button>
+          <button type="submit" class="btn btn-buy-now w-100 mt-3" <%= !allowedMethods.length ? 'disabled' : '' %>>অর্ডার কনফার্ম করুন <i class="bi bi-check2-circle"></i></button>
         </div>
       </div>
     </div>
@@ -106,7 +113,8 @@
 <script>
 document.querySelectorAll('input[name="paymentMethod"]').forEach(function (radio) {
   radio.addEventListener('change', function () {
-    document.getElementById('bkashExtra').style.display = (document.getElementById('pmBkash').checked) ? 'block' : 'none';
+    var pmBkash = document.getElementById('pmBkash');
+    document.getElementById('bkashExtra').style.display = (pmBkash && pmBkash.checked) ? 'block' : 'none';
   });
 });
 </script>

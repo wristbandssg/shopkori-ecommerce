@@ -1,12 +1,12 @@
 <%
-  const hasSale = p.salePrice && p.salePrice < p.price;
-  const discount = hasSale ? Math.round(((p.price - p.salePrice) / p.price) * 100) : 0;
+  const hasVariants = !!(p.hasVariants && p.variants && p.variants.length);
+  const displayPrice = hasVariants ? p.startingPrice() : p.effectivePrice;
   const rating = p.rating || 4.5;
 %>
 <div class="product-card">
   <a href="/product/<%= p.slug %>" class="product-card-img">
     <img src="<%= productImageUrl(p.image) %>" alt="<%= p.name %>" loading="lazy" onerror="this.src='/images/product-placeholder.svg'">
-    <% if (hasSale) { %><span class="badge-discount">-<%= discount %>%</span><% } %>
+    <% if (!hasVariants && p.hasSale) { %><span class="badge-discount">-<%= p.discountPercent %>%</span><% } %>
     <% if (p.isFlashSale) { %><span class="badge-flash"><i class="bi bi-lightning-fill"></i></span><% } %>
   </a>
   <div class="product-card-body">
@@ -18,16 +18,22 @@
       <span class="rating-num">(<%= rating.toFixed(1) %>)</span>
     </div>
     <div class="product-price">
-      <% if (hasSale) { %>
-        <span class="price-now"><%= currency(p.salePrice) %></span>
+      <% if (hasVariants) { %>
+        <span class="text-muted small">থেকে</span> <span class="price-now"><%= currency(displayPrice) %></span>
+      <% } else if (p.hasSale) { %>
+        <span class="price-now"><%= currency(p.effectivePrice) %></span>
         <span class="price-old"><%= currency(p.price) %></span>
       <% } else { %>
-        <span class="price-now"><%= currency(p.price) %></span>
+        <span class="price-now"><%= currency(p.effectivePrice) %></span>
       <% } %>
     </div>
     <div class="product-actions">
-      <button class="btn btn-add-cart" data-add-cart data-id="<%= p._id %>">আরো কিনুন</button>
-      <a href="/checkout?buyNow=<%= p._id %>" class="btn btn-buy-now">এখনই কিনুন</a>
+      <% if (hasVariants) { %>
+        <a href="/product/<%= p.slug %>" class="btn btn-buy-now w-100">ভ্যারিয়েন্ট দেখুন</a>
+      <% } else { %>
+        <button class="btn btn-add-cart" data-add-cart data-id="<%= p._id %>">আরো কিনুন</button>
+        <a href="/checkout?buyNow=<%= p._id %>" class="btn btn-buy-now">এখনই কিনুন</a>
+      <% } %>
     </div>
   </div>
 </div>

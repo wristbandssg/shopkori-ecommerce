@@ -42,6 +42,58 @@ async function checkOrderLimitCard(card, matchQuery, fallbackMessage) {
 }
 
 /* =====================================================================
+   Per-product delivery (Admin > Manage Product > Products > Delivery Type
+   / Delivery Method) enforcement helpers.
+   ===================================================================== */
+const ALL_PAYMENT_METHODS = ['cod', 'bkash', 'sslcommerz'];
+
+// One shipment, one fee: if every item in the cart is Free Shipping the
+// order ships free; otherwise the fee is the highest fee any single item
+// requires (a Flat Rate item's own rate, or the site's default flat fee
+// for a Manual item) — that highest rate is what actually covers shipping
+// the whole parcel.
+function computeShippingFee(items, globalFlatFee) {
+  if (!items.length) return 0;
+  const fees = items.map((item) => {
+    const p = item.product;
+    if (p.deliveryType === 'free_shipping') return 0;
+    if (p.deliveryType === 'flat_rate') return Number(p.deliveryFlatRate) || 0;
+    return Number(globalFlatFee) || 0;
+  });
+  return Math.max(...fees);
+}
+
+// A product with no deliveryMethods set has no restriction. The cart's
+// allowed methods are the intersection of every item's allowed methods.
+function computeAllowedPaymentMethods(items) {
+  let allowed = ALL_PAYMENT_METHODS;
+  items.forEach((item) => {
+    const methods = item.product.deliveryMethods;
+    if (methods && methods.length) {
+      allowed = allowed.filter((m) => methods.includes(m));
+    }
+  });
+  return allowed;
+}
+
+// Resolves a buy-now line item (product + optional variant), respecting
+// variantMandatory — returns null when a mandatory variant wasn't chosen.
+function resolveBuyNowItem(product, variantId) {
+  if (product.hasVariants && product.variantMandatory && !variantId) return null;
+  const resolved = product.resolveVariant(variantId);
+  if (!resolved) return null;
+  return {
+    product,
+    variant: resolved.variant,
+    variantLabel: resolved.label,
+    qty: 1,
+    price: resolved.price,
+    stock: resolved.stock,
+    lineTotal: resolved.price,
+  };
+}
+
+/* =====================================================================
    HOME
    ===================================================================== */
 router.get('/', async (req, res, next) => {
@@ -127,7 +179,14 @@ router.get('/product/:slug', async (req, res, next) => {
       status: true,
     }).limit(4);
 
-    res.render('product', { pageTitle: product.name, product, related });
+    res.render('product', {
+      pageTitle: product.name,
+      product,
+      related,
+      metaTitle: product.metaTitle,
+      metaDescription: product.metaDescription,
+      metaKeywords: product.metaKeywords,
+    });
   } catch (err) {
     next(err);
   }
@@ -137,13 +196,22 @@ router.get('/product/:slug', async (req, res, next) => {
    CART
    ===================================================================== */
 router.post('/cart/action', async (req, res) => {
-  const { action, productId, qty } = req.body;
+  const { action, productId, qty, variantId } = req.body;
   const q = parseInt(qty, 10) || 1;
 
   try {
-    if (action === 'add') cart.cartAdd(req, productId, Math.max(1, q));
-    else if (action === 'update') cart.cartSet(req, productId, Math.max(0, q));
-    else if (action === 'remove') cart.cartRemove(req, productId);
+    if (action === 'add') {
+      const product = await Product.findOne({ _id: productId, status: true });
+      if (!product) return res.status(400).json({ success: false, message: 'প্রোডাক্টটি পাওয়া যায়নি।' });
+      if (product.hasVariants && product.variantMandatory && !variantId) {
+        return res.status(400).json({ success: false, message: 'দয়া করে একটি ভ্যারিয়েন্ট নির্বাচন করুন।' });
+      }
+      if (variantId && !product.variants.id(variantId)) {
+        return res.status(400).json({ success: false, message: 'ভ্যারিয়েন্টটি পাওয়া যায়নি।' });
+      }
+      cart.cartAdd(req, productId, Math.max(1, q), variantId || null);
+    } else if (action === 'update') cart.cartSet(req, productId, Math.max(0, q), variantId || null);
+    else if (action === 'remove') cart.cartRemove(req, productId, variantId || null);
     else if (action === 'clear') cart.cartClear(req);
     else return res.status(400).json({ success: false, message: 'Unknown action' });
 
@@ -181,12 +249,14 @@ router.post('/cart', verifyCsrf, async (req, res, next) => {
   try {
     if (req.body.updateQty) {
       const qty = req.body.qty || {};
-      Object.keys(qty).forEach((productId) => {
-        cart.cartSet(req, productId, Math.max(0, parseInt(qty[productId], 10) || 0));
+      Object.keys(qty).forEach((key) => {
+        const { productId, variantId } = cart.parseKey(key);
+        cart.cartSet(req, productId, Math.max(0, parseInt(qty[key], 10) || 0), variantId);
       });
       req.flash('success', 'কার্ট আপডেট হয়েছে।');
     } else if (req.body.removeId) {
-      cart.cartRemove(req, req.body.removeId);
+      const { productId, variantId } = cart.parseKey(req.body.removeId);
+      cart.cartRemove(req, productId, variantId);
       req.flash('success', 'প্রোডাক্ট কার্ট থেকে সরানো হয়েছে।');
     }
     res.redirect('/cart');
@@ -203,13 +273,16 @@ router.get('/checkout', async (req, res, next) => {
     let items = [];
     let subtotal = 0;
     const buyNowId = req.query.buyNow;
+    const buyNowVariantId = req.query.variant || '';
 
     if (buyNowId) {
       const product = await Product.findOne({ _id: buyNowId, status: true });
       if (product) {
-        const price = product.salePrice && product.salePrice < product.price ? product.salePrice : product.price;
-        items = [{ product, qty: 1, price, lineTotal: price }];
-        subtotal = price;
+        const item = resolveBuyNowItem(product, buyNowVariantId);
+        if (item) {
+          items = [item];
+          subtotal = item.lineTotal;
+        }
       }
     } else {
       const details = await cart.cartDetails(req);
@@ -218,11 +291,12 @@ router.get('/checkout', async (req, res, next) => {
     }
 
     if (items.length === 0) {
-      req.flash('warning', 'চেকআউট করার আগে অন্তত একটি প্রোডাক্ট কার্টে যোগ করুন।');
+      req.flash('warning', 'চেকআউট করার আগে অন্তত একটি প্রোডাক্ট কার্টে যোগ করুন (অথবা প্রোডাক্ট পেজে ফিরে গিয়ে ভ্যারিয়েন্ট নির্বাচন করুন)।');
       return res.redirect('/');
     }
 
-    const shippingFee = Number(res.locals.settings.flat_shipping_fee || 80);
+    const shippingFee = computeShippingFee(items, res.locals.settings.flat_shipping_fee || 80);
+    const allowedMethods = computeAllowedPaymentMethods(items);
     res.render('checkout', {
       pageTitle: 'চেকআউট',
       items,
@@ -230,6 +304,8 @@ router.get('/checkout', async (req, res, next) => {
       shippingFee,
       grandTotal: subtotal + shippingFee,
       buyNowId: buyNowId || null,
+      buyNowVariantId,
+      allowedMethods,
       errors: [],
       formData: {},
     });
@@ -246,15 +322,18 @@ router.post('/checkout', async (req, res, next) => {
     }
 
     const buyNowId = req.body.buyNowId || null;
+    const buyNowVariantId = req.body.buyNowVariantId || '';
     let items = [];
     let subtotal = 0;
 
     if (buyNowId) {
       const product = await Product.findOne({ _id: buyNowId, status: true });
       if (product) {
-        const price = product.salePrice && product.salePrice < product.price ? product.salePrice : product.price;
-        items = [{ product, qty: 1, price, lineTotal: price }];
-        subtotal = price;
+        const item = resolveBuyNowItem(product, buyNowVariantId);
+        if (item) {
+          items = [item];
+          subtotal = item.lineTotal;
+        }
       }
     } else {
       const details = await cart.cartDetails(req);
@@ -267,7 +346,8 @@ router.post('/checkout', async (req, res, next) => {
       return res.redirect('/');
     }
 
-    const shippingFee = Number(res.locals.settings.flat_shipping_fee || 80);
+    const shippingFee = computeShippingFee(items, res.locals.settings.flat_shipping_fee || 80);
+    const allowedMethods = computeAllowedPaymentMethods(items);
     const grandTotal = subtotal + shippingFee;
 
     const { name, email, phone, address, city, notes, paymentMethod, bkashTrxId } = req.body;
@@ -276,7 +356,14 @@ router.post('/checkout', async (req, res, next) => {
     if (!phone || !/^[0-9+\-\s]{6,20}$/.test(phone)) errors.push('সঠিক মোবাইল নম্বর দিন।');
     if (!address || !address.trim()) errors.push('ডেলিভারি ঠিকানা আবশ্যক।');
     if (!['cod', 'bkash', 'sslcommerz'].includes(paymentMethod)) errors.push('পেমেন্ট মেথড নির্বাচন করুন।');
+    else if (!allowedMethods.includes(paymentMethod)) errors.push('এই প্রোডাক্ট(গুলো)-র জন্য এই পেমেন্ট মেথডটি সমর্থিত নয়। অনুগ্রহ করে অন্য একটি মেথড বেছে নিন।');
     if (paymentMethod === 'bkash' && (!bkashTrxId || !bkashTrxId.trim())) errors.push('bKash Transaction ID আবশ্যক।');
+    items.forEach((item) => {
+      if (!item.product.overselling && item.qty > item.stock) {
+        const label = item.variantLabel ? `${item.product.name} (${item.variantLabel})` : item.product.name;
+        errors.push(`${label} — পর্যাপ্ত স্টক নেই (আছে ${item.stock} টি)।`);
+      }
+    });
 
     // Order Setting enforcement (see block comment above router.use(storeLocals)).
     const orderSettings = await getOrderSettings();
@@ -320,6 +407,8 @@ router.post('/checkout', async (req, res, next) => {
         shippingFee,
         grandTotal,
         buyNowId,
+        buyNowVariantId,
+        allowedMethods,
         errors,
         formData: req.body,
       });
@@ -339,8 +428,10 @@ router.post('/checkout', async (req, res, next) => {
       notes: (notes || '').trim(),
       items: items.map((item) => ({
         product: item.product._id,
-        productName: item.product.name,
+        productName: item.variantLabel ? `${item.product.name} (${item.variantLabel})` : item.product.name,
         productImage: item.product.image,
+        variantId: item.variant ? item.variant._id : null,
+        variantLabel: item.variantLabel || '',
         price: item.price,
         qty: item.qty,
         lineTotal: item.lineTotal,
@@ -356,14 +447,29 @@ router.post('/checkout', async (req, res, next) => {
       trackToken,
     });
 
-    // decrement stock
+    // Decrement stock — the variant's own stock when one was picked,
+    // otherwise the product's base stock. When overselling is on for that
+    // product, skip the clamp-to-zero step so it can legitimately go
+    // negative (a visible backorder count) instead of being blocked.
     await Promise.all(
-      items.map((item) =>
-        Product.updateOne(
-          { _id: item.product._id },
-          { $inc: { stock: -item.qty } }
-        ).then(() => Product.updateOne({ _id: item.product._id, stock: { $lt: 0 } }, { $set: { stock: 0 } }))
-      )
+      items.map((item) => {
+        if (item.variant) {
+          const p = Product.updateOne(
+            { _id: item.product._id, 'variants._id': item.variant._id },
+            { $inc: { 'variants.$.stock': -item.qty } }
+          );
+          if (item.product.overselling) return p;
+          return p.then(() =>
+            Product.updateOne(
+              { _id: item.product._id, 'variants._id': item.variant._id, 'variants.$.stock': { $lt: 0 } },
+              { $set: { 'variants.$.stock': 0 } }
+            )
+          );
+        }
+        const p = Product.updateOne({ _id: item.product._id }, { $inc: { stock: -item.qty } });
+        if (item.product.overselling) return p;
+        return p.then(() => Product.updateOne({ _id: item.product._id, stock: { $lt: 0 } }, { $set: { stock: 0 } }));
+      })
     );
 
     if (!buyNowId) {
@@ -387,7 +493,27 @@ router.get('/order/success/:orderNumber', async (req, res, next) => {
   try {
     const order = await Order.findOne({ orderNumber: req.params.orderNumber });
     if (!order) return res.redirect('/');
-    res.render('order-success', { pageTitle: 'অর্ডার সফল হয়েছে', order });
+
+    // After Confirm Products (Admin > Products > a product's After Confirm
+    // Products section): show upsell products configured on any product
+    // that was just ordered, using each product's current settings.
+    const orderedProductIds = order.items.map((i) => i.product).filter(Boolean);
+    const orderedProducts = orderedProductIds.length
+      ? await Product.find({ _id: { $in: orderedProductIds } })
+      : [];
+    const upsellIds = new Set();
+    let offerText = '';
+    orderedProducts.forEach((p) => {
+      if (p.afterConfirmEnabled && p.afterConfirmProducts && p.afterConfirmProducts.length) {
+        p.afterConfirmProducts.forEach((id) => upsellIds.add(String(id)));
+        if (p.afterConfirmOfferDescription) offerText = p.afterConfirmOfferDescription;
+      }
+    });
+    const upsellProducts = upsellIds.size
+      ? await Product.find({ _id: { $in: [...upsellIds] }, status: true })
+      : [];
+
+    res.render('order-success', { pageTitle: 'অর্ডার সফল হয়েছে', order, upsellProducts, offerText });
   } catch (err) {
     next(err);
   }

@@ -5,6 +5,8 @@ const orderItemSchema = new mongoose.Schema(
     product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', default: null },
     productName: { type: String, required: true },
     productImage: { type: String, default: null },
+    variantId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    variantLabel: { type: String, default: '' },
     price: { type: Number, required: true },
     qty: { type: Number, required: true, default: 1 },
     lineTotal: { type: Number, required: true },
