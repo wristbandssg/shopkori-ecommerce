@@ -90,7 +90,15 @@ const productSchema = new mongoose.Schema(
 
     isFeatured: { type: Boolean, default: false },
     isFlashSale: { type: Boolean, default: false },
+    // `status` stays the single boolean every storefront/admin query already
+    // filters on ("is this product visible right now"). `publishStatus` +
+    // `publishAt` are the admin-facing Draft/Published/Schedule controls that
+    // drive it — kept in sync in routes/admin.js (saveProduct, bulk-status,
+    // duplicate) and by the scheduled-publish job in server.js, which flips
+    // a due 'scheduled' product over to 'published'/status:true.
     status: { type: Boolean, default: true },
+    publishStatus: { type: String, enum: ['draft', 'published', 'scheduled'], default: 'published' },
+    publishAt: { type: Date, default: null },
     views: { type: Number, default: 0 },
     rating: { type: Number, default: 4.5 },
   },

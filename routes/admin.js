@@ -882,7 +882,12 @@ router.post('/products/bulk-status', verifyCsrf, async (req, res, next) => {
     const ids = parseIds(req.body);
     const status = req.query.status === 'active';
     if (ids.length) {
-      await Product.updateMany({ _id: { $in: ids } }, { status });
+      // Keep publishStatus in sync too, and clear any leftover schedule date,
+      // so a bulk-activated/deactivated product doesn't stay tagged "Scheduled".
+      await Product.updateMany(
+        { _id: { $in: ids } },
+        { status, publishStatus: status ? 'published' : 'draft', publishAt: null }
+      );
       req.flash('success', `${ids.length} product(s) ${status ? 'activated' : 'deactivated'}.`);
     }
     res.redirect(req.get('Referer') || '/admin/products');
@@ -912,13 +917,15 @@ router.get('/products/duplicate/:id', async (req, res, next) => {
     copy.slug = await ensureUniqueSlug(Product, slugify(copy.name), null);
     copy.sku = original.sku ? `${original.sku}-COPY` : '';
     copy.status = false; // duplicated products start hidden so they can be reviewed/edited first
+    copy.publishStatus = 'draft';
+    copy.publishAt = null;
     // Variant subdocuments need fresh _ids of their own, not the originals'.
     copy.variants = (original.variants || []).map((v) => {
       const { _id, ...rest } = v;
       return rest;
     });
     const created = await Product.create(copy);
-    req.flash('success', 'Product duplicated. It is hidden (Inactive) until you review and publish it.');
+    req.flash('success', 'Product duplicated as a Draft. Review it, then Publish when ready.');
     res.redirect(`/admin/products/${created._id}/edit`);
   } catch (err) {
     next(err);
@@ -994,11 +1001,38 @@ async function saveProduct(req, res, next, existingId) {
       deliveryType, deliveryFlatRate,
       afterConfirmOfferDescription,
       metaTitle, metaKeywords, metaDescription,
+      publishStatus, publishAt,
     } = req.body;
 
     const errors = [];
     if (!name || !name.trim()) errors.push('Product name is required.');
     if (!categoryId) errors.push('Category is required.');
+
+    // Publish / Draft / Schedule — resolves to the single `status` boolean
+    // every existing storefront/admin query already filters on, so nothing
+    // else in the app has to change. A schedule time that's already in the
+    // past just publishes immediately instead of erroring.
+    const now = new Date();
+    let publishStatusValue = ['draft', 'published', 'scheduled'].includes(publishStatus) ? publishStatus : 'published';
+    let publishAtValue = null;
+    let statusValue = true;
+    if (publishStatusValue === 'draft') {
+      statusValue = false;
+    } else if (publishStatusValue === 'scheduled') {
+      const parsedPublishAt = publishAt ? new Date(publishAt) : null;
+      if (!parsedPublishAt || Number.isNaN(parsedPublishAt.getTime())) {
+        errors.push('Please choose a date & time to schedule this product.');
+      } else if (parsedPublishAt <= now) {
+        publishStatusValue = 'published';
+        statusValue = true;
+      } else {
+        publishAtValue = parsedPublishAt;
+        statusValue = false;
+      }
+    } else {
+      publishStatusValue = 'published';
+      statusValue = true;
+    }
     const priceNum = parseFloat(price);
     if (!priceNum || priceNum <= 0) errors.push('Please enter a valid regular price.');
     const salePriceNum = salePrice !== undefined && salePrice !== '' ? parseFloat(salePrice) : NaN;
@@ -1151,7 +1185,9 @@ async function saveProduct(req, res, next, existingId) {
       metaDescription: (metaDescription || '').trim(),
       isFeatured: !!req.body.isFeatured,
       isFlashSale: !!req.body.isFlashSale,
-      status: !!req.body.status,
+      status: statusValue,
+      publishStatus: publishStatusValue,
+      publishAt: publishAtValue,
     };
 
     if (existing) {

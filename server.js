@@ -10,6 +10,7 @@ const mongoose = require('mongoose');
 const connectDB = require('./config/db');
 const flashMiddleware = require('./middleware/flash');
 const { csrfMiddleware } = require('./middleware/csrf');
+const Product = require('./models/Product');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -57,6 +58,26 @@ async function bootstrap() {
 
   app.use(flashMiddleware);
   app.use(csrfMiddleware);
+
+  // ---- Scheduled product publishing ----
+  // Admin > Products lets a product be scheduled to go live at a future
+  // date/time (publishStatus: 'scheduled', publishAt). Nothing else in the
+  // request path flips it live on its own, so this small background job
+  // does: every minute (and once at boot, to catch anything that came due
+  // while the server was down), any scheduled product whose time has
+  // arrived is switched to published/visible.
+  async function publishDueScheduledProducts() {
+    try {
+      await Product.updateMany(
+        { publishStatus: 'scheduled', publishAt: { $lte: new Date() } },
+        { $set: { publishStatus: 'published', status: true } }
+      );
+    } catch (err) {
+      console.error('[scheduled-publish]', err);
+    }
+  }
+  publishDueScheduledProducts();
+  setInterval(publishDueScheduledProducts, 60 * 1000);
 
   // ---- Routes ----
   app.use('/', require('./routes/store'));
