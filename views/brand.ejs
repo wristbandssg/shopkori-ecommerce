@@ -1,0 +1,101 @@
+<%
+  const ogImage = (brand && (brand.bannerImage || brand.image)) ? baseUrl + categoryImageUrl(brand.bannerImage || brand.image) : '';
+%>
+<%- include('partials/header', { ogImage }) %>
+
+<%
+  // ---- schema.org structured data ----
+  // Same BreadcrumbList + ItemList treatment as category.ejs, so a brand
+  // page reads as a real product listing to search engines too.
+  const breadcrumbItems = [
+    { '@type': 'ListItem', position: 1, name: 'হোম', item: baseUrl + '/' },
+    { '@type': 'ListItem', position: 2, name: brand.name, item: baseUrl + '/brand/' + brand.slug },
+  ];
+  const brandBreadcrumbSchema = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: breadcrumbItems };
+  const brandItemListSchema = products.length ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: products.map(function (p, i) {
+      return { '@type': 'ListItem', position: (page - 1) * perPage + i + 1, url: baseUrl + '/product/' + p.slug };
+    }),
+  } : null;
+%>
+<script type="application/ld+json"><%- JSON.stringify(brandBreadcrumbSchema) %></script>
+<% if (brandItemListSchema) { %><script type="application/ld+json"><%- JSON.stringify(brandItemListSchema) %></script><% } %>
+
+<div class="container py-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">হোম</a></li>
+      <li class="breadcrumb-item active"><%= brand.name %></li>
+    </ol>
+  </nav>
+
+  <% if (brand.bannerImage) { %>
+    <img src="<%= categoryImageUrl(brand.bannerImage) %>" class="brand-banner-img mb-3" alt="<%= brand.name %>">
+  <% } %>
+
+  <div class="d-flex align-items-center gap-3 mb-2">
+    <img src="<%= categoryImageUrl(brand.image) %>" class="brand-logo-img" alt="<%= brand.name %>">
+    <h1 class="category-intro-title mb-0"><%= brand.pageTitle || brand.name %></h1>
+  </div>
+  <% if (brand.shortDescription) { %>
+    <p class="category-intro-text text-muted mb-3"><%- nl2br(brand.shortDescription) %></p>
+  <% } %>
+
+  <div class="row">
+    <div class="col-lg-3 mb-4">
+      <div class="filter-box">
+        <h6>ব্র্যান্ড</h6>
+        <ul class="filter-cat-list">
+          <% allBrands.forEach(function (b) { %>
+            <li><a href="/brand/<%= b.slug %>" class="<%= String(brand._id) === String(b._id) ? 'active' : '' %>"><%= b.name %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-lg-9">
+      <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h5 class="mb-0"><%= total %> টি প্রোডাক্ট</h5>
+        <form method="get" class="d-flex align-items-center gap-2">
+          <label class="mb-0 small">সাজান:</label>
+          <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="newest" <%= sort === 'newest' ? 'selected' : '' %>>নতুন</option>
+            <option value="price_asc" <%= sort === 'price_asc' ? 'selected' : '' %>>মূল্য: কম থেকে বেশি</option>
+            <option value="price_desc" <%= sort === 'price_desc' ? 'selected' : '' %>>মূল্য: বেশি থেকে কম</option>
+            <option value="popular" <%= sort === 'popular' ? 'selected' : '' %>>জনপ্রিয়তা</option>
+          </select>
+        </form>
+      </div>
+
+      <% if (!products.length) { %>
+        <div class="alert alert-info">এই মুহূর্তে এই ব্র্যান্ডের কোনো প্রোডাক্ট পাওয়া যায়নি।</div>
+      <% } else { %>
+        <div class="product-grid">
+          <% products.forEach(function (p) { %><%- include('partials/product-card', { p }) %><% }); %>
+        </div>
+
+        <% if (totalPages > 1) { %>
+          <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+              <% for (let i = 1; i <= totalPages; i++) { %>
+                <li class="page-item <%= i === page ? 'active' : '' %>">
+                  <a class="page-link" href="/brand/<%= brand.slug %>?sort=<%= sort %>&page=<%= i %>"><%= i %></a>
+                </li>
+              <% } %>
+            </ul>
+          </nav>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (brand.description) { %>
+    <div class="category-seo-content mt-4 pt-4 border-top">
+      <%- brand.description %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

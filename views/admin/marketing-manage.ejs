@@ -1,0 +1,134 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/marketing" class="text-decoration-none">Marketing Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted"><%= meta.title %></span>
+</nav>
+
+<% var s = marketing[card] || {}; %>
+
+<div class="row g-4">
+  <div class="col-lg-7">
+    <div class="admin-card">
+      <div class="d-flex align-items-center gap-3 mb-3">
+        <div class="d-flex align-items-center justify-content-center rounded-circle text-white" style="width:40px;height:40px;background:<%= meta.color %>;flex-shrink:0;">
+          <% if (meta.icon) { %><i class="bi <%= meta.icon %>"></i><% } else { %><strong>G</strong><% } %>
+        </div>
+        <div>
+          <h5 class="mb-0"><%= meta.title %></h5>
+          <span class="badge bg-<%= s.status ? 'success' : 'secondary' %>"><%= s.status ? 'ON' : 'OFF' %></span>
+        </div>
+      </div>
+
+      <form method="post" action="/admin/marketing/<%= card %>">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+        <% if (card === 'sms') { %>
+          <p class="small text-muted">Enter your SMS gateway's endpoint as a template. It's filled in and called for real by "Send Test SMS" on the right, and can be reused anywhere else an SMS needs to go out.</p>
+          <div class="mb-3">
+            <label class="form-label">API URL template</label>
+            <input type="text" name="apiUrl" class="form-control" placeholder="https://api.yourgateway.com/send?apikey={apiKey}&senderid={senderId}&number={number}&message={message}" value="<%= s.apiUrl || '' %>">
+            <div class="form-text">Placeholders: <code>{apiKey}</code> <code>{senderId}</code> <code>{number}</code> <code>{message}</code></div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">API Key</label>
+            <input type="text" name="apiKey" class="form-control" value="<%= s.apiKey || '' %>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Sender ID</label>
+            <input type="text" name="senderId" class="form-control" value="<%= s.senderId || '' %>">
+          </div>
+        <% } else if (card === 'facebookPixel') { %>
+          <p class="small text-muted">When ON, the Facebook Pixel base code loads automatically on every storefront page (see views/partials/header.ejs).</p>
+          <div class="mb-3">
+            <label class="form-label">Pixel ID</label>
+            <input type="text" name="pixelId" class="form-control" placeholder="e.g. 123456789012345" value="<%= s.pixelId || '' %>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Access Token <span class="text-muted small">(Conversions API, optional)</span></label>
+            <input type="text" name="accessToken" class="form-control" value="<%= s.accessToken || '' %>">
+          </div>
+        <% } else if (card === 'tiktokPixel') { %>
+          <p class="small text-muted">When ON, the TikTok Pixel base code loads automatically on every storefront page.</p>
+          <div class="mb-3">
+            <label class="form-label">Pixel ID</label>
+            <input type="text" name="pixelId" class="form-control" placeholder="e.g. CXXXXXXXXXXXXXXXXXXX" value="<%= s.pixelId || '' %>">
+          </div>
+        <% } else if (card === 'googleTagManager') { %>
+          <p class="small text-muted">When ON, the GTM container snippet loads in &lt;head&gt; and the required &lt;noscript&gt; iframe right after &lt;body&gt; on every storefront page.</p>
+          <div class="mb-3">
+            <label class="form-label">Container ID</label>
+            <input type="text" name="containerId" class="form-control" placeholder="GTM-XXXXXXX" value="<%= s.containerId || '' %>">
+          </div>
+        <% } else if (card === 'googleAnalytics') { %>
+          <p class="small text-muted">When ON, the Google Analytics (GA4) tag loads automatically on every storefront page.</p>
+          <div class="mb-3">
+            <label class="form-label">Measurement ID</label>
+            <input type="text" name="measurementId" class="form-control" placeholder="G-XXXXXXXXXX" value="<%= s.measurementId || '' %>">
+          </div>
+        <% } else if (card === 'facebookCatalog') { %>
+          <p class="small text-muted">Meta doesn't need a script — it polls a live feed URL. Paste the Feed URL below into Meta Commerce Manager's Data Feed setup; it always reflects your current published products.</p>
+          <div class="mb-3">
+            <label class="form-label">Catalog ID <span class="text-muted small">(from Meta Commerce Manager, for your reference)</span></label>
+            <input type="text" name="catalogId" class="form-control" value="<%= s.catalogId || '' %>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Feed URL</label>
+            <div class="input-group">
+              <input type="text" class="form-control" value="<%= baseUrl %>/feed/facebook-catalog.xml" readonly id="feedUrlInput">
+              <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('feedUrlInput').select(); document.execCommand('copy');"><i class="bi bi-clipboard"></i> Copy</button>
+            </div>
+            <div class="form-text">Live now — <a href="/feed/facebook-catalog.xml" target="_blank">open the feed</a> to see it.</div>
+          </div>
+        <% } %>
+
+        <div class="mb-3">
+          <label class="form-label">Status</label>
+          <select name="status" class="form-select">
+            <option value="on" <%= s.status ? 'selected' : '' %>>ON</option>
+            <option value="off" <%= !s.status ? 'selected' : '' %>>OFF</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-brand">Save Changes</button>
+        <a href="/admin/marketing" class="btn btn-outline-secondary">Back</a>
+      </form>
+    </div>
+  </div>
+
+  <% if (card === 'sms') { %>
+    <div class="col-lg-5">
+      <div class="admin-card">
+        <h6>Send Test SMS</h6>
+        <p class="small text-muted">Sends a real request to the API URL above right now, and shows exactly what the gateway sent back.</p>
+        <form method="post" action="/admin/marketing/sms/test">
+          <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+          <div class="mb-3">
+            <label class="form-label">Test Number</label>
+            <input type="text" name="testNumber" class="form-control" placeholder="01700000000" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Message</label>
+            <textarea name="testMessage" class="form-control" rows="2">This is a test SMS from your ShopKori admin panel.</textarea>
+          </div>
+          <button type="submit" class="btn btn-outline-primary w-100">Send Test SMS</button>
+        </form>
+
+        <% if (testResult) { %>
+          <div class="alert alert-<%= testResult.ok ? 'success' : 'danger' %> mt-3 mb-0">
+            <% if (testResult.ok) { %>
+              <strong>Gateway responded (HTTP <%= testResult.statusCode %>)</strong>
+              <pre class="small mb-0 mt-2" style="white-space:pre-wrap;word-break:break-all;"><%= testResult.body %></pre>
+            <% } else { %>
+              <strong>Failed:</strong> <%= testResult.error %>
+            <% } %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/admin-footer') %>

@@ -98,6 +98,9 @@
     </div>
     <div class="col-md-7">
       <h1 class="product-detail-title"><%= product.name %></h1>
+      <% if (product.brand && product.brand.name) { %>
+        <div class="product-brand-link mb-1"><a href="/brand/<%= product.brand.slug %>">ব্র্যান্ড: <%= product.brand.name %></a></div>
+      <% } %>
       <div class="product-rating mb-2">
         <% for (let i = 1; i <= 5; i++) { %>
           <% if (i <= Math.round(rating)) { %><i class="bi bi-star-fill"></i><% } else { %><i class="bi bi-star"></i><% } %>

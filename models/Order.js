@@ -82,6 +82,34 @@ const orderSchema = new mongoose.Schema(
     // limit enforcement in Order Setting.
     ip: { type: String, default: '' },
     trackToken: { type: String, default: '' },
+
+    // -- In-house Delivery Man tracking (Admin > Manage Delivery) --
+    // Separate from `courier`/`assignedEmployee` above, which are for
+    // 3rd-party courier hand-off and general staff assignment. This is an
+    // order's own physical journey through an in-house rider: Delivery Man
+    // (status/deliveryMan) -> Delivered Order (collected) -> Clear Delivery
+    // (clearedToOffice), or, once cancelled, Cancelled Order / Return
+    // Confirm (returnStatus). "Employee"/"deliveryMan" is always an Admin
+    // account, same as `assignedEmployee` — see Admin > Staff.
+    delivery: {
+      status: {
+        type: String,
+        enum: ['pending', 'picked', 'received', 'assigned', 'out_for_delivery', 'customer_not_available', 'hold'],
+        default: 'pending',
+      },
+      deliveryMan: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+      assignedAt: { type: Date, default: null },
+      note: { type: String, default: '' },
+      officeNote: { type: String, default: '' },
+      // COD cash collected from the customer at hand-off.
+      collected: { type: Boolean, default: false },
+      collectedAt: { type: Date, default: null },
+      // The rider has since handed that cash over to the office (Clear Delivery).
+      clearedToOffice: { type: Boolean, default: false },
+      clearedAt: { type: Date, default: null },
+      // Set once the order is cancelled — the return-to-office journey.
+      returnStatus: { type: String, enum: ['', 'return_pending', 'return_sending', 'return_received'], default: '' },
+    },
   },
   { timestamps: true }
 );

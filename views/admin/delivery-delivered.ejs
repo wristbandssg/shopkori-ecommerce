@@ -1,0 +1,73 @@
+<%- include('partials/admin-header') %>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#f0ad4e;"><i class="bi bi-hourglass-split"></i></div>
+      <div><span class="stat-value"><%= currency(pendingAmount) %></span><span class="stat-label">Pending Amount</span></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#2e9e5b;"><i class="bi bi-cash-coin"></i></div>
+      <div><span class="stat-value"><%= currency(collectedAmount) %></span><span class="stat-label">Collected Amount</span></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#337ab7;"><i class="bi bi-wallet2"></i></div>
+      <div><span class="stat-value"><%= currency(availableAmount) %></span><span class="stat-label">Available Amount</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex gap-2 flex-wrap">
+    <input type="text" name="q" class="form-control" style="max-width:260px" placeholder="Search order#, name or phone" value="<%= q %>">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Search</button>
+  </form>
+</div>
+
+<div class="admin-card">
+  <form method="post" id="deliveredOrderForm">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+    <div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+      <div class="form-check">
+        <input type="checkbox" class="form-check-input js-select-all" id="selectAllDelivery">
+        <label class="form-check-label" for="selectAllDelivery">Select All</label>
+      </div>
+      <select name="employeeId" class="form-select" style="max-width:220px">
+        <option value="">-- Select Employee --</option>
+        <% employees.forEach(function (e) { %>
+          <option value="<%= e._id %>"><%= e.fullName || e.username %></option>
+        <% }); %>
+      </select>
+      <button type="submit" formaction="/admin/delivery/delivered/assign" class="btn btn-outline-primary btn-sm">Assign</button>
+      <button type="submit" formaction="/admin/delivery/delivered/office-send" class="btn btn-brand btn-sm">Send to Office</button>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th></th><th>Order ID</th><th>Customer Info</th><th>Amount</th><th>Cash Collected</th><th>Delivery Man</th></tr></thead>
+        <tbody>
+          <% orders.forEach(function (o) { %>
+            <tr>
+              <td><input type="checkbox" class="form-check-input" name="ids" value="<%= o._id %>"></td>
+              <td>
+                <a href="/admin/orders/<%= o._id %>"><strong>#<%= o.orderNumber %></strong></a>
+                <br><small class="text-muted"><%= new Date(o.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></small>
+              </td>
+              <td><%= o.customerName %><br><small class="text-muted"><i class="bi bi-telephone"></i> <%= o.customerPhone %></small></td>
+              <td><%= currency(o.total) %></td>
+              <td><span class="badge bg-<%= o.delivery.collected ? 'success' : 'secondary' %>"><%= o.delivery.collected ? 'Collected' : 'Pending' %></span></td>
+              <td><%= o.delivery.deliveryMan ? (o.delivery.deliveryMan.fullName || o.delivery.deliveryMan.username) : '—' %></td>
+            </tr>
+          <% }); %>
+          <% if (!orders.length) { %><tr><td colspan="6" class="text-center text-muted py-4">No delivered orders awaiting office clearance.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

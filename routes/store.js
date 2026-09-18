@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const router = express.Router();
 
 const Category = require('../models/Category');
+const Brand = require('../models/Brand');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
@@ -96,6 +97,72 @@ function resolveBuyNowItem(product, variantId) {
 }
 
 /* =====================================================================
+   FACEBOOK CATALOG FEED (Admin > Marketing > Facebook Catalog)
+   ---------------------------------------------------------------------
+   A live RSS/g: product feed — the format Meta Commerce Manager's "Data
+   Feed" URL upload expects. Always up to date (built fresh on every
+   request from the current published/in-stock catalog), regardless of
+   whether the card is toggled ON — ON just means "advertise this URL";
+   the URL itself works either way.
+   ===================================================================== */
+function xmlEscape(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+}
+function cdata(str) {
+  return `<![CDATA[${String(str == null ? '' : str).replace(/]]>/g, ']]]]><![CDATA[>')}]]>`;
+}
+
+router.get('/feed/facebook-catalog.xml', async (req, res, next) => {
+  try {
+    const [products, settings] = await Promise.all([
+      Product.find({ status: true }).populate('category').populate('brand').sort({ createdAt: -1 }),
+      getSettings(),
+    ]);
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const imageUrl = (filename) => baseUrl + (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/product-placeholder.svg');
+
+    const items = products.map((p) => {
+      const hasSale = p.salePrice != null && p.salePrice < p.price;
+      const availability = p.stock > 0 || p.overselling ? 'in stock' : 'out of stock';
+      const link = `${baseUrl}/product/${p.slug}`;
+      return (
+        '<item>' +
+        `<g:id>${xmlEscape(p.sku || String(p._id))}</g:id>` +
+        `<title>${cdata(p.name)}</title>` +
+        `<description>${cdata(p.shortDescription || p.name)}</description>` +
+        `<link>${xmlEscape(link)}</link>` +
+        `<g:image_link>${xmlEscape(imageUrl(p.image))}</g:image_link>` +
+        `<g:availability>${availability}</g:availability>` +
+        `<g:condition>${p.condition === 'used' ? 'used' : (p.condition === 'refurbished' ? 'refurbished' : 'new')}</g:condition>` +
+        `<g:price>${Number(p.price).toFixed(2)} BDT</g:price>` +
+        (hasSale ? `<g:sale_price>${Number(p.salePrice).toFixed(2)} BDT</g:sale_price>` : '') +
+        `<g:brand>${cdata(p.brand ? p.brand.name : settings.site_name)}</g:brand>` +
+        (p.category ? `<g:product_type>${cdata(p.category.name)}</g:product_type>` : '') +
+        '</item>'
+      );
+    }).join('');
+
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">' +
+      '<channel>' +
+      `<title>${cdata(settings.site_name + ' Product Catalog')}</title>` +
+      `<link>${xmlEscape(baseUrl)}</link>` +
+      `<description>${cdata('Live product feed for ' + settings.site_name)}</description>` +
+      items +
+      '</channel>' +
+      '</rss>';
+
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.send(xml);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
    HOME
    ===================================================================== */
 router.get('/', async (req, res, next) => {
@@ -162,6 +229,55 @@ router.get(['/category', '/category/:slug'], async (req, res, next) => {
       metaTitle: category ? category.metaTitle : '',
       metaKeywords: category ? category.metaKeywords : '',
       metaDescription: category ? category.metaDescription : '',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   BRAND LISTING (same shape as CATEGORY / PRODUCT LISTING above, so a
+   brand page reads, sorts and ranks the same way a category page does)
+   ===================================================================== */
+router.get('/brand/:slug', async (req, res, next) => {
+  try {
+    const brand = await Brand.findOne({ slug: req.params.slug, status: true });
+    if (!brand) return res.status(404).render('404', { pageTitle: 'ব্র্যান্ড পাওয়া যায়নি' });
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const perPage = 12;
+    const sort = req.query.sort || 'newest';
+    const sortMap = {
+      price_asc: { price: 1 },
+      price_desc: { price: -1 },
+      popular: { views: -1 },
+      newest: { createdAt: -1 },
+    };
+    const filter = { status: true, brand: brand._id };
+
+    const [total, products, allBrands] = await Promise.all([
+      Product.countDocuments(filter),
+      Product.find(filter)
+        .sort(sortMap[sort] || sortMap.newest)
+        .skip((page - 1) * perPage)
+        .limit(perPage),
+      Brand.find({ status: true }).sort({ sortOrder: 1, name: 1 }),
+    ]);
+
+    res.render('brand', {
+      pageTitle: brand.pageTitle || brand.name,
+      brand,
+      products,
+      allBrands,
+      total,
+      page,
+      perPage,
+      totalPages: Math.max(1, Math.ceil(total / perPage)),
+      sort,
+      query: req.query,
+      metaTitle: brand.metaTitle,
+      metaKeywords: brand.metaKeywords,
+      metaDescription: brand.metaDescription,
     });
   } catch (err) {
     next(err);

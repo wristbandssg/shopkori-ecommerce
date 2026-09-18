@@ -1,0 +1,92 @@
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger">
+    <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+  </div>
+<% } %>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="admin-card">
+      <h5>New Commission Request</h5>
+      <form method="post" action="/admin/delivery/commission-request">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-3">
+          <label class="form-label">Employee</label>
+          <select name="employee" class="form-select" required>
+            <option value="">-- Select Employee --</option>
+            <% employees.forEach(function (e) { %>
+              <option value="<%= e._id %>"><%= e.fullName || e.username %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Amount</label>
+          <input type="number" name="amount" class="form-control" min="1" step="0.01" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Payment Method</label>
+          <select name="method" class="form-select">
+            <option value="">-- Select Method --</option>
+            <option value="cash">Cash</option>
+            <option value="bkash">bKash</option>
+            <option value="nagad">Nagad</option>
+            <option value="bank">Bank</option>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Note</label>
+          <textarea name="note" class="form-control" rows="2"></textarea>
+        </div>
+        <button type="submit" class="btn btn-brand w-100">Submit Request</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="order-tabs mb-3">
+      <a href="/admin/delivery/commission-request?tab=pending" class="order-tab <%= tab === 'pending' ? 'active' : '' %>">Pending <span class="order-tab-count"><%= countMap.pending %></span></a>
+      <a href="/admin/delivery/commission-request?tab=approved" class="order-tab <%= tab === 'approved' ? 'active' : '' %>">Approved <span class="order-tab-count"><%= countMap.approved %></span></a>
+      <a href="/admin/delivery/commission-request?tab=rejected" class="order-tab <%= tab === 'rejected' ? 'active' : '' %>">Rejected <span class="order-tab-count"><%= countMap.rejected %></span></a>
+    </div>
+
+    <div class="admin-card">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Employee</th><th>Amount</th><th>Method</th><th>Note</th><th>Requested</th><th>Action</th></tr></thead>
+          <tbody>
+            <% requests.forEach(function (r) { %>
+              <tr>
+                <td><%= r.employee ? (r.employee.fullName || r.employee.username) : '—' %></td>
+                <td><%= currency(r.amount) %></td>
+                <td><%= r.method ? r.method.charAt(0).toUpperCase() + r.method.slice(1) : '—' %></td>
+                <td><%= r.note || '—' %></td>
+                <td><small class="text-muted"><%= new Date(r.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></small></td>
+                <td class="text-nowrap">
+                  <% if (r.status === 'pending') { %>
+                    <form method="post" action="/admin/delivery/commission-request/<%= r._id %>/action" class="d-inline">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="action" value="approve">
+                      <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i> Approve</button>
+                    </form>
+                    <form method="post" action="/admin/delivery/commission-request/<%= r._id %>/action" class="d-inline">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="action" value="reject">
+                      <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i> Reject</button>
+                    </form>
+                  <% } else { %>
+                    <span class="badge bg-<%= r.status === 'approved' ? 'success' : 'danger' %>"><%= r.status %></span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+            <% if (!requests.length) { %><tr><td colspan="6" class="text-center text-muted py-4">No <%= tab %> commission requests.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

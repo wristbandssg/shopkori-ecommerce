@@ -1,0 +1,100 @@
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger">
+    <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+  </div>
+<% } %>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="admin-card">
+      <h5>Add Commission Setup</h5>
+      <form method="post" action="/admin/delivery/commission">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-3">
+          <label class="form-label">Employee</label>
+          <select name="employee" class="form-select" required>
+            <option value="">-- Select Employee --</option>
+            <% employees.forEach(function (e) { %>
+              <option value="<%= e._id %>"><%= e.fullName || e.username %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">After Cancel (order count)</label>
+          <input type="number" name="afterCancelCount" class="form-control" min="0" value="0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Commission After Cancel</label>
+          <input type="number" name="commissionAfterCancel" class="form-control" min="0" step="0.01" value="0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">After Delivered (order count)</label>
+          <input type="number" name="afterDeliveredCount" class="form-control" min="0" value="0">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Commission After Delivered</label>
+          <input type="number" name="commissionAfterDelivered" class="form-control" min="0" step="0.01" value="0">
+        </div>
+        <button type="submit" class="btn btn-brand w-100">Add</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <h5>Delivery Commission Setup</h5>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Employee</th><th>After Cancel</th><th>Commission After Cancel</th><th>After Delivered</th><th>Commission After Delivered</th><th>Action</th></tr></thead>
+          <tbody>
+            <% setups.forEach(function (s) { %>
+              <tr>
+                <td><%= s.employee ? (s.employee.fullName || s.employee.username) : '—' %></td>
+                <td><%= s.afterCancelCount %></td>
+                <td><%= currency(s.commissionAfterCancel) %></td>
+                <td><%= s.afterDeliveredCount %></td>
+                <td><%= currency(s.commissionAfterDelivered) %></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editComm<%= s._id %>"><i class="bi bi-pencil"></i></button>
+                  <a href="/admin/delivery/commission/delete/<%= s._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this commission setup?')"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+
+              <div class="modal fade" id="editComm<%= s._id %>" tabindex="-1">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form method="post" action="/admin/delivery/commission">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="id" value="<%= s._id %>">
+                      <div class="modal-header"><h5 class="modal-title">Edit Commission Setup</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                      <div class="modal-body">
+                        <div class="mb-3">
+                          <label class="form-label">Employee</label>
+                          <select name="employee" class="form-select" required>
+                            <% employees.forEach(function (e) { %>
+                              <option value="<%= e._id %>" <%= s.employee && String(s.employee._id) === String(e._id) ? 'selected' : '' %>><%= e.fullName || e.username %></option>
+                            <% }); %>
+                          </select>
+                        </div>
+                        <div class="mb-3"><label class="form-label">After Cancel (order count)</label><input type="number" name="afterCancelCount" class="form-control" min="0" value="<%= s.afterCancelCount %>"></div>
+                        <div class="mb-3"><label class="form-label">Commission After Cancel</label><input type="number" name="commissionAfterCancel" class="form-control" min="0" step="0.01" value="<%= s.commissionAfterCancel %>"></div>
+                        <div class="mb-3"><label class="form-label">After Delivered (order count)</label><input type="number" name="afterDeliveredCount" class="form-control" min="0" value="<%= s.afterDeliveredCount %>"></div>
+                        <div class="mb-3"><label class="form-label">Commission After Delivered</label><input type="number" name="commissionAfterDelivered" class="form-control" min="0" step="0.01" value="<%= s.commissionAfterDelivered %>"></div>
+                      </div>
+                      <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+            <% if (!setups.length) { %><tr><td colspan="6" class="text-center text-muted">No commission setups yet.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

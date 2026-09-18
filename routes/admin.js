@@ -5,22 +5,31 @@ const router = express.Router();
 
 const Category = require('../models/Category');
 const Brand = require('../models/Brand');
+const VariantAttribute = require('../models/VariantAttribute');
 const Supplier = require('../models/Supplier');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
 const Admin = require('../models/Admin');
+const DeliveryCommissionSetup = require('../models/DeliveryCommissionSetup');
+const DeliveryRequest = require('../models/DeliveryRequest');
 const Page = require('../models/Page');
 const BlogPost = require('../models/BlogPost');
 const { getSettings, setSetting } = require('../models/Setting');
 const { getOrderSettings, updateOrderSettingCard } = require('../models/OrderSetting');
+const { getMarketingSettings, updateMarketingSettingCard } = require('../models/MarketingSetting');
+const { sendSms } = require('../lib/sms');
 
 const adminLocals = require('../middleware/adminLocals');
 const { requireAdminLogin } = require('../middleware/auth');
 const { verifyCsrf } = require('../middleware/csrf');
 const upload = require('../middleware/upload');
 const { slugify, ensureUniqueSlug } = require('../middleware/helpers');
-const { ORDER_STATUSES, COURIERS, statusLabel } = require('../middleware/orderConstants');
+const {
+  ORDER_STATUSES, COURIERS, statusLabel,
+  DELIVERY_STATUSES, RETURN_STATUSES,
+  deliveryStatusLabel, deliveryStatusBadge, returnStatusLabel, returnStatusBadge,
+} = require('../middleware/orderConstants');
 
 router.use(adminLocals);
 
@@ -65,14 +74,13 @@ router.use(requireAdminLogin);
    click, every one of those links renders this same friendly "coming
    soon" page until its real backend is built, module by module.
    Real, working modules (Products, Category, Orders — the full pipeline
-   below, Customers, Settings, Blog, Pages) are NOT in this list — they
-   have their own routes.
+   below, Manage Delivery, Staff, Marketing, Customers, Settings, Blog,
+   Pages) are NOT in this list — they have their own routes.
    Registered FIRST (before any /orders/:id-style wildcard route further
    down) so an exact path like /orders/incomplete is never swallowed by
    a wildcard route meant for a real order id.
    ===================================================================== */
 const COMING_SOON_PAGES = {
-  '/marketing': 'Marketing',
   '/analytics': 'Analytics',
 
   '/landing-page/main': 'Main Landing Page',
@@ -81,8 +89,6 @@ const COMING_SOON_PAGES = {
   '/landing-page/advance': 'Advance Landing Page',
 
   '/customization': 'Customization',
-
-  '/products/variant': 'Variant',
 
   '/inventory': 'Inventory',
   '/inventory/purchase': 'Purchase',
@@ -96,8 +102,6 @@ const COMING_SOON_PAGES = {
   '/offer/latest': 'Latest Products',
   '/offer/popup': 'PopUp Offer',
 
-  '/staff': 'Staff',
-
   '/accounting/income': 'Income',
   '/accounting/expenses': 'Expenses',
   '/accounting/expense-list': 'Expense List',
@@ -109,15 +113,6 @@ const COMING_SOON_PAGES = {
 
   '/task-management': 'Task Management',
   '/pos': 'POS',
-
-  '/delivery/delivery-man': 'Delivery Man',
-  '/delivery/delivered': 'Delivered Order',
-  '/delivery/clear': 'Clear Delivery',
-  '/delivery/cancelled': 'Cancelled Order',
-  '/delivery/return-confirm': 'Return Confirm',
-  '/delivery/amount-request': 'Amount Request',
-  '/delivery/commission': 'Delivery Commission',
-  '/delivery/commission-request': 'Commission Request',
 
   // Still coming soon — no distinct UI/spec provided for these yet.
   '/orders/follow-up': 'Follow Up',
@@ -155,6 +150,19 @@ async function applyStatusChange(order, newStatus) {
   }
   if (newStatus === 'confirmed' && !order.confirmedAt) {
     order.confirmedAt = new Date();
+  }
+  // Manage Delivery: a COD order reaching "Delivered" is taken to mean the
+  // rider collected the cash on the spot — it then falls out of the
+  // Delivery Man queue and into Delivered Order (Pending -> Collected).
+  // A "Cancelled" order starts its Cancelled Order / Return Confirm
+  // journey back to the office.
+  if (newStatus === 'delivered' && order.paymentMethod === 'cod' && !order.delivery.collected) {
+    order.delivery.collected = true;
+    order.delivery.collectedAt = new Date();
+    if (order.paymentStatus !== 'paid') order.paymentStatus = 'paid';
+  }
+  if (newStatus === 'cancelled' && !order.delivery.returnStatus) {
+    order.delivery.returnStatus = 'return_pending';
   }
   order.status = newStatus;
   pushActivity(order, `Status changed: ${statusLabel(oldStatus)} -> ${statusLabel(newStatus)}`);
@@ -699,39 +707,172 @@ router.get('/', async (req, res, next) => {
 });
 
 /* =====================================================================
+   VARIANT ATTRIBUTES
+   ---------------------------------------------------------------------
+   A small reusable library of variation TYPES (Color, Size, Weight...)
+   with their own value lists — see models/VariantAttribute.js for why
+   this is kept separate from a product's own variant rows. This page
+   just manages that library; loadProductFormLookups() below hands the
+   active list to the product form's "Quick Add from Attribute" helper.
+   ===================================================================== */
+router.get('/products/variant', async (req, res, next) => {
+  try {
+    const variantAttributes = await VariantAttribute.find().sort({ name: 1 });
+    res.render('admin/variant', { adminPageTitle: 'Variant', variantAttributes });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/products/variant', verifyCsrf, async (req, res, next) => {
+  try {
+    const { id, name, values } = req.body;
+    if (!name || !name.trim()) {
+      req.flash('danger', 'Attribute name is required.');
+      return res.redirect('/admin/products/variant');
+    }
+    const valuesList = (values || '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean)
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+
+    if (id) {
+      await VariantAttribute.updateOne(
+        { _id: id },
+        { name: name.trim(), values: valuesList, status: !!req.body.status }
+      );
+      req.flash('success', 'Variant attribute updated successfully.');
+    } else {
+      const slug = await ensureUniqueSlug(VariantAttribute, slugify(name), null);
+      await VariantAttribute.create({ name: name.trim(), slug, values: valuesList, status: !!req.body.status });
+      req.flash('success', 'New variant attribute added successfully.');
+    }
+    res.redirect('/admin/products/variant');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/products/variant/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/products/variant');
+    }
+    await VariantAttribute.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Variant attribute deleted successfully.');
+    res.redirect('/admin/products/variant');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
    BRANDS
    ===================================================================== */
 router.get('/products/brands', async (req, res, next) => {
   try {
-    const brands = await Brand.find().sort({ name: 1 });
+    const brands = await Brand.find().sort({ sortOrder: 1, name: 1 });
     res.render('admin/brands', { adminPageTitle: 'Brands', brands });
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/products/brands', upload.single('image'), verifyCsrf, async (req, res, next) => {
-  try {
-    const { id, name } = req.body;
-    if (!name || !name.trim()) return res.redirect('/admin/products/brands');
-    const existing = id ? await Brand.findById(id) : null;
-    let imageName = existing ? existing.image : null;
-    if (req.file) imageName = req.file.filename;
+async function renderBrandForm(res, { brand, errors, formData }) {
+  res.render('admin/brand-form', {
+    adminPageTitle: brand && brand._id ? 'Edit Brand' : 'Add New Brand',
+    brand: brand || {},
+    errors: errors || [],
+    formData: formData || {},
+  });
+}
 
-    if (id) {
-      const slug = await ensureUniqueSlug(Brand, slugify(name), id);
-      await Brand.updateOne({ _id: id }, { name: name.trim(), slug, status: !!req.body.status, image: imageName });
+router.get('/products/brands/new', (req, res) => {
+  renderBrandForm(res, { brand: null });
+});
+
+router.get('/products/brands/:id/edit', async (req, res, next) => {
+  try {
+    const brand = await Brand.findById(req.params.id);
+    if (!brand) {
+      req.flash('danger', 'Brand not found.');
+      return res.redirect('/admin/products/brands');
+    }
+    renderBrandForm(res, { brand });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CSRF is checked manually below (not via the verifyCsrf middleware) because
+// multer's upload.fields() is what parses multipart/form-data — req.body
+// (and so req.body.csrfToken) isn't populated until after it runs. Same
+// pattern as saveCategory/saveProduct.
+const brandUpload = upload.fields([{ name: 'image', maxCount: 1 }, { name: 'bannerImage', maxCount: 1 }]);
+
+async function saveBrand(req, res, next, existingId) {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/products/brands');
+    }
+    const {
+      name, sortOrder,
+      pageTitle, shortDescription, description,
+      metaTitle, metaKeywords, metaDescription,
+    } = req.body;
+
+    const errors = [];
+    if (!name || !name.trim()) errors.push('Brand name is required.');
+
+    const existing = existingId ? await Brand.findById(existingId) : null;
+    const files = req.files || {};
+    let imageName = existing ? existing.image : null;
+    if (files.image && files.image[0]) imageName = files.image[0].filename;
+    let bannerImageName = existing ? existing.bannerImage : null;
+    if (files.bannerImage && files.bannerImage[0]) bannerImageName = files.bannerImage[0].filename;
+
+    if (errors.length) {
+      return renderBrandForm(res, {
+        brand: { ...(existing ? existing.toObject() : {}), ...req.body, image: imageName, bannerImage: bannerImageName },
+        errors,
+        formData: req.body,
+      });
+    }
+
+    const data = {
+      name: name.trim(),
+      sortOrder: parseInt(sortOrder, 10) || 0,
+      status: !!req.body.status,
+      image: imageName,
+      bannerImage: bannerImageName,
+      pageTitle: (pageTitle || '').trim(),
+      shortDescription: (shortDescription || '').trim(),
+      description: description || '',
+      metaTitle: (metaTitle || '').trim(),
+      metaKeywords: (metaKeywords || '').trim(),
+      metaDescription: (metaDescription || '').trim(),
+    };
+
+    if (existing) {
+      data.slug = await ensureUniqueSlug(Brand, slugify(name), existingId);
+      await Brand.updateOne({ _id: existingId }, data);
       req.flash('success', 'Brand updated successfully.');
     } else {
-      const slug = await ensureUniqueSlug(Brand, slugify(name), null);
-      await Brand.create({ name: name.trim(), slug, status: !!req.body.status, image: imageName });
+      data.slug = await ensureUniqueSlug(Brand, slugify(name), null);
+      await Brand.create(data);
       req.flash('success', 'New brand added successfully.');
     }
     res.redirect('/admin/products/brands');
   } catch (err) {
     next(err);
   }
-});
+}
+
+router.post('/products/brands/new', brandUpload, (req, res, next) => saveBrand(req, res, next, null));
+router.post('/products/brands/:id/edit', brandUpload, (req, res, next) => saveBrand(req, res, next, req.params.id));
 
 router.get('/products/brands/delete/:id', async (req, res, next) => {
   try {
@@ -935,13 +1076,14 @@ router.get('/products/duplicate/:id', async (req, res, next) => {
 async function loadProductFormLookups(excludeId) {
   const productFilter = { status: true };
   if (excludeId) productFilter._id = { $ne: excludeId };
-  const [categories, brands, suppliers, allProducts] = await Promise.all([
+  const [categories, brands, suppliers, allProducts, variantAttributes] = await Promise.all([
     Category.find().sort({ name: 1 }),
     Brand.find({ status: true }).sort({ name: 1 }),
     Supplier.find({ status: true }).sort({ name: 1 }),
     Product.find(productFilter).select('name image').sort({ name: 1 }),
+    VariantAttribute.find({ status: true }).sort({ name: 1 }),
   ]);
-  return { categories, brands, suppliers, allProducts };
+  return { categories, brands, suppliers, allProducts, variantAttributes };
 }
 
 router.get('/products/new', async (req, res, next) => {
@@ -1352,6 +1494,8 @@ router.get('/orders/:id', async (req, res, next) => {
       employees,
       ORDER_STATUSES,
       COURIERS,
+      DELIVERY_STATUSES,
+      RETURN_STATUSES,
     });
   } catch (err) {
     next(err);
@@ -1379,6 +1523,588 @@ router.post('/orders/:id', verifyCsrf, async (req, res, next) => {
     await order.save();
     req.flash('success', 'Order updated successfully.');
     res.redirect(`/admin/orders/${req.params.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delivery Tracking card on the order detail page — the in-house rider's
+// own journey (Order.delivery), separate from the update form above.
+router.post('/orders/:id/delivery', verifyCsrf, async (req, res, next) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      req.flash('danger', 'Order not found.');
+      return res.redirect('/admin/orders');
+    }
+    const { deliveryStatus, deliveryMan, note, officeNote, returnStatus } = req.body;
+
+    if (DELIVERY_STATUSES.some((s) => s.value === deliveryStatus)) order.delivery.status = deliveryStatus;
+    order.delivery.deliveryMan = deliveryMan || null;
+    if (deliveryMan && !order.delivery.assignedAt) order.delivery.assignedAt = new Date();
+    order.delivery.note = (note || '').trim();
+    order.delivery.officeNote = (officeNote || '').trim();
+
+    const collected = !!req.body.collected;
+    if (collected && !order.delivery.collected) order.delivery.collectedAt = new Date();
+    if (!collected) order.delivery.collectedAt = null;
+    order.delivery.collected = collected;
+
+    const clearedToOffice = !!req.body.clearedToOffice;
+    if (clearedToOffice && !order.delivery.clearedToOffice) order.delivery.clearedAt = new Date();
+    if (!clearedToOffice) order.delivery.clearedAt = null;
+    order.delivery.clearedToOffice = clearedToOffice;
+
+    if (order.status === 'cancelled' && RETURN_STATUSES.some((s) => s.value === returnStatus)) {
+      order.delivery.returnStatus = returnStatus;
+    }
+
+    pushActivity(order, 'Delivery tracking updated.');
+    await order.save();
+    req.flash('success', 'Delivery tracking updated successfully.');
+    res.redirect(`/admin/orders/${req.params.id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   STAFF
+   ---------------------------------------------------------------------
+   Every "Employee" used across Order Management / Manage Delivery
+   (Order.assignedEmployee, Order.delivery.deliveryMan) is one of these
+   Admin accounts — this is where they actually get created, so those
+   dropdowns have someone in them. `role` is a free-text label only
+   (e.g. "Delivery Man", "Manager") — there's no access control tied to
+   it anywhere in this app.
+   ===================================================================== */
+router.get('/staff', async (req, res, next) => {
+  try {
+    const staff = await Admin.find().sort({ createdAt: -1 });
+    res.render('admin/staff', { adminPageTitle: 'Staff', staff, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/staff', verifyCsrf, async (req, res, next) => {
+  try {
+    const { id, username, email, fullName, role, password } = req.body;
+    const errors = [];
+    if (!username || !username.trim()) errors.push('Username is required.');
+    if (!email || !email.trim()) errors.push('Email is required.');
+    if (!id && (!password || password.length < 4)) errors.push('Password must be at least 4 characters.');
+
+    if (!errors.length) {
+      const dupe = await Admin.findOne({
+        _id: { $ne: id || null },
+        $or: [{ username: (username || '').trim() }, { email: (email || '').trim().toLowerCase() }],
+      });
+      if (dupe) errors.push('That username or email is already in use.');
+    }
+
+    if (errors.length) {
+      const staff = await Admin.find().sort({ createdAt: -1 });
+      return res.render('admin/staff', { adminPageTitle: 'Staff', staff, errors });
+    }
+
+    const data = {
+      username: username.trim(),
+      email: email.trim().toLowerCase(),
+      fullName: (fullName || '').trim(),
+      role: (role || '').trim() || 'admin',
+    };
+    if (password) data.password = await bcrypt.hash(password, 10);
+
+    if (id) {
+      await Admin.updateOne({ _id: id }, data);
+      req.flash('success', 'Staff account updated successfully.');
+    } else {
+      await Admin.create(data);
+      req.flash('success', 'New staff account created successfully.');
+    }
+    res.redirect('/admin/staff');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/staff/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/staff');
+    }
+    if (String(req.params.id) === String(req.session.adminId)) {
+      req.flash('danger', "You can't delete the account you're currently logged in as.");
+      return res.redirect('/admin/staff');
+    }
+    await Admin.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Staff account deleted successfully.');
+    res.redirect('/admin/staff');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   MANAGE DELIVERY
+   ---------------------------------------------------------------------
+   An order's own in-house hand-off journey (Order.delivery, see
+   models/Order.js) — separate from the 3rd-party `courier` field on the
+   order update form above. Every list below mirrors the reference
+   design exactly: a plain table with a "Select Employee + Assign" bulk
+   action and no extra Action column — the order number itself is the
+   link into detail. All fine-grained per-order editing (delivery
+   status, notes, return status...) lives on the order detail page's
+   "Delivery Tracking" card (see POST /orders/:id/delivery above)
+   instead, reached by clicking that order number.
+   ===================================================================== */
+
+// Orders still on their way out — not yet delivered/cancelled/returned —
+// available to be picked up / assigned to an in-house rider.
+const DELIVERY_MAN_FILTER = { isDeleted: false, status: { $in: ['confirmed', 'packaging', 'courier'] } };
+
+router.get('/delivery/delivery-man', async (req, res, next) => {
+  try {
+    const filter = { ...DELIVERY_MAN_FILTER };
+    const q = (req.query.q || '').trim();
+    if (q) Object.assign(filter, ORDER_SEARCH_FIELDS(q));
+
+    const [orders, employees] = await Promise.all([
+      Order.find(filter).sort({ createdAt: -1 }).populate('delivery.deliveryMan', 'username fullName'),
+      Admin.find().sort({ username: 1 }).select('username fullName'),
+    ]);
+
+    res.render('admin/delivery-man', { adminPageTitle: 'Delivery Man', orders, employees, q });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/delivery/delivery-man/assign', verifyCsrf, async (req, res, next) => {
+  try {
+    const ids = parseIds(req.body);
+    const employeeId = req.body.employeeId || null;
+    if (ids.length && employeeId) {
+      const employee = await Admin.findById(employeeId);
+      const orders = await Order.find({ _id: { $in: ids } });
+      await Promise.all(orders.map((o) => {
+        o.delivery.deliveryMan = employeeId;
+        o.delivery.assignedAt = new Date();
+        if (o.delivery.status === 'pending') o.delivery.status = 'assigned';
+        pushActivity(o, `Assigned to delivery man: ${employee ? (employee.fullName || employee.username) : employeeId}`);
+        return o.save();
+      }));
+      req.flash('success', `Assigned ${ids.length} order(s) to a delivery man.`);
+    } else {
+      req.flash('danger', 'Select at least one order and an employee.');
+    }
+    res.redirect(req.get('Referer') || '/admin/delivery/delivery-man');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   DELIVERED ORDER — COD cash collected by the rider, still awaiting
+   hand-off to the office (Order.delivery.collected, not yet
+   clearedToOffice).
+   --------------------------------------------------------------------- */
+router.get('/delivery/delivered', async (req, res, next) => {
+  try {
+    const filter = { isDeleted: false, status: 'delivered', 'delivery.clearedToOffice': false };
+    const q = (req.query.q || '').trim();
+    if (q) Object.assign(filter, ORDER_SEARCH_FIELDS(q));
+
+    const [orders, employees, sums] = await Promise.all([
+      Order.find(filter).sort({ createdAt: -1 }).populate('delivery.deliveryMan', 'username fullName'),
+      Admin.find().sort({ username: 1 }).select('username fullName'),
+      Order.aggregate([
+        { $match: { isDeleted: false, status: 'delivered', 'delivery.clearedToOffice': false } },
+        { $group: { _id: '$delivery.collected', total: { $sum: '$total' } } },
+      ]),
+    ]);
+
+    let pendingAmount = 0;
+    let collectedAmount = 0;
+    sums.forEach((s) => { if (s._id) collectedAmount = s.total; else pendingAmount = s.total; });
+
+    res.render('admin/delivery-delivered', {
+      adminPageTitle: 'Delivered Order',
+      orders, employees, q,
+      pendingAmount, collectedAmount, availableAmount: collectedAmount,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/delivery/delivered/assign', verifyCsrf, async (req, res, next) => {
+  try {
+    const ids = parseIds(req.body);
+    const employeeId = req.body.employeeId || null;
+    if (ids.length && employeeId) {
+      await Order.updateMany({ _id: { $in: ids } }, { 'delivery.deliveryMan': employeeId });
+      req.flash('success', `Assigned ${ids.length} order(s).`);
+    } else {
+      req.flash('danger', 'Select at least one order and an employee.');
+    }
+    res.redirect(req.get('Referer') || '/admin/delivery/delivered');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/delivery/delivered/office-send', verifyCsrf, async (req, res, next) => {
+  try {
+    const ids = parseIds(req.body);
+    if (ids.length) {
+      const orders = await Order.find({ _id: { $in: ids }, 'delivery.collected': true });
+      await Promise.all(orders.map((o) => {
+        o.delivery.clearedToOffice = true;
+        o.delivery.clearedAt = new Date();
+        pushActivity(o, 'Delivery cash cleared to office.');
+        return o.save();
+      }));
+      req.flash('success', `Sent ${orders.length} order(s) to Clear Delivery.`);
+    }
+    res.redirect(req.get('Referer') || '/admin/delivery/delivered');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   CLEAR DELIVERY — read-only record of what's already been cleared to
+   the office via Delivered Order's "Send to Office" action above.
+   --------------------------------------------------------------------- */
+router.get('/delivery/clear', async (req, res, next) => {
+  try {
+    const filter = { isDeleted: false, 'delivery.clearedToOffice': true };
+    const q = (req.query.q || '').trim();
+    if (q) Object.assign(filter, ORDER_SEARCH_FIELDS(q));
+
+    const orders = await Order.find(filter).sort({ 'delivery.clearedAt': -1 }).populate('delivery.deliveryMan', 'username fullName');
+    res.render('admin/delivery-clear', { adminPageTitle: 'Clear Delivery', orders, q });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   CANCELLED ORDER / RETURN CONFIRM — same list, same handler: a
+   cancelled order's product coming back to the office
+   (Order.delivery.returnStatus).
+   --------------------------------------------------------------------- */
+function deliveryCancelledHandler(pageTitle) {
+  return async (req, res, next) => {
+    try {
+      const filter = { isDeleted: false, status: 'cancelled' };
+      const q = (req.query.q || '').trim();
+      if (q) Object.assign(filter, ORDER_SEARCH_FIELDS(q));
+
+      const [orders, employees] = await Promise.all([
+        Order.find(filter).sort({ createdAt: -1 }).populate('delivery.deliveryMan', 'username fullName'),
+        Admin.find().sort({ username: 1 }).select('username fullName'),
+      ]);
+
+      res.render('admin/delivery-cancelled', { adminPageTitle: pageTitle, orders, employees, q });
+    } catch (err) {
+      next(err);
+    }
+  };
+}
+router.get('/delivery/cancelled', deliveryCancelledHandler('Cancelled Order'));
+router.get('/delivery/return-confirm', deliveryCancelledHandler('Return Confirm'));
+
+router.post('/delivery/cancelled/assign', verifyCsrf, async (req, res, next) => {
+  try {
+    const ids = parseIds(req.body);
+    const employeeId = req.body.employeeId || null;
+    if (ids.length && employeeId) {
+      const orders = await Order.find({ _id: { $in: ids } });
+      await Promise.all(orders.map((o) => {
+        o.delivery.deliveryMan = employeeId;
+        if (!o.delivery.returnStatus) o.delivery.returnStatus = 'return_pending';
+        pushActivity(o, 'Assigned to delivery man for return pickup.');
+        return o.save();
+      }));
+      req.flash('success', `Assigned ${ids.length} order(s).`);
+    } else {
+      req.flash('danger', 'Select at least one order and an employee.');
+    }
+    res.redirect(req.get('Referer') || '/admin/delivery/cancelled');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   AMOUNT REQUEST — a cash advance/reimbursement raised for a delivery
+   employee, approved/rejected by the office.
+   --------------------------------------------------------------------- */
+async function renderAmountRequest(res, tab, errors) {
+  const [requests, employees, counts] = await Promise.all([
+    DeliveryRequest.find({ type: 'amount', status: tab }).sort({ createdAt: -1 }).populate('employee', 'username fullName'),
+    Admin.find().sort({ username: 1 }).select('username fullName'),
+    DeliveryRequest.aggregate([{ $match: { type: 'amount' } }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
+  ]);
+  const countMap = { pending: 0, approved: 0, rejected: 0 };
+  counts.forEach((c) => { countMap[c._id] = c.n; });
+  res.render('admin/delivery-amount-request', { adminPageTitle: 'Amount Request', requests, employees, tab, countMap, errors });
+}
+
+router.get('/delivery/amount-request', async (req, res, next) => {
+  try {
+    const tab = ['pending', 'approved', 'rejected'].includes(req.query.tab) ? req.query.tab : 'pending';
+    await renderAmountRequest(res, tab, []);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/delivery/amount-request', verifyCsrf, async (req, res, next) => {
+  try {
+    const { employee, amount, note } = req.body;
+    const errors = [];
+    if (!employee) errors.push('Select an employee.');
+    if (!amount || Number(amount) <= 0) errors.push('Enter a valid amount.');
+
+    if (errors.length) {
+      return await renderAmountRequest(res, 'pending', errors);
+    }
+
+    await DeliveryRequest.create({ type: 'amount', employee, amount: Number(amount), note: (note || '').trim() });
+    req.flash('success', 'Amount request submitted successfully.');
+    res.redirect('/admin/delivery/amount-request');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/delivery/amount-request/:id/action', verifyCsrf, async (req, res, next) => {
+  try {
+    const action = req.body.action === 'approve' ? 'approved' : (req.body.action === 'reject' ? 'rejected' : null);
+    if (action) {
+      await DeliveryRequest.updateOne({ _id: req.params.id, type: 'amount' }, { status: action });
+      req.flash('success', `Request ${action}.`);
+    }
+    res.redirect(req.get('Referer') || '/admin/delivery/amount-request');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   DELIVERY COMMISSION — volume-based commission tiers per employee
+   (see models/DeliveryCommissionSetup.js).
+   --------------------------------------------------------------------- */
+router.get('/delivery/commission', async (req, res, next) => {
+  try {
+    const [setups, employees] = await Promise.all([
+      DeliveryCommissionSetup.find().sort({ createdAt: -1 }).populate('employee', 'username fullName'),
+      Admin.find().sort({ username: 1 }).select('username fullName'),
+    ]);
+    res.render('admin/delivery-commission', { adminPageTitle: 'Delivery Commission', setups, employees, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/delivery/commission', verifyCsrf, async (req, res, next) => {
+  try {
+    const { id, employee, afterCancelCount, commissionAfterCancel, afterDeliveredCount, commissionAfterDelivered } = req.body;
+    const errors = [];
+    if (!employee) errors.push('Select an employee.');
+
+    if (errors.length) {
+      const [setups, employees] = await Promise.all([
+        DeliveryCommissionSetup.find().sort({ createdAt: -1 }).populate('employee', 'username fullName'),
+        Admin.find().sort({ username: 1 }).select('username fullName'),
+      ]);
+      return res.render('admin/delivery-commission', { adminPageTitle: 'Delivery Commission', setups, employees, errors });
+    }
+
+    const data = {
+      employee,
+      afterCancelCount: Number(afterCancelCount) || 0,
+      commissionAfterCancel: Number(commissionAfterCancel) || 0,
+      afterDeliveredCount: Number(afterDeliveredCount) || 0,
+      commissionAfterDelivered: Number(commissionAfterDelivered) || 0,
+    };
+    if (id) {
+      await DeliveryCommissionSetup.updateOne({ _id: id }, data);
+      req.flash('success', 'Commission setup updated successfully.');
+    } else {
+      await DeliveryCommissionSetup.create(data);
+      req.flash('success', 'New commission setup added successfully.');
+    }
+    res.redirect('/admin/delivery/commission');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/delivery/commission/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/delivery/commission');
+    }
+    await DeliveryCommissionSetup.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Commission setup deleted successfully.');
+    res.redirect('/admin/delivery/commission');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   COMMISSION REQUEST — payout of earned commission (see Delivery
+   Commission above), approved/rejected by the office.
+   --------------------------------------------------------------------- */
+async function renderCommissionRequest(res, tab, errors) {
+  const [requests, employees, counts] = await Promise.all([
+    DeliveryRequest.find({ type: 'commission', status: tab }).sort({ createdAt: -1 }).populate('employee', 'username fullName'),
+    Admin.find().sort({ username: 1 }).select('username fullName'),
+    DeliveryRequest.aggregate([{ $match: { type: 'commission' } }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
+  ]);
+  const countMap = { pending: 0, approved: 0, rejected: 0 };
+  counts.forEach((c) => { countMap[c._id] = c.n; });
+  res.render('admin/delivery-commission-request', { adminPageTitle: 'Commission Request', requests, employees, tab, countMap, errors });
+}
+
+router.get('/delivery/commission-request', async (req, res, next) => {
+  try {
+    const tab = ['pending', 'approved', 'rejected'].includes(req.query.tab) ? req.query.tab : 'pending';
+    await renderCommissionRequest(res, tab, []);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/delivery/commission-request', verifyCsrf, async (req, res, next) => {
+  try {
+    const { employee, amount, method, note } = req.body;
+    const errors = [];
+    if (!employee) errors.push('Select an employee.');
+    if (!amount || Number(amount) <= 0) errors.push('Enter a valid amount.');
+
+    if (errors.length) {
+      return await renderCommissionRequest(res, 'pending', errors);
+    }
+
+    await DeliveryRequest.create({
+      type: 'commission', employee, amount: Number(amount),
+      method: ['cash', 'bkash', 'nagad', 'bank'].includes(method) ? method : '',
+      note: (note || '').trim(),
+    });
+    req.flash('success', 'Commission request submitted successfully.');
+    res.redirect('/admin/delivery/commission-request');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/delivery/commission-request/:id/action', verifyCsrf, async (req, res, next) => {
+  try {
+    const action = req.body.action === 'approve' ? 'approved' : (req.body.action === 'reject' ? 'rejected' : null);
+    if (action) {
+      await DeliveryRequest.updateOne({ _id: req.params.id, type: 'commission' }, { status: action });
+      req.flash('success', `Request ${action}.`);
+    }
+    res.redirect(req.get('Referer') || '/admin/delivery/commission-request');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   MARKETING
+   ---------------------------------------------------------------------
+   Six integration cards (see models/MarketingSetting.js for what each
+   one actually drives once turned ON): a grid page + one shared "Manage"
+   form page per card, matching the reference design.
+   ===================================================================== */
+const MARKETING_CARDS = ['sms', 'facebookPixel', 'tiktokPixel', 'googleTagManager', 'googleAnalytics', 'facebookCatalog'];
+const MARKETING_CARD_META = {
+  sms: { title: 'SMS', icon: 'bi-chat-dots-fill', color: '#f0ad4e' },
+  facebookPixel: { title: 'Facebook Pixel', icon: 'bi-facebook', color: '#1877f2' },
+  tiktokPixel: { title: 'TikTok Pixel', icon: 'bi-tiktok', color: '#000000' },
+  googleTagManager: { title: 'Google Tag Manager', icon: '', color: '#7c3aed' },
+  googleAnalytics: { title: 'Google Analytic', icon: '', color: '#f4a100' },
+  facebookCatalog: { title: 'Facebook Catelog', icon: 'bi-facebook', color: '#1877f2' },
+};
+
+router.get('/marketing', async (req, res, next) => {
+  try {
+    const marketing = await getMarketingSettings();
+    res.render('admin/marketing', { adminPageTitle: 'Marketing Settings', marketing, MARKETING_CARDS, MARKETING_CARD_META });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/marketing/:card', async (req, res, next) => {
+  try {
+    const card = req.params.card;
+    if (!MARKETING_CARDS.includes(card)) {
+      req.flash('danger', 'Unknown marketing integration.');
+      return res.redirect('/admin/marketing');
+    }
+    const marketing = await getMarketingSettings();
+    res.render('admin/marketing-manage', {
+      adminPageTitle: MARKETING_CARD_META[card].title,
+      card,
+      meta: MARKETING_CARD_META[card],
+      marketing,
+      testResult: null,
+      baseUrl: `${req.protocol}://${req.get('host')}`,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/marketing/:card', verifyCsrf, async (req, res, next) => {
+  try {
+    const card = req.params.card;
+    if (!MARKETING_CARDS.includes(card)) return res.redirect('/admin/marketing');
+    const data = { ...req.body };
+    delete data.csrfToken;
+    data.status = data.status === 'on';
+    await updateMarketingSettingCard(card, data);
+    req.flash('success', `${MARKETING_CARD_META[card].title} settings saved successfully.`);
+    res.redirect(`/admin/marketing/${card}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/marketing/sms/test', verifyCsrf, async (req, res, next) => {
+  try {
+    const marketing = await getMarketingSettings();
+    const { testNumber, testMessage } = req.body;
+    let testResult;
+    try {
+      const result = await sendSms(
+        marketing.sms.toObject ? marketing.sms.toObject() : marketing.sms,
+        testNumber,
+        testMessage || 'This is a test SMS from your ShopKori admin panel.'
+      );
+      testResult = { ok: true, statusCode: result.statusCode, body: result.body };
+    } catch (err) {
+      testResult = { ok: false, error: err.message };
+    }
+    res.render('admin/marketing-manage', {
+      adminPageTitle: MARKETING_CARD_META.sms.title,
+      card: 'sms',
+      meta: MARKETING_CARD_META.sms,
+      marketing,
+      testResult,
+      baseUrl: `${req.protocol}://${req.get('host')}`,
+    });
   } catch (err) {
     next(err);
   }

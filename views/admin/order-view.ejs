@@ -86,7 +86,7 @@
               <option value="<%= c.value %>" <%= order.courier === c.value ? 'selected' : '' %>><%= c.label %></option>
             <% }); %>
           </select>
-          <div class="form-text">Add a Pathao / Steadfast courier account (Manage Delivery — coming soon) before this can push tracking automatically.</div>
+          <div class="form-text">For 3rd-party courier hand-off. For an in-house rider, use the Delivery Tracking card below instead.</div>
         </div>
         <div class="mb-3">
           <label class="form-label">Courier Tracking ID</label>
@@ -106,6 +106,59 @@
           <textarea name="adminNote" class="form-control" rows="3"><%= order.adminNote || '' %></textarea>
         </div>
         <button type="submit" class="btn btn-brand w-100">Update</button>
+      </form>
+    </div>
+
+    <div class="admin-card mt-4">
+      <h5>Delivery Tracking</h5>
+      <p class="small text-muted">This order's own in-house rider journey — separate from the 3rd-party Courier field above. Also drives the Manage Delivery lists (Delivery Man, Delivered Order, Clear Delivery, Cancelled Order).</p>
+      <form method="post" action="/admin/orders/<%= order._id %>/delivery">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-3">
+          <label class="form-label">Delivery Status</label>
+          <select name="deliveryStatus" class="form-select">
+            <% DELIVERY_STATUSES.forEach(function (s) { %>
+              <option value="<%= s.value %>" <%= order.delivery.status === s.value ? 'selected' : '' %>><%= s.label %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Delivery Man</label>
+          <select name="deliveryMan" class="form-select">
+            <option value="">-- Unassigned --</option>
+            <% employees.forEach(function (e) { %>
+              <option value="<%= e._id %>" <%= order.delivery.deliveryMan && String(order.delivery.deliveryMan._id || order.delivery.deliveryMan) === String(e._id) ? 'selected' : '' %>><%= e.fullName || e.username %></option>
+            <% }); %>
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Rider Note</label>
+          <textarea name="note" class="form-control" rows="2"><%= order.delivery.note || '' %></textarea>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Office Note</label>
+          <textarea name="officeNote" class="form-control" rows="2"><%= order.delivery.officeNote || '' %></textarea>
+        </div>
+        <div class="form-check mb-2">
+          <input class="form-check-input" type="checkbox" name="collected" id="deliveryCollected" <%= order.delivery.collected ? 'checked' : '' %>>
+          <label class="form-check-label" for="deliveryCollected">Cash Collected (COD)</label>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="clearedToOffice" id="deliveryCleared" <%= order.delivery.clearedToOffice ? 'checked' : '' %>>
+          <label class="form-check-label" for="deliveryCleared">Cleared to Office</label>
+        </div>
+        <% if (order.status === 'cancelled') { %>
+          <div class="mb-3">
+            <label class="form-label">Return Status</label>
+            <select name="returnStatus" class="form-select">
+              <option value="">-- Not started --</option>
+              <% RETURN_STATUSES.forEach(function (s) { %>
+                <option value="<%= s.value %>" <%= order.delivery.returnStatus === s.value ? 'selected' : '' %>><%= s.label %></option>
+              <% }); %>
+            </select>
+          </div>
+        <% } %>
+        <button type="submit" class="btn btn-brand w-100">Save Delivery Tracking</button>
       </form>
     </div>
   </div>

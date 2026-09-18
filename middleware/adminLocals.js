@@ -2,7 +2,11 @@ const Admin = require('../models/Admin');
 const Order = require('../models/Order');
 const { getSettings } = require('../models/Setting');
 const { currencyFormatter } = require('./helpers');
-const { ORDER_STATUSES, COURIERS, statusLabel, statusBadge } = require('./orderConstants');
+const {
+  ORDER_STATUSES, COURIERS, statusLabel, statusBadge,
+  DELIVERY_STATUSES, RETURN_STATUSES,
+  deliveryStatusLabel, deliveryStatusBadge, returnStatusLabel, returnStatusBadge,
+} = require('./orderConstants');
 
 async function adminLocals(req, res, next) {
   try {
@@ -19,6 +23,12 @@ async function adminLocals(req, res, next) {
     res.locals.COURIERS = COURIERS;
     res.locals.statusLabel = statusLabel;
     res.locals.statusBadge = statusBadge;
+    res.locals.DELIVERY_STATUSES = DELIVERY_STATUSES;
+    res.locals.RETURN_STATUSES = RETURN_STATUSES;
+    res.locals.deliveryStatusLabel = deliveryStatusLabel;
+    res.locals.deliveryStatusBadge = deliveryStatusBadge;
+    res.locals.returnStatusLabel = returnStatusLabel;
+    res.locals.returnStatusBadge = returnStatusBadge;
 
     // Derive which sidebar nav item should be highlighted from the URL, e.g.
     // /admin/products/123/edit -> "products", /admin -> "dashboard"

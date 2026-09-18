@@ -1,0 +1,51 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Marketing Settings</span>
+</nav>
+
+<div class="admin-card mb-3">
+  <div class="d-flex gap-2 flex-wrap">
+    <input type="text" id="marketingSearch" class="form-control" style="max-width:260px" placeholder="Search integration...">
+    <button class="btn btn-outline-secondary" type="button"><i class="bi bi-search"></i></button>
+  </div>
+</div>
+
+<div class="row g-3" id="marketingGrid">
+  <% MARKETING_CARDS.forEach(function (key) { %>
+    <% var m = MARKETING_CARD_META[key]; var s = marketing[key] || {}; %>
+    <div class="col-md-4 marketing-grid-item" data-name="<%= m.title.toLowerCase() %>">
+      <a href="/admin/marketing/<%= key %>" class="text-decoration-none">
+        <div class="admin-card d-flex align-items-center justify-content-between" style="<%= key === 'sms' ? 'background:#fdf3e7;' : '' %>">
+          <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center justify-content-center rounded-circle text-white" style="width:44px;height:44px;background:<%= m.color %>;font-size:1.1rem;flex-shrink:0;">
+              <% if (m.icon) { %><i class="bi <%= m.icon %>"></i><% } else { %><strong>G</strong><% } %>
+            </div>
+            <div>
+              <div class="fw-semibold text-dark"><%= m.title %></div>
+              <span class="small text-primary">Manage <i class="bi bi-arrow-right"></i></span>
+            </div>
+          </div>
+          <span class="badge bg-<%= s.status ? 'success' : 'secondary' %>"><%= s.status ? 'ON' : 'OFF' %></span>
+        </div>
+      </a>
+    </div>
+  <% }); %>
+</div>
+
+<script>
+  (function () {
+    var input = document.getElementById('marketingSearch');
+    if (!input) return;
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      document.querySelectorAll('#marketingGrid .marketing-grid-item').forEach(function (item) {
+        item.style.display = !q || item.getAttribute('data-name').indexOf(q) !== -1 ? '' : 'none';
+      });
+    });
+  })();
+</script>
+
+<%- include('partials/admin-footer') %>

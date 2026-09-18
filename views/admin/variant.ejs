@@ -1,0 +1,89 @@
+<%- include('partials/admin-header') %>
+
+<div class="row g-4">
+  <div class="col-lg-4">
+    <div class="admin-card">
+      <h5><i class="bi bi-palette2"></i> Add New Attribute</h5>
+      <form method="post" action="/admin/products/variant">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-3">
+          <label class="form-label">Attribute Name</label>
+          <input type="text" name="name" class="form-control" placeholder="e.g. Color, Size, Weight" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Values <small class="text-muted">(comma separated)</small></label>
+          <textarea name="values" class="form-control" rows="3" placeholder="e.g. Red, Blue, Green" required></textarea>
+          <div class="form-text">Each value becomes a tick-box option when quick-adding variant rows on a product.</div>
+        </div>
+        <div class="form-check mb-3">
+          <input class="form-check-input" type="checkbox" name="status" id="attrStatus" checked>
+          <label class="form-check-label" for="attrStatus">Active</label>
+        </div>
+        <button type="submit" class="btn btn-brand w-100"><i class="bi bi-plus-circle"></i> Add Attribute</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="col-lg-8">
+    <div class="admin-card">
+      <h5><i class="bi bi-diagram-3"></i> All Attributes</h5>
+      <p class="text-muted small mb-3">
+        Build a library of variation types once — Color, Size, Weight — and reuse it on every product instead of
+        typing the same labels out by hand each time. Go to <strong>Manage Product → Products → Add New/Edit →
+        Add Variant</strong> and use <strong>Quick Add from Attribute</strong> to tick values from a saved list here
+        and turn them straight into variant rows.
+      </p>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Name</th><th>Values</th><th>Status</th><th>Action</th></tr></thead>
+          <tbody>
+            <% variantAttributes.forEach(function (a) { %>
+              <tr>
+                <td><%= a.name %></td>
+                <td>
+                  <% (a.values || []).forEach(function (v) { %><span class="badge bg-light text-dark border me-1 mb-1"><%= v %></span><% }); %>
+                  <% if (!a.values || !a.values.length) { %><span class="text-muted">—</span><% } %>
+                </td>
+                <td><span class="badge bg-<%= a.status ? 'success' : 'secondary' %>"><%= a.status ? 'Active' : 'Hidden' %></span></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editAttr<%= a._id %>" title="Edit"><i class="bi bi-pencil"></i></button>
+                  <a href="/admin/products/variant/delete/<%= a._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this attribute?" title="Delete"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+
+              <div class="modal fade" id="editAttr<%= a._id %>" tabindex="-1">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form method="post" action="/admin/products/variant">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="id" value="<%= a._id %>">
+                      <div class="modal-header"><h5 class="modal-title">Edit Attribute</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                      <div class="modal-body">
+                        <div class="mb-3">
+                          <label class="form-label">Attribute Name</label>
+                          <input type="text" name="name" class="form-control" value="<%= a.name %>" required>
+                        </div>
+                        <div class="mb-3">
+                          <label class="form-label">Values <small class="text-muted">(comma separated)</small></label>
+                          <textarea name="values" class="form-control" rows="3"><%= (a.values || []).join(', ') %></textarea>
+                        </div>
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" name="status" <%= a.status ? 'checked' : '' %>>
+                          <label class="form-check-label">Active</label>
+                        </div>
+                      </div>
+                      <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+            <% if (!variantAttributes.length) { %><tr><td colspan="4" class="text-center text-muted">No attributes yet — add Color, Size, etc. on the left.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

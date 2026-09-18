@@ -1,6 +1,7 @@
 const Category = require('../models/Category');
 const Customer = require('../models/Customer');
 const { getSettings } = require('../models/Setting');
+const { getMarketingSettings } = require('../models/MarketingSetting');
 const { currencyFormatter, nl2br } = require('./helpers');
 const { cartCount } = require('./cart');
 
@@ -11,9 +12,10 @@ const { cartCount } = require('./cart');
  */
 async function storeLocals(req, res, next) {
   try {
-    const [settings, allCategories] = await Promise.all([
+    const [settings, allCategories, marketing] = await Promise.all([
       getSettings(),
       Category.find({ status: true }).sort({ sortOrder: 1, name: 1 }).lean(),
+      getMarketingSettings(),
     ]);
 
     // Build a 2-level tree (parent -> children) so the header can render a
@@ -33,6 +35,9 @@ async function storeLocals(req, res, next) {
       });
 
     res.locals.settings = settings;
+    // Admin > Marketing (see views/partials/header.ejs for what each ON
+    // card actually injects into the page).
+    res.locals.marketing = marketing;
     res.locals.currency = currencyFormatter(settings.currency_symbol || '৳');
     // Absolute site URL, used to build canonical links and the absolute
     // URLs schema.org JSON-LD structured data requires (Organization/WebSite
