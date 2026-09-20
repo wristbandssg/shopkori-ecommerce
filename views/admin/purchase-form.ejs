@@ -1,0 +1,175 @@
+<%- include('partials/admin-header') %>
+
+<h5 class="mb-3">Add Purchase</h5>
+
+<form method="post" action="/admin/inventory/purchase/new" id="purchaseForm">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+  <div class="admin-card p-0 overflow-hidden mb-3">
+    <div class="d-flex justify-content-between align-items-center px-3 py-2" style="background:var(--bs-brand,#EC0E8C);color:#fff;">
+      <h6 class="mb-0 text-white">Add Purchase Details</h6>
+      <a href="/admin/inventory/purchase" class="text-white text-decoration-none"><i class="bi bi-arrow-left"></i> Back</a>
+    </div>
+
+    <div class="p-3">
+      <label class="form-label">Supplier *</label>
+      <select id="supplierSelect" class="form-select mb-3" style="max-width:400px" required>
+        <option value="">— Select Supplier —</option>
+        <% suppliers.forEach(function (s) { %><option value="<%= s._id %>"><%= s.name %></option><% }); %>
+      </select>
+
+      <button type="button" class="btn btn-brand btn-sm mb-2" id="addSelectedBtn"><i class="bi bi-plus-lg"></i> Add Selected</button>
+
+      <div class="table-responsive mb-4">
+        <table class="table table-sm align-middle">
+          <thead><tr><th style="width:36px;"><input type="checkbox" id="pickAllCheckbox"></th><th>SKU</th><th>Image</th><th>Title</th><th>Category</th></tr></thead>
+          <tbody id="pickerBody">
+            <tr><td colspan="5" class="text-center text-muted py-4">Please select a supplier to load products.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm align-middle">
+          <thead><tr><th>#</th><th>SKU</th><th>Image</th><th>Title</th><th>Variation</th><th>Stock</th><th>Buying Price</th><th>Quantity</th><th>Subtotal</th><th></th></tr></thead>
+          <tbody id="cartBody">
+            <tr id="cartEmptyRow"><td colspan="10" class="text-center text-muted py-4">No products added yet.</td></tr>
+          </tbody>
+          <tfoot>
+            <tr><td colspan="8" class="text-end fw-semibold">Total:</td><td colspan="2" class="fw-bold" id="cartTotal">0.00</td></tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <label class="form-label mt-2">Note</label>
+      <textarea name="note" class="form-control mb-3" rows="2"></textarea>
+
+      <button type="submit" class="btn btn-brand" id="submitPurchaseBtn" disabled><i class="bi bi-check2"></i> Add Purchase</button>
+    </div>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var supplierSelect = document.getElementById('supplierSelect');
+  var pickerBody = document.getElementById('pickerBody');
+  var cartBody = document.getElementById('cartBody');
+  var cartEmptyRow = document.getElementById('cartEmptyRow');
+  var cartTotalEl = document.getElementById('cartTotal');
+  var submitBtn = document.getElementById('submitPurchaseBtn');
+  var pickAllCheckbox = document.getElementById('pickAllCheckbox');
+  var rowIndex = 0;
+  var loadedProducts = [];
+
+  var currencyFmt = <%- JSON.stringify(settings.currency_symbol || '৳') %>;
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+
+  supplierSelect.addEventListener('change', function () {
+    var supplierId = supplierSelect.value;
+    loadedProducts = [];
+    if (!supplierId) {
+      pickerBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Please select a supplier to load products.</td></tr>';
+      return;
+    }
+    pickerBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">Loading…</td></tr>';
+    fetch('/admin/inventory/purchase/products?supplier=' + encodeURIComponent(supplierId))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        loadedProducts = data.products || [];
+        if (!loadedProducts.length) {
+          pickerBody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">This supplier has no products yet.</td></tr>';
+          return;
+        }
+        pickerBody.innerHTML = loadedProducts.map(function (p, i) {
+          return '<tr>' +
+            '<td><input type="checkbox" class="pick-checkbox" data-idx="' + i + '"></td>' +
+            '<td>' + esc(p.sku || '—') + '</td>' +
+            '<td><img src="' + esc(p.image) + '" style="width:32px;height:32px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'"></td>' +
+            '<td>' + esc(p.title) + (p.hasVariants ? ' <span class="badge bg-light text-dark border">' + p.variants.length + ' variants</span>' : '') + '</td>' +
+            '<td>' + esc(p.category) + '</td>' +
+            '</tr>';
+        }).join('');
+      })
+      .catch(function () {
+        pickerBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger py-4">Could not load products. Please try again.</td></tr>';
+      });
+  });
+
+  pickAllCheckbox.addEventListener('change', function () {
+    document.querySelectorAll('.pick-checkbox').forEach(function (cb) { cb.checked = pickAllCheckbox.checked; });
+  });
+
+  function addCartRow(product, variant) {
+    if (cartEmptyRow) { cartEmptyRow.remove(); cartEmptyRow = null; }
+    var idx = rowIndex++;
+    var stock = variant ? variant.stock : product.stock;
+    var sku = variant ? (variant.sku || product.sku) : product.sku;
+    var variation = variant ? variant.label : '';
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + (idx + 1) + '</td>' +
+      '<td>' + esc(sku || '—') +
+        '<input type="hidden" name="items[' + idx + '][product]" value="' + esc(product._id) + '">' +
+        '<input type="hidden" name="items[' + idx + '][variantId]" value="' + esc(variant ? variant._id : '') + '">' +
+        '<input type="hidden" name="items[' + idx + '][sku]" value="' + esc(sku || '') + '">' +
+        '<input type="hidden" name="items[' + idx + '][image]" value="' + esc(product.image ? product.image.split('/uploads/')[1] || '' : '') + '">' +
+        '<input type="hidden" name="items[' + idx + '][title]" value="' + esc(product.title) + '">' +
+        '<input type="hidden" name="items[' + idx + '][variation]" value="' + esc(variation) + '">' +
+      '</td>' +
+      '<td><img src="' + esc(product.image) + '" style="width:32px;height:32px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'"></td>' +
+      '<td>' + esc(product.title) + '</td>' +
+      '<td>' + esc(variation || '—') + '</td>' +
+      '<td>' + stock + '</td>' +
+      '<td><input type="number" step="0.01" min="0" class="form-control form-control-sm row-price" name="items[' + idx + '][buyingPrice]" value="' + (product.buyingPrice || 0) + '" style="width:100px"></td>' +
+      '<td><input type="number" min="1" class="form-control form-control-sm row-qty" name="items[' + idx + '][quantity]" value="1" style="width:80px"></td>' +
+      '<td class="row-subtotal">' + (product.buyingPrice || 0).toFixed(2) + '</td>' +
+      '<td><button type="button" class="btn btn-sm btn-outline-danger row-remove"><i class="bi bi-trash"></i></button></td>';
+    cartBody.appendChild(tr);
+
+    function recalcRow() {
+      var price = parseFloat(tr.querySelector('.row-price').value) || 0;
+      var qty = parseInt(tr.querySelector('.row-qty').value, 10) || 0;
+      tr.querySelector('.row-subtotal').textContent = (price * qty).toFixed(2);
+      recalcTotal();
+    }
+    tr.querySelector('.row-price').addEventListener('input', recalcRow);
+    tr.querySelector('.row-qty').addEventListener('input', recalcRow);
+    tr.querySelector('.row-remove').addEventListener('click', function () {
+      tr.remove();
+      recalcTotal();
+      if (!cartBody.children.length) {
+        cartEmptyRow = document.createElement('tr');
+        cartEmptyRow.id = 'cartEmptyRow';
+        cartEmptyRow.innerHTML = '<td colspan="10" class="text-center text-muted py-4">No products added yet.</td>';
+        cartBody.appendChild(cartEmptyRow);
+      }
+    });
+    recalcTotal();
+  }
+
+  function recalcTotal() {
+    var total = 0;
+    document.querySelectorAll('.row-subtotal').forEach(function (el) { total += parseFloat(el.textContent) || 0; });
+    cartTotalEl.textContent = currencyFmt + total.toFixed(2);
+    submitBtn.disabled = total <= 0 && cartBody.querySelectorAll('tr').length <= (cartEmptyRow ? 1 : 0);
+    submitBtn.disabled = document.querySelectorAll('.row-subtotal').length === 0;
+  }
+
+  document.getElementById('addSelectedBtn').addEventListener('click', function () {
+    document.querySelectorAll('.pick-checkbox:checked').forEach(function (cb) {
+      var product = loadedProducts[parseInt(cb.getAttribute('data-idx'), 10)];
+      if (!product) return;
+      if (product.hasVariants && product.variants.length) {
+        product.variants.forEach(function (v) { addCartRow(product, v); });
+      } else {
+        addCartRow(product, null);
+      }
+      cb.checked = false;
+    });
+    pickAllCheckbox.checked = false;
+  });
+});
+</script>
+
+<%- include('partials/admin-footer') %>

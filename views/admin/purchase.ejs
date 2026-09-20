@@ -1,0 +1,38 @@
+<%- include('partials/admin-header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">Purchase</h5>
+  <a href="/admin/inventory/purchase/new" class="btn btn-brand"><i class="bi bi-plus-lg"></i> Add Purchase</a>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Product</th><th>Image</th><th>Supplier</th><th>Status</th><th>Created</th><th>Note</th><th>Action</th></tr></thead>
+      <tbody>
+        <% purchases.forEach(function (pur) { %>
+          <tr>
+            <td>
+              <% if (pur.items.length === 1) { %>
+                <%= pur.items[0].title %><% if (pur.items[0].variation) { %> <span class="text-muted small">(<%= pur.items[0].variation %>)</span><% } %>
+              <% } else { %>
+                <%= pur.items[0] ? pur.items[0].title : '' %> <span class="badge bg-light text-dark border">+<%= pur.items.length - 1 %> more</span>
+              <% } %>
+            </td>
+            <td>
+              <% if (pur.items[0] && productImageUrl(pur.items[0].image)) { %><img src="<%= productImageUrl(pur.items[0].image) %>" class="admin-thumb" style="width:36px;height:36px;object-fit:cover;"><% } %>
+            </td>
+            <td><%= pur.supplier ? pur.supplier.name : '—' %></td>
+            <td><span class="badge bg-<%= pur.status === 'received' ? 'success' : 'secondary' %>"><%= pur.status === 'received' ? 'Received' : 'Pending' %></span></td>
+            <td><%= pur.createdAt.toLocaleDateString() %></td>
+            <td class="text-truncate" style="max-width:180px;"><%= pur.note || '—' %></td>
+            <td><span class="text-muted small">Total: <%= currency(pur.total) %></span></td>
+          </tr>
+        <% }); %>
+        <% if (!purchases.length) { %><tr><td colspan="7" class="text-center text-muted py-4">No purchases found.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

@@ -28,6 +28,7 @@ const CustomPage = require('../models/CustomPage');
 const Coupon = require('../models/Coupon');
 const { getStoreCustomization, updateStoreCustomization } = require('../models/StoreCustomization');
 const { getThemeCustomizer, updateThemeCustomizer } = require('../models/ThemeCustomizer');
+const Purchase = require('../models/Purchase');
 const PixelSetting = require('../models/PixelSetting');
 const HomeSetting = require('../models/HomeSetting');
 const OrderPageSetting = require('../models/OrderPageSetting');
@@ -102,9 +103,6 @@ const COMING_SOON_PAGES = {
   // (Manage Sliders, Product View Setting) still land here.
   '/customization/sliders': 'Manage Sliders',
   '/customization/product-view': 'Product View Setting',
-
-  '/inventory': 'Inventory',
-  '/inventory/purchase': 'Purchase',
 
   '/offer/flash-sale': 'Flash Sale',
   '/offer/combo': 'Combo Offer',
@@ -3924,6 +3922,194 @@ router.post('/customization/theme', verifyCsrf, async (req, res, next) => {
     await updateThemeCustomizer({ themeName: b.themeName || 'Theme 1', topHeader, header, navMenu, category, product, home, footer });
     req.flash('success', 'Theme settings saved successfully.');
     res.redirect('/admin/customization/theme');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   INVENTORY — Purchase orders (real stock-in from a supplier) + an
+   Inventory report built from real Purchase + Product + Order data.
+
+   This app has no multi-warehouse concept (one `stock`/variant `stock`
+   number per product, same as everywhere else in the app), so "Total
+   Warehouses" reports 1 once at least one purchase exists, 0 otherwise —
+   disclosed simplification, not a fake counter. "Total Wastage" is always
+   0: nothing in this app records wastage/damage yet, so rather than guess
+   at a number from purchased-vs-available stock (which would be wrong for
+   any product whose stock was set directly on the product form before
+   ever being purchased here), it's honestly left at 0. "Sold" figures
+   count items from any order that isn't cancelled — an approximation
+   (an order still mid-pipeline counts as sold) rather than only fully
+   delivered orders, to keep the report simple.
+   ===================================================================== */
+router.get('/inventory/purchase', async (req, res, next) => {
+  try {
+    const purchases = await Purchase.find().populate('supplier').sort({ createdAt: -1 });
+    res.render('admin/purchase', { adminPageTitle: 'Purchase', purchases });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/inventory/purchase/new', async (req, res, next) => {
+  try {
+    const suppliers = await Supplier.find({ status: true }).sort({ name: 1 });
+    res.render('admin/purchase-form', { adminPageTitle: 'Add Purchase', suppliers });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// JSON API backing the Add Purchase page's product picker (AJAX-loaded once
+// a supplier is chosen — see the inline script in admin/purchase-form.ejs).
+router.get('/inventory/purchase/products', async (req, res, next) => {
+  try {
+    if (!req.query.supplier) return res.json({ products: [] });
+    const products = await Product.find({ supplier: req.query.supplier }).populate('category').lean();
+    const productImageUrl = res.locals.productImageUrl;
+    const rows = products.map((p) => ({
+      _id: p._id,
+      sku: p.sku || '',
+      image: productImageUrl(p.image),
+      title: p.name,
+      category: p.category ? p.category.name : '—',
+      buyingPrice: p.buyingPrice || 0,
+      hasVariants: !!p.hasVariants,
+      stock: p.stock || 0,
+      variants: (p.variants || []).map((v) => ({ _id: v._id, label: v.label, sku: v.sku, stock: v.stock || 0 })),
+    }));
+    res.json({ products: rows });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/inventory/purchase/new', verifyCsrf, async (req, res, next) => {
+  try {
+    const supplierId = req.body.supplier;
+    const rawItems = req.body.items;
+    const itemsArr = Array.isArray(rawItems) ? rawItems : (rawItems ? Object.values(rawItems) : []);
+
+    const items = [];
+    let total = 0;
+    itemsArr.forEach((it) => {
+      if (!it || !it.product) return;
+      const qty = parseInt(it.quantity, 10) || 0;
+      const price = parseFloat(it.buyingPrice) || 0;
+      if (qty <= 0) return;
+      const subtotal = qty * price;
+      total += subtotal;
+      items.push({
+        product: it.product,
+        variantId: it.variantId || null,
+        sku: it.sku || '',
+        image: it.image || null,
+        title: it.title || '',
+        variation: it.variation || '',
+        buyingPrice: price,
+        quantity: qty,
+        subtotal,
+      });
+    });
+
+    if (!supplierId || !items.length) {
+      req.flash('danger', 'Please select a supplier and add at least one product with a quantity.');
+      return res.redirect('/admin/inventory/purchase/new');
+    }
+
+    await Purchase.create({ supplier: supplierId, items, total, note: (req.body.note || '').trim(), status: 'received' });
+
+    // Real stock-in: bump each product's (or variant's) live stock —
+    // the same field the storefront checks at checkout.
+    for (const it of items) {
+      if (it.variantId) {
+        await Product.updateOne(
+          { _id: it.product, 'variants._id': it.variantId },
+          { $inc: { 'variants.$.stock': it.quantity } }
+        );
+      } else {
+        await Product.updateOne({ _id: it.product }, { $inc: { stock: it.quantity } });
+      }
+    }
+
+    req.flash('success', 'Purchase added and stock updated successfully.');
+    res.redirect('/admin/inventory/purchase');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/inventory', async (req, res, next) => {
+  try {
+    const purchases = await Purchase.find().lean();
+    const byProduct = {};
+    purchases.forEach((pur) => {
+      (pur.items || []).forEach((it) => {
+        const key = String(it.product);
+        if (!byProduct[key]) byProduct[key] = { purchasedQty: 0, purchaseCost: 0 };
+        byProduct[key].purchasedQty += it.quantity;
+        byProduct[key].purchaseCost += it.subtotal;
+      });
+    });
+    const productIds = Object.keys(byProduct);
+
+    let rows = [];
+    let totalStockValue = 0;
+    let totalSaleValue = 0;
+
+    if (productIds.length) {
+      const products = await Product.find({ _id: { $in: productIds } }).lean();
+      const orders = await Order.find({ status: { $ne: 'cancelled' }, 'items.product': { $in: productIds } }).select('items').lean();
+      const soldByProduct = {};
+      orders.forEach((o) => {
+        (o.items || []).forEach((it) => {
+          if (!it.product) return;
+          const key = String(it.product);
+          if (!byProduct[key]) return; // only report on products that have a purchase history
+          if (!soldByProduct[key]) soldByProduct[key] = { qty: 0, revenue: 0 };
+          soldByProduct[key].qty += it.qty;
+          soldByProduct[key].revenue += it.lineTotal;
+        });
+      });
+
+      rows = products.map((p) => {
+        const key = String(p._id);
+        const purchased = byProduct[key] || { purchasedQty: 0, purchaseCost: 0 };
+        const sold = soldByProduct[key] || { qty: 0, revenue: 0 };
+        const availableQty = (p.hasVariants && p.variants && p.variants.length)
+          ? p.variants.reduce((sum, v) => sum + (v.stock || 0), 0)
+          : (p.stock || 0);
+        return {
+          _id: p._id,
+          name: p.name,
+          image: p.image,
+          warehouseQty: purchased.purchasedQty,
+          availableQty,
+          purchaseCost: purchased.purchaseCost,
+          sellRevenue: sold.revenue,
+          soldCost: sold.qty * (p.buyingPrice || 0),
+          wastage: 0,
+          totalQty: purchased.purchasedQty,
+        };
+      });
+
+      totalStockValue = products.reduce((sum, p) => {
+        const qty = (p.hasVariants && p.variants && p.variants.length) ? p.variants.reduce((s, v) => s + (v.stock || 0), 0) : (p.stock || 0);
+        return sum + qty * (p.buyingPrice || 0);
+      }, 0);
+      totalSaleValue = products.reduce((sum, p) => {
+        const qty = (p.hasVariants && p.variants && p.variants.length) ? p.variants.reduce((s, v) => s + (v.stock || 0), 0) : (p.stock || 0);
+        return sum + qty * (p.salePrice || p.price || 0);
+      }, 0);
+    }
+
+    const q = (req.query.q || '').trim().toLowerCase();
+    if (q) rows = rows.filter((r) => r.name.toLowerCase().indexOf(q) !== -1);
+
+    res.render('admin/inventory', {
+      adminPageTitle: 'Inventory', rows, totalWarehouses: productIds.length ? 1 : 0, totalStockValue, totalSaleValue, q: req.query.q || '',
+    });
   } catch (err) {
     next(err);
   }

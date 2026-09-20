@@ -1,0 +1,73 @@
+<%- include('partials/admin-header') %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">Inventory</h5>
+  <a href="/admin/inventory/purchase" class="btn btn-brand"><i class="bi bi-bag-plus"></i> Go to Purchase</a>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#2F5FE0;"><i class="bi bi-shop"></i></div>
+      <div><span class="stat-value"><%= totalWarehouses %></span><span class="stat-label">Total Warehouses</span></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#EC0E8C;"><i class="bi bi-box-seam"></i></div>
+      <div><span class="stat-value"><%= currency(totalStockValue) %></span><span class="stat-label">Total Stock Value</span></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#28a745;"><i class="bi bi-graph-up-arrow"></i></div>
+      <div><span class="stat-value"><%= currency(totalSaleValue) %></span><span class="stat-label">Total Sale Value</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex gap-2 flex-wrap">
+    <input type="text" name="q" class="form-control" style="max-width:260px" placeholder="Search product name" value="<%= q %>">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Search</button>
+  </form>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>No</th>
+          <th>Name</th>
+          <th>Total Warehouse Quantity</th>
+          <th>Total Available Quantity</th>
+          <th>Purchase Cost</th>
+          <th>Sell</th>
+          <th>Sold Cost</th>
+          <th>Total Wastage</th>
+          <th>Total Quantity</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function (r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td class="d-flex align-items-center gap-2"><img src="<%= productImageUrl(r.image) %>" class="admin-thumb"><%= r.name %></td>
+            <td><%= r.warehouseQty %></td>
+            <td><%= r.availableQty %></td>
+            <td><%= currency(r.purchaseCost) %></td>
+            <td><%= currency(r.sellRevenue) %></td>
+            <td><%= currency(r.soldCost) %></td>
+            <td><%= r.wastage %></td>
+            <td><%= r.totalQty %></td>
+          </tr>
+        <% }); %>
+        <% if (!rows.length) { %><tr><td colspan="9" class="text-center text-muted py-4">No inventory data found.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+  <p class="text-muted small mt-2 mb-0">Only products with at least one Purchase record are listed here. "Total Wastage" is always 0 — this app doesn't track wastage/damage yet.</p>
+</div>
+
+<%- include('partials/admin-footer') %>
