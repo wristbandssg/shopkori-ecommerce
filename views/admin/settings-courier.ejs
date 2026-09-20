@@ -1,0 +1,112 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Courier</span>
+</nav>
+
+<h5 class="mb-3">Courier Settings</h5>
+
+<div class="admin-card">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div>
+      <h5 class="mb-0"><i class="bi bi-box-seam"></i> Courier Setups</h5>
+      <p class="text-muted small mb-0">Manage your courier API integrations</p>
+    </div>
+    <button class="btn btn-brand" data-bs-toggle="modal" data-bs-target="#addCourierModal"><i class="bi bi-plus-circle"></i> Add New</button>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>#</th><th>Courier</th><th>API Key</th><th>Store ID</th><th>Webhook</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        <% couriers.forEach(function (c, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><%= c.courier %></td>
+            <td><code><%= c.apiKey || '—' %></code></td>
+            <td><code><%= c.storeId || '—' %></code></td>
+            <td class="text-truncate" style="max-width:180px;"><%= c.webhookUrl || '—' %></td>
+            <td><span class="badge bg-<%= c.status ? 'success' : 'secondary' %>"><%= c.status ? 'Active' : 'Inactive' %></span></td>
+            <td class="text-nowrap">
+              <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editCourier<%= c._id %>" title="Edit"><i class="bi bi-pencil"></i></button>
+              <a href="/admin/settings/courier/delete/<%= c._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this courier setup?" title="Delete"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+
+          <div class="modal fade" id="editCourier<%= c._id %>" tabindex="-1">
+            <div class="modal-dialog">
+              <div class="modal-content">
+                <form method="post" action="/admin/settings/courier/<%= c._id %>/edit">
+                  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                  <div class="modal-header">
+                    <h5 class="modal-title">Edit Courier Setup</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                  </div>
+                  <div class="modal-body">
+                    <div class="mb-3">
+                      <label class="form-label">Courier</label>
+                      <select name="courier" class="form-select" required>
+                        <% COURIERS.filter(function (co) { return co.value; }).forEach(function (co) { %>
+                          <option value="<%= co.label %>" <%= c.courier === co.label ? 'selected' : '' %>><%= co.label %></option>
+                        <% }); %>
+                        <option value="<%= c.courier %>" <%= !COURIERS.some(function (co) { return co.label === c.courier; }) ? 'selected' : '' %>><%= c.courier %></option>
+                      </select>
+                    </div>
+                    <div class="mb-3"><label class="form-label">API Key</label><input type="text" name="apiKey" class="form-control" value="<%= c.apiKey || '' %>"></div>
+                    <div class="mb-3"><label class="form-label">Secret Key</label><input type="text" name="secretKey" class="form-control" value="<%= c.secretKey || '' %>"></div>
+                    <div class="mb-3"><label class="form-label">Store ID</label><input type="text" name="storeId" class="form-control" value="<%= c.storeId || '' %>"></div>
+                    <div class="mb-3"><label class="form-label">Webhook URL</label><input type="text" name="webhookUrl" class="form-control" value="<%= c.webhookUrl || '' %>"></div>
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" name="status" id="courierStatus<%= c._id %>" <%= c.status ? 'checked' : '' %>>
+                      <label class="form-check-label" for="courierStatus<%= c._id %>">Active</label>
+                    </div>
+                  </div>
+                  <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
+                </form>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+        <% if (!couriers.length) { %><tr><td colspan="7" class="text-center text-muted py-4">No courier setups found. Click "Add New" to create one.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="addCourierModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/admin/settings/courier/new">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Courier Setup</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Courier</label>
+            <select name="courier" class="form-select" required>
+              <option value="">— Select —</option>
+              <% COURIERS.filter(function (co) { return co.value; }).forEach(function (co) { %>
+                <option value="<%= co.label %>"><%= co.label %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="mb-3"><label class="form-label">API Key</label><input type="text" name="apiKey" class="form-control"></div>
+          <div class="mb-3"><label class="form-label">Secret Key</label><input type="text" name="secretKey" class="form-control"></div>
+          <div class="mb-3"><label class="form-label">Store ID</label><input type="text" name="storeId" class="form-control"></div>
+          <div class="mb-3"><label class="form-label">Webhook URL</label><input type="text" name="webhookUrl" class="form-control"></div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="status" id="newCourierStatus" checked>
+            <label class="form-check-label" for="newCourierStatus">Active</label>
+          </div>
+        </div>
+        <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

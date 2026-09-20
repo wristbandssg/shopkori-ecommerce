@@ -1,0 +1,52 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/settings" class="text-decoration-none">Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/settings/payment" class="text-decoration-none">Payment Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Bkash</span>
+</nav>
+
+<div class="admin-card" style="max-width:700px">
+  <h5 class="mb-3"><i class="bi bi-phone"></i> Bkash Online Payment</h5>
+  <form method="post" action="/admin/settings/payment/bkash">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+    <h6 class="text-muted mb-2">API Credentials</h6>
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">User Name</label>
+        <input type="text" name="username" class="form-control" value="<%= payment.bkash.username %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-control" value="<%= payment.bkash.password %>" autocomplete="new-password">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">App Key</label>
+        <input type="text" name="appKey" class="form-control" value="<%= payment.bkash.appKey %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">App Secret</label>
+        <input type="password" name="appSecret" class="form-control" value="<%= payment.bkash.appSecret %>" autocomplete="new-password">
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="status" id="bkashStatus" <%= payment.bkash.status ? 'checked' : '' %>>
+        <label class="form-check-label" for="bkashStatus">Payment Status</label>
+      </div>
+      <span class="badge bg-<%= payment.bkash.status ? 'success' : 'secondary' %>"><%= payment.bkash.status ? 'Active' : 'Inactive' %></span>
+    </div>
+
+    <p class="text-muted small">Note: no bKash payment gateway API is wired into checkout yet in this app — these credentials are saved here so they're ready, but they aren't read by the storefront's checkout flow.</p>
+
+    <button type="submit" class="btn btn-brand">Save Changes</button>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

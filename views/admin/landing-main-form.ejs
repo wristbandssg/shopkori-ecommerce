@@ -1,0 +1,371 @@
+<%
+  const d = landing || {};
+  const isEdit = !!(d && d._id);
+  const formAction = isEdit ? `/admin/landing-page/main/${d._id}/edit` : '/admin/landing-page/main/new';
+  const sliderViewValue = d.sliderView === 'grid' ? 'grid' : 'slide';
+  const reviewViewValue = d.reviewView === 'grid' ? 'grid' : 'slide';
+  const reviewModeValue = d.reviewProductSelectMode === 'single' ? 'single' : 'multiple';
+  const deliveryModeValue = ['required', 'optional', 'free'].includes(d.deliveryChargeMode) ? d.deliveryChargeMode : 'required';
+  const youtubeInitial = (d.youtubeVideos && d.youtubeVideos.length) ? d.youtubeVideos : [];
+  const descInitial = (d.descriptionBlocks && d.descriptionBlocks.length) ? d.descriptionBlocks : [];
+  const selectedReviewIds = (d.reviewProducts || []).map(function (rp) { return String(rp.product && rp.product._id ? rp.product._id : rp.product); });
+  const autoCartReviewIds = (d.reviewProducts || [])
+    .filter(function (rp) { return rp.autoCart; })
+    .map(function (rp) { return String(rp.product && rp.product._id ? rp.product._id : rp.product); });
+%>
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+<% } %>
+
+<form method="post" action="<%= formAction %>" enctype="multipart/form-data" id="landingForm">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-globe2 text-brand"></i> <%= isEdit ? 'Edit Landing Page' : 'Add Landing' %></h4>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="status" id="landingStatus" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
+        <label class="form-check-label" for="landingStatus">Active</label>
+      </div>
+      <a href="/admin/landing-page/main" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+    </div>
+  </div>
+
+  <!-- ---------- Basic Information ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-card-text"></i> Basic Information</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Page Title *</label>
+        <input type="text" name="title" class="form-control" required value="<%= d.title || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Page Slug <small class="text-muted">(leave blank to auto-generate from the title)</small></label>
+        <input type="text" name="slug" class="form-control" placeholder="e.g. summer-combo-offer" value="<%= d.slug || '' %>">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Main Banner</label>
+        <input type="file" name="mainBanner" class="form-control" accept="image/*">
+        <% if (d.mainBanner) { %><img src="<%= landingImageUrl(d.mainBanner) %>" class="admin-thumb mt-2"><% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Slider ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-images"></i> Slider</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Slider Title</label>
+        <input type="text" name="sliderTitle" class="form-control" value="<%= d.sliderTitle || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label d-block">Slider Images View</label>
+        <div class="btn-group" role="group">
+          <input type="radio" class="btn-check" name="sliderView" id="svSlide" value="slide" autocomplete="off" <%= sliderViewValue === 'slide' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="svSlide">Image Slide</label>
+          <input type="radio" class="btn-check" name="sliderView" id="svGrid" value="grid" autocomplete="off" <%= sliderViewValue === 'grid' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="svGrid">Grid View</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Slider Images <small class="text-muted">(you can select multiple images)</small></label>
+        <input type="file" name="sliderImages" class="form-control" accept="image/*" multiple>
+        <% if (d.sliderImages && d.sliderImages.length) { %>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <% d.sliderImages.forEach(function (img) { %><img src="<%= landingImageUrl(img) %>" class="admin-thumb"><% }); %>
+          </div>
+          <div class="form-text">Uploading new images here replaces the whole set above.</div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Instruction Message ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-chat-square-text"></i> Instruction Message</h5>
+    <textarea name="instructionMessage" class="form-control" rows="3" placeholder="e.g. How to order instructions shown to the visitor..."><%= d.instructionMessage || '' %></textarea>
+  </div>
+
+  <!-- ---------- Page Behaviour ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-sliders"></i> Page Behaviour</h5>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="modernUi" id="modernUi" <%= d.modernUi ? 'checked' : '' %>>
+          <label class="form-check-label" for="modernUi">UI/UX (Modern Layout)</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="showNumber" id="showNumber" <%= (d.showNumber === undefined || d.showNumber) ? 'checked' : '' %>>
+          <label class="form-check-label" for="showNumber">Show Number</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="productsLayoutGrid" id="productsLayoutGrid" <%= (d.productsLayoutGrid === undefined || d.productsLayoutGrid) ? 'checked' : '' %>>
+          <label class="form-check-label" for="productsLayoutGrid">Products Layout (Grid)</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Contact & Order Button ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-telephone"></i> Contact &amp; Order Button</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Contact Title</label>
+        <input type="text" name="contactTitle" class="form-control" value="<%= d.contactTitle || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Phone Number</label>
+        <input type="text" name="phoneNumber" class="form-control" value="<%= d.phoneNumber || '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Order Button Text</label>
+        <input type="text" name="orderButtonText" class="form-control" value="<%= d.orderButtonText || 'Order Now' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label d-block">Order Button Text Color</label>
+        <input type="color" name="orderButtonTextColor" class="form-control form-control-color w-100" value="<%= d.orderButtonTextColor || '#ffffff' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label d-block">Order Button BG Color</label>
+        <input type="color" name="orderButtonBgColor" class="form-control form-control-color w-100" value="<%= d.orderButtonBgColor || '#e74c3c' %>">
+      </div>
+      <div class="col-12">
+        <span class="form-label mb-0">Preview:</span>
+        <button type="button" class="btn" id="orderBtnPreview" style="color:<%= d.orderButtonTextColor || '#ffffff' %>;background-color:<%= d.orderButtonBgColor || '#e74c3c' %>;border:0;"><%= d.orderButtonText || 'Order Now' %></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- YouTube Videos ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-youtube"></i> YouTube Videos</h5>
+    <div class="form-text mb-2">ভিডিও লিংক হিসেবে YouTube-এর সরাসরি ভিডিও লিংক অথবা embed লিংক দিন (iframe embed কোড না দিয়ে শুধু লিংকটি দিন)।</div>
+    <div id="youtubeRows">
+      <% youtubeInitial.forEach(function (v) { %>
+        <div class="row g-2 align-items-center mb-2 youtube-row">
+          <div class="col-md-5"><input type="text" name="youtubeTitle" class="form-control" placeholder="Video Title" value="<%= v.title || '' %>"></div>
+          <div class="col-md-6"><input type="text" name="youtubeLink" class="form-control" placeholder="Video Link" value="<%= v.link || '' %>"></div>
+          <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger js-remove-row"><i class="bi bi-trash"></i></button></div>
+        </div>
+      <% }); %>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="addYoutubeRow"><i class="bi bi-plus-lg"></i> Add Video</button>
+  </div>
+
+  <!-- ---------- Product Description ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-list-ul"></i> Product Description</h5>
+    <div id="descRows">
+      <% descInitial.forEach(function (v) { %>
+        <div class="row g-2 align-items-center mb-2 desc-row">
+          <div class="col-md-5"><input type="text" name="descTitle" class="form-control" placeholder="Title" value="<%= v.title || '' %>"></div>
+          <div class="col-md-6"><input type="text" name="descValue" class="form-control" placeholder="Value" value="<%= v.value || '' %>"></div>
+          <div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger js-remove-row"><i class="bi bi-trash"></i></button></div>
+        </div>
+      <% }); %>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="addDescRow"><i class="bi bi-plus-lg"></i> Add To Description</button>
+  </div>
+
+  <!-- ---------- Customer Review ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-star-fill"></i> Customer Review</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Review Section Title</label>
+        <input type="text" name="reviewSectionTitle" class="form-control" value="<%= d.reviewSectionTitle || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label d-block">Review Images View</label>
+        <div class="btn-group" role="group">
+          <input type="radio" class="btn-check" name="reviewView" id="rvSlide" value="slide" autocomplete="off" <%= reviewViewValue === 'slide' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="rvSlide">Image Slide</label>
+          <input type="radio" class="btn-check" name="reviewView" id="rvGrid" value="grid" autocomplete="off" <%= reviewViewValue === 'grid' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="rvGrid">Grid View</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Select Review Images <small class="text-muted">(you can select multiple images)</small></label>
+        <input type="file" name="reviewImages" class="form-control" accept="image/*" multiple>
+        <% if (d.reviewImages && d.reviewImages.length) { %>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <% d.reviewImages.forEach(function (img) { %><img src="<%= landingImageUrl(img) %>" class="admin-thumb"><% }); %>
+          </div>
+          <div class="form-text">Uploading new images here replaces the whole set above.</div>
+        <% } %>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label d-block">Product Select</label>
+        <div class="btn-group mb-2" role="group">
+          <input type="radio" class="btn-check" name="reviewProductSelectMode" id="rpmSingle" value="single" autocomplete="off" <%= reviewModeValue === 'single' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="rpmSingle">Single Product</label>
+          <input type="radio" class="btn-check" name="reviewProductSelectMode" id="rpmMultiple" value="multiple" autocomplete="off" <%= reviewModeValue === 'multiple' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="rpmMultiple">Multiple Product</label>
+        </div>
+        <input type="text" class="form-control mb-2" id="reviewProductSearch" placeholder="Search products...">
+        <div class="table-responsive" style="max-height:320px; overflow-y:auto;">
+          <table class="table table-sm align-middle">
+            <thead><tr><th></th><th>Product</th><th>Is Auto Cart</th><th>Sale Price</th><th>Price</th><th>Stock</th></tr></thead>
+            <tbody>
+              <% products.forEach(function (p) { %>
+                <tr class="review-product-row" data-name="<%= p.name.toLowerCase() %>">
+                  <td><input type="<%= reviewModeValue === 'single' ? 'radio' : 'checkbox' %>" name="reviewProductIds" value="<%= p._id %>" class="form-check-input" <%= selectedReviewIds.includes(String(p._id)) ? 'checked' : '' %>></td>
+                  <td><%= p.name %></td>
+                  <td><input type="checkbox" name="autoCartProductIds" value="<%= p._id %>" class="form-check-input" <%= autoCartReviewIds.includes(String(p._id)) ? 'checked' : '' %>></td>
+                  <td><%= p.salePrice ? currency(p.salePrice) : '—' %></td>
+                  <td><%= currency(p.price) %></td>
+                  <td><%= p.stock %></td>
+                </tr>
+              <% }); %>
+              <% if (!products.length) { %><tr><td colspan="6" class="text-center text-muted">No active products yet.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Title Setting ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-palette"></i> Title Setting</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label d-block">Title Color</label>
+        <input type="color" name="titleColor" class="form-control form-control-color w-100" value="<%= d.titleColor || '#1e3a5f' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label d-block">Title Icon Color</label>
+        <input type="color" name="titleIconColor" class="form-control form-control-color w-100" value="<%= d.titleIconColor || '#d4a537' %>">
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Delivery Settings ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-truck"></i> Delivery Settings</h5>
+    <div class="btn-group flex-wrap" role="group">
+      <input type="radio" class="btn-check" name="deliveryChargeMode" id="dcRequired" value="required" autocomplete="off" <%= deliveryModeValue === 'required' ? 'checked' : '' %>>
+      <label class="btn btn-outline-primary btn-sm" for="dcRequired">Delivery Charge Required</label>
+      <input type="radio" class="btn-check" name="deliveryChargeMode" id="dcOptional" value="optional" autocomplete="off" <%= deliveryModeValue === 'optional' ? 'checked' : '' %>>
+      <label class="btn btn-outline-primary btn-sm" for="dcOptional">Delivery Charge Optional</label>
+      <input type="radio" class="btn-check" name="deliveryChargeMode" id="dcFree" value="free" autocomplete="off" <%= deliveryModeValue === 'free' ? 'checked' : '' %>>
+      <label class="btn btn-outline-primary btn-sm" for="dcFree">Free Delivery</label>
+    </div>
+  </div>
+
+  <!-- ---------- Payment Methods ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-credit-card"></i> Payment Methods</h5>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="paymentCod" id="paymentCod" <%= (d.paymentCod === undefined || d.paymentCod) ? 'checked' : '' %>>
+          <label class="form-check-label" for="paymentCod">Cash On Delivery</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="paymentBkash" id="paymentBkash" <%= d.paymentBkash ? 'checked' : '' %>>
+          <label class="form-check-label" for="paymentBkash">bKash Payment</label>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="paymentManual" id="paymentManual" <%= d.paymentManual ? 'checked' : '' %>>
+          <label class="form-check-label" for="paymentManual">Manual Payment</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+    <a href="/admin/landing-page/main" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // ---- Order button live preview ----
+  (function () {
+    var textInput = document.querySelector('input[name="orderButtonText"]');
+    var textColor = document.querySelector('input[name="orderButtonTextColor"]');
+    var bgColor = document.querySelector('input[name="orderButtonBgColor"]');
+    var preview = document.getElementById('orderBtnPreview');
+    function update() {
+      preview.textContent = textInput.value || 'Order Now';
+      preview.style.color = textColor.value;
+      preview.style.backgroundColor = bgColor.value;
+    }
+    [textInput, textColor, bgColor].forEach(function (el) { el.addEventListener('input', update); });
+  })();
+
+  // ---- Repeatable row helper (YouTube Videos / Product Description) ----
+  function makeRepeatable(addBtnId, rowsWrapId, rowClass, fields) {
+    var addBtn = document.getElementById(addBtnId);
+    var wrap = document.getElementById(rowsWrapId);
+    if (!addBtn || !wrap) return;
+    addBtn.addEventListener('click', function () {
+      var row = document.createElement('div');
+      row.className = 'row g-2 align-items-center mb-2 ' + rowClass;
+      var html = '';
+      fields.forEach(function (f) {
+        html += '<div class="col-md-' + f.width + '"><input type="text" name="' + f.name + '" class="form-control" placeholder="' + f.placeholder + '"></div>';
+      });
+      html += '<div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger js-remove-row"><i class="bi bi-trash"></i></button></div>';
+      row.innerHTML = html;
+      wrap.appendChild(row);
+    });
+    wrap.addEventListener('click', function (e) {
+      var btn = e.target.closest('.js-remove-row');
+      if (btn) btn.closest('.' + rowClass).remove();
+    });
+  }
+
+  makeRepeatable('addYoutubeRow', 'youtubeRows', 'youtube-row', [
+    { name: 'youtubeTitle', placeholder: 'Video Title', width: 5 },
+    { name: 'youtubeLink', placeholder: 'Video Link', width: 6 },
+  ]);
+  makeRepeatable('addDescRow', 'descRows', 'desc-row', [
+    { name: 'descTitle', placeholder: 'Title', width: 5 },
+    { name: 'descValue', placeholder: 'Value', width: 6 },
+  ]);
+
+  // ---- Review product search filter ----
+  var reviewSearch = document.getElementById('reviewProductSearch');
+  if (reviewSearch) {
+    reviewSearch.addEventListener('input', function () {
+      var term = reviewSearch.value.toLowerCase();
+      document.querySelectorAll('.review-product-row').forEach(function (row) {
+        row.style.display = row.getAttribute('data-name').indexOf(term) !== -1 ? '' : 'none';
+      });
+    });
+  }
+
+  // ---- Single vs Multiple product select mode: swap checkbox<->radio ----
+  document.querySelectorAll('input[name="reviewProductSelectMode"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      var single = this.value === 'single';
+      var checkedValues = [];
+      document.querySelectorAll('input[name="reviewProductIds"]:checked').forEach(function (el) { checkedValues.push(el.value); });
+      document.querySelectorAll('input[name="reviewProductIds"]').forEach(function (el) {
+        el.type = single ? 'radio' : 'checkbox';
+        el.checked = single ? (checkedValues[0] === el.value) : checkedValues.includes(el.value);
+      });
+    });
+  });
+});
+</script>
+
+<%- include('partials/admin-footer') %>

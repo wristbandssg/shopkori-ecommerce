@@ -1,0 +1,47 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/analytics" class="text-decoration-none">Analytics Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted"><%= meta.title %></span>
+</nav>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#f0ad4e;"><i class="bi bi-exclamation-triangle"></i></div>
+      <div><span class="stat-value"><%= products.length %></span><span class="stat-label">Low / Out of Stock Products</span></div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#d9534f;"><i class="bi bi-x-circle"></i></div>
+      <div><span class="stat-value"><%= outOfStockCount %></span><span class="stat-label">Completely Out of Stock</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Product</th><th>Category</th><th>Stock</th><th>Stock Alert Threshold</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        <% products.forEach(function (p) { %>
+          <tr>
+            <td class="d-flex align-items-center gap-2"><img src="<%= productImageUrl(p.image) %>" class="admin-thumb"><%= p.name %></td>
+            <td><%= p.category ? p.category.name : '—' %></td>
+            <td><%= p.stock %></td>
+            <td><%= p.stockAlert %></td>
+            <td><span class="badge bg-<%= p.stock <= 0 ? 'danger' : 'warning' %>"><%= p.stock <= 0 ? 'Out of Stock' : 'Low Stock' %></span></td>
+            <td><a href="/admin/products/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary">Restock</a></td>
+          </tr>
+        <% }); %>
+        <% if (!products.length) { %><tr><td colspan="6" class="text-center text-muted py-4">No products are low on stock right now.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

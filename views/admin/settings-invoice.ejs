@@ -1,0 +1,52 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/settings" class="text-decoration-none">Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Invoice Setting</span>
+</nav>
+
+<div class="admin-card" style="max-width:700px">
+  <h5 class="mb-3"><i class="bi bi-receipt"></i> Invoice Setting</h5>
+  <form method="post" action="/admin/settings/invoice">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">Invoice Prefix</label>
+        <input type="text" name="invoicePrefix" class="form-control" value="<%= invoice.invoicePrefix %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Starting Number</label>
+        <input type="number" name="startingNumber" class="form-control" value="<%= invoice.startingNumber %>">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Company Name</label>
+        <input type="text" name="companyName" class="form-control" value="<%= invoice.companyName %>">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Company Address</label>
+        <textarea name="companyAddress" class="form-control" rows="2"><%= invoice.companyAddress %></textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Footer Note</label>
+        <textarea name="footerNote" class="form-control" rows="2" placeholder="e.g. Thank you for shopping with us!"><%= invoice.footerNote %></textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Tax (%)</label>
+        <input type="number" step="0.01" name="taxPercent" class="form-control" value="<%= invoice.taxPercent %>">
+      </div>
+    </div>
+
+    <div class="form-check form-switch mb-3">
+      <input class="form-check-input" type="checkbox" name="showLogo" id="invoiceShowLogo" <%= invoice.showLogo ? 'checked' : '' %>>
+      <label class="form-check-label" for="invoiceShowLogo">Show Logo on Invoice</label>
+    </div>
+
+    <button type="submit" class="btn btn-brand">Save</button>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

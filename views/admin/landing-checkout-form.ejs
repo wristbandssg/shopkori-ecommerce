@@ -1,0 +1,177 @@
+<%
+  const d = landing || {};
+  const isEdit = !!(d && d._id);
+  const formAction = isEdit ? `/admin/landing-page/checkout/${d._id}/edit` : '/admin/landing-page/checkout/new';
+  const modeValue = d.productSelectMode === 'single' ? 'single' : 'multiple';
+  const deliveryModeValue = ['required', 'optional', 'free'].includes(d.deliveryChargeMode) ? d.deliveryChargeMode : 'required';
+  const itemsInitial = (d.items && d.items.length) ? d.items : [];
+%>
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+<% } %>
+
+<h5 class="mb-3"><%= isEdit ? 'Edit Landing' : 'Create Landing' %></h5>
+
+<form method="post" action="<%= formAction %>" id="landingCheckoutForm">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+  <div class="admin-card mb-3">
+    <div class="d-flex justify-content-end mb-2">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="status" id="checkoutStatus" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
+        <label class="form-check-label" for="checkoutStatus">Active</label>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Title</label>
+        <input type="text" name="title" class="form-control" required value="<%= d.title || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Slug</label>
+        <input type="text" name="slug" class="form-control" placeholder="e.g. quick-checkout" value="<%= d.slug || '' %>">
+        <div class="form-text">Leave blank to auto-generate from the Title.</div>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label d-block">Product Select</label>
+        <div class="d-flex flex-wrap align-items-center gap-3">
+          <div class="btn-group" role="group">
+            <input type="radio" class="btn-check" name="productSelectMode" id="pmSingle" value="single" autocomplete="off" <%= modeValue === 'single' ? 'checked' : '' %>>
+            <label class="btn btn-outline-primary btn-sm" for="pmSingle">User Can Select Only 1 Product</label>
+            <input type="radio" class="btn-check" name="productSelectMode" id="pmMultiple" value="multiple" autocomplete="off" <%= modeValue === 'multiple' ? 'checked' : '' %>>
+            <label class="btn btn-outline-primary btn-sm" for="pmMultiple">User Can Select Multiple Product</label>
+          </div>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" name="instantSelectRequired" id="instantSelectRequired" <%= d.instantSelectRequired ? 'checked' : '' %>>
+            <label class="form-check-label" for="instantSelectRequired">Instant Select Required?</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Select Product</label>
+        <select class="form-select" id="checkoutProductPicker">
+          <option value="">- Choose Product -</option>
+          <% products.forEach(function (p) { %>
+            <option value="<%= p._id %>" data-name="<%= p.name %>"><%= p.name %></option>
+          <% }); %>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-responsive mt-3">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Product</th><th>Is Auto Cart</th><th>Best Sell</th><th>Action</th></tr></thead>
+        <tbody id="checkoutItemsBody">
+          <% itemsInitial.forEach(function (it, i) { %>
+            <% const pid = String(it.product && it.product._id ? it.product._id : it.product || ''); %>
+            <% const pname = it.product && it.product.name ? it.product.name : pid; %>
+            <tr>
+              <td>
+                <%= pname %>
+                <input type="hidden" name="items[<%= i %>][product]" value="<%= pid %>">
+              </td>
+              <td><input type="checkbox" class="form-check-input" name="items[<%= i %>][autoCart]" <%= it.autoCart ? 'checked' : '' %>></td>
+              <td><input type="checkbox" class="form-check-input" name="items[<%= i %>][bestSell]" <%= it.bestSell ? 'checked' : '' %>></td>
+              <td><button type="button" class="btn btn-sm btn-outline-danger js-remove-checkout-item"><i class="bi bi-trash"></i></button></td>
+            </tr>
+          <% }); %>
+          <% if (!itemsInitial.length) { %><tr class="js-empty-row"><td colspan="4" class="text-center text-muted">No products selected yet.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-3">
+      <label class="form-label d-block">Delivery Settings</label>
+      <div class="btn-group flex-wrap" role="group">
+        <input type="radio" class="btn-check" name="deliveryChargeMode" id="lcDcRequired" value="required" autocomplete="off" <%= deliveryModeValue === 'required' ? 'checked' : '' %>>
+        <label class="btn btn-outline-primary btn-sm" for="lcDcRequired">Delivery Charge Required</label>
+        <input type="radio" class="btn-check" name="deliveryChargeMode" id="lcDcOptional" value="optional" autocomplete="off" <%= deliveryModeValue === 'optional' ? 'checked' : '' %>>
+        <label class="btn btn-outline-primary btn-sm" for="lcDcOptional">Delivery Charge Optional</label>
+        <input type="radio" class="btn-check" name="deliveryChargeMode" id="lcDcFree" value="free" autocomplete="off" <%= deliveryModeValue === 'free' ? 'checked' : '' %>>
+        <label class="btn btn-outline-primary btn-sm" for="lcDcFree">Free Delivery</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <button type="submit" class="btn btn-brand"><i class="bi bi-check2-circle"></i> Save &amp; Publish</button>
+    <a href="/admin/landing-page/checkout" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var body = document.getElementById('checkoutItemsBody');
+  var picker = document.getElementById('checkoutProductPicker');
+  var rowIndex = document.querySelectorAll('#checkoutItemsBody tr:not(.js-empty-row)').length;
+
+  function currentMode() {
+    var checked = document.querySelector('input[name="productSelectMode"]:checked');
+    return checked ? checked.value : 'multiple';
+  }
+
+  function clearEmptyRow() {
+    var empty = body.querySelector('.js-empty-row');
+    if (empty) empty.remove();
+  }
+
+  function showEmptyRowIfNeeded() {
+    if (!body.querySelectorAll('tr:not(.js-empty-row)').length) {
+      body.innerHTML = '<tr class="js-empty-row"><td colspan="4" class="text-center text-muted">No products selected yet.</td></tr>';
+    }
+  }
+
+  function alreadyAdded(id) {
+    return !!body.querySelector('input[type="hidden"][value="' + id + '"]');
+  }
+
+  function addRow(id, name) {
+    if (!id || alreadyAdded(id)) return;
+    if (currentMode() === 'single') {
+      body.innerHTML = '';
+    }
+    clearEmptyRow();
+    var i = rowIndex++;
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + name + '<input type="hidden" name="items[' + i + '][product]" value="' + id + '"></td>' +
+      '<td><input type="checkbox" class="form-check-input" name="items[' + i + '][autoCart]"></td>' +
+      '<td><input type="checkbox" class="form-check-input" name="items[' + i + '][bestSell]"></td>' +
+      '<td><button type="button" class="btn btn-sm btn-outline-danger js-remove-checkout-item"><i class="bi bi-trash"></i></button></td>';
+    body.appendChild(tr);
+  }
+
+  picker.addEventListener('change', function () {
+    var opt = picker.options[picker.selectedIndex];
+    if (opt && opt.value) {
+      addRow(opt.value, opt.getAttribute('data-name') || opt.textContent);
+      picker.value = '';
+    }
+  });
+
+  body.addEventListener('click', function (e) {
+    var btn = e.target.closest('.js-remove-checkout-item');
+    if (btn) {
+      btn.closest('tr').remove();
+      showEmptyRowIfNeeded();
+    }
+  });
+
+  // Switching to "single" trims the table down to at most the first row.
+  document.querySelectorAll('input[name="productSelectMode"]').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      if (this.value === 'single') {
+        var rows = body.querySelectorAll('tr:not(.js-empty-row)');
+        rows.forEach(function (row, idx) { if (idx > 0) row.remove(); });
+      }
+    });
+  });
+});
+</script>
+
+<%- include('partials/admin-footer') %>

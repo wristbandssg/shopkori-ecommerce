@@ -3,20 +3,20 @@
 <nav class="small mb-3">
   <a href="/admin" class="text-decoration-none">Home</a>
   <span class="text-muted mx-1">&gt;</span>
-  <span class="text-muted">Settings</span>
+  <span class="text-muted">Offer Settings</span>
 </nav>
 
 <div class="admin-card mb-3">
   <div class="d-flex gap-2 flex-wrap">
-    <input type="text" id="settingsSearch" class="form-control" style="max-width:260px" placeholder="Search...">
+    <input type="text" id="offerSearch" class="form-control" style="max-width:260px" placeholder="Search...">
     <button class="btn btn-outline-secondary" type="button"><i class="bi bi-search"></i></button>
   </div>
 </div>
 
-<div class="row g-3" id="settingsGrid">
-  <% SETTINGS_CARDS.forEach(function (key) { %>
-    <% var m = SETTINGS_CARD_META[key]; %>
-    <div class="col-md-4 settings-grid-item" data-name="<%= m.title.toLowerCase() %>">
+<div class="row g-3" id="offerGrid">
+  <% OFFER_CARDS.forEach(function (key) { %>
+    <% var m = OFFER_CARD_META[key]; %>
+    <div class="col-md-4 offer-grid-item" data-name="<%= m.title.toLowerCase() %>">
       <a href="<%= m.path %>" class="text-decoration-none">
         <div class="admin-card d-flex align-items-center justify-content-between">
           <div class="d-flex align-items-center gap-3">
@@ -36,11 +36,11 @@
 
 <script>
   (function () {
-    var input = document.getElementById('settingsSearch');
+    var input = document.getElementById('offerSearch');
     if (!input) return;
     input.addEventListener('input', function () {
       var q = input.value.trim().toLowerCase();
-      document.querySelectorAll('#settingsGrid .settings-grid-item').forEach(function (item) {
+      document.querySelectorAll('#offerGrid .offer-grid-item').forEach(function (item) {
         item.style.display = !q || item.getAttribute('data-name').indexOf(q) !== -1 ? '' : 'none';
       });
     });

@@ -1,0 +1,39 @@
+<%- include('partials/admin-header') %>
+
+<h5 class="mb-3">Advanced Landing List</h5>
+
+<div class="admin-card mb-3">
+  <div class="d-flex justify-content-end mb-2">
+    <a href="/admin/landing-page/advance/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> Create New</a>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>#</th><th>Title</th><th>Slug</th><th>Banner</th><th>Background Color</th><th>Action</th></tr></thead>
+      <tbody>
+        <% advanceLandingPages.forEach(function (p, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td>
+              <%= p.title %>
+              <span class="badge bg-<%= p.status ? 'success' : 'secondary' %> ms-1"><%= p.status ? 'Active' : 'Hidden' %></span>
+            </td>
+            <td><code><%= p.slug %></code></td>
+            <td><img src="<%= landingImageUrl(p.bannerImage) %>" class="admin-thumb"></td>
+            <td>
+              <span class="d-inline-block" style="width:20px;height:20px;border-radius:4px;border:1px solid #ddd;background-color:<%= p.backgroundColor || '#ffffff' %>;vertical-align:middle;"></span>
+              <code class="ms-1"><%= p.backgroundColor || '#ffffff' %></code>
+            </td>
+            <td class="text-nowrap">
+              <a href="/admin/landing-page/advance/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+              <a href="/admin/landing-page/advance/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this landing page?" title="Delete"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!advanceLandingPages.length) { %><tr><td colspan="6" class="text-center text-muted">No Data Found</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

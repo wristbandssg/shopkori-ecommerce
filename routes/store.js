@@ -14,6 +14,7 @@ const { getSettings, setSetting: setSiteSetting } = require('../models/Setting')
 const { getOrderSettings } = require('../models/OrderSetting');
 
 const storeLocals = require('../middleware/storeLocals');
+const trackPageView = require('../middleware/trackPageView');
 const { requireCustomerLogin } = require('../middleware/auth');
 const { verifyCsrf } = require('../middleware/csrf');
 const cart = require('../middleware/cart');
@@ -21,6 +22,7 @@ const { generateOrderNumber } = require('../middleware/helpers');
 const sslcommerz = require('../lib/sslcommerz');
 
 router.use(storeLocals);
+router.use(trackPageView);
 
 /* =====================================================================
    ORDER SETTING enforcement (Admin > Orders > Order Setting)

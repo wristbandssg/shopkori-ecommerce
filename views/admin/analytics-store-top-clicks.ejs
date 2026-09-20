@@ -1,0 +1,46 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/analytics" class="text-decoration-none">Analytics Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted"><%= meta.title %></span>
+</nav>
+
+<p class="small text-muted">The storefront pages getting the most real traffic, logged from every page load.</p>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex gap-2 align-items-end flex-wrap">
+    <div>
+      <label class="form-label">Start Date</label>
+      <input type="date" name="from" class="form-control" value="<%= from %>">
+    </div>
+    <div>
+      <label class="form-label">End Date</label>
+      <input type="date" name="to" class="form-control" value="<%= to %>">
+    </div>
+    <button class="btn btn-brand">Filter</button>
+  </form>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>#</th><th>Page</th><th>Views</th><th>Share</th></tr></thead>
+      <tbody>
+        <% rows.forEach(function (r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><code><%= r._id %></code></td>
+            <td><span class="badge bg-primary"><%= r.views %></span></td>
+            <td><%= totalViews > 0 ? Math.round((r.views / totalViews) * 100) : 0 %>%</td>
+          </tr>
+        <% }); %>
+        <% if (!rows.length) { %><tr><td colspan="4" class="text-center text-muted py-4">No page views recorded in this period.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

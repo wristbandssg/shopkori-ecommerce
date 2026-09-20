@@ -1,0 +1,131 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/settings" class="text-decoration-none">Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Product Coupons</span>
+</nav>
+
+<div class="admin-card">
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <div class="d-flex align-items-center gap-2">
+      <h5 class="mb-0"><i class="bi bi-ticket-perforated"></i> All Coupons</h5>
+      <span class="badge bg-light text-dark border"><%= coupons.length %> Total</span>
+    </div>
+    <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addCouponModal" title="Add Coupon"><i class="bi bi-plus-lg"></i></button>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Name</th><th>Code</th><th>Discount</th><th>Limit</th><th>Used</th><th>Action</th></tr></thead>
+      <tbody>
+        <% coupons.forEach(function (c) { %>
+          <tr>
+            <td><%= c.name %></td>
+            <td><code><%= c.code %></code></td>
+            <td><%= c.discountType === 'flat' ? currency(c.discountValue) : (c.discountValue + '%') %></td>
+            <td><%= c.limit %></td>
+            <td><%= c.used %></td>
+            <td>
+              <a href="/admin/settings/coupon/delete/<%= c._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this coupon?" title="Delete"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!coupons.length) { %><tr><td colspan="6" class="text-center text-muted py-4">No coupons available</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal fade" id="addCouponModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/admin/settings/coupon" id="addCouponForm">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="modal-header">
+          <h5 class="modal-title">Add Coupon</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <% if (errors.length) { %>
+            <div class="alert alert-danger py-2">
+              <% errors.forEach(function (e) { %><div><%= e %></div><% }); %>
+            </div>
+          <% } %>
+
+          <div class="mb-3">
+            <label class="form-label">Name *</label>
+            <div class="input-group">
+              <input type="text" name="name" id="couponName" class="form-control" required>
+              <button type="button" class="btn btn-outline-secondary" id="couponAiBtn"><i class="bi bi-stars"></i> Generate with AI</button>
+            </div>
+            <div class="form-text">"Generate with AI" fills in a suggested name locally — it doesn't call an external AI service.</div>
+          </div>
+
+          <input type="hidden" name="discountType" id="discountTypeInput" value="percent">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="flatToggle">
+            <label class="form-check-label" for="flatToggle">Flat Discount</label>
+          </div>
+
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label" id="discountLabel">Discount (%) *</label>
+              <input type="number" step="0.01" name="discountValue" class="form-control" required>
+            </div>
+            <div class="col-6">
+              <label class="form-label">Limit *</label>
+              <input type="number" name="limit" class="form-control" required>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Code *</label>
+              <div class="input-group">
+                <input type="text" name="code" id="couponCode" class="form-control text-uppercase" required>
+                <button type="button" class="btn btn-outline-secondary" id="couponGenBtn">Generate</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  <% if (errors.length) { %>
+    var reopenModal = new bootstrap.Modal(document.getElementById('addCouponModal'));
+    reopenModal.show();
+  <% } %>
+
+  var flatToggle = document.getElementById('flatToggle');
+  var discountTypeInput = document.getElementById('discountTypeInput');
+  var discountLabel = document.getElementById('discountLabel');
+  flatToggle.addEventListener('change', function () {
+    discountTypeInput.value = flatToggle.checked ? 'flat' : 'percent';
+    discountLabel.textContent = flatToggle.checked ? 'Discount (Amount) *' : 'Discount (%) *';
+  });
+
+  document.getElementById('couponGenBtn').addEventListener('click', function () {
+    var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    var code = '';
+    for (var i = 0; i < 8; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+    document.getElementById('couponCode').value = code;
+  });
+
+  document.getElementById('couponAiBtn').addEventListener('click', function () {
+    var adjectives = ['Mega', 'Super', 'Flash', 'Festive', 'Weekend', 'Bonus'];
+    var nouns = ['Savings', 'Discount', 'Deal', 'Offer'];
+    var name = adjectives[Math.floor(Math.random() * adjectives.length)] + ' ' + nouns[Math.floor(Math.random() * nouns.length)];
+    document.getElementById('couponName').value = name;
+  });
+});
+</script>
+
+<%- include('partials/admin-footer') %>

@@ -13,8 +13,19 @@ const Order = require('../models/Order');
 const Admin = require('../models/Admin');
 const DeliveryCommissionSetup = require('../models/DeliveryCommissionSetup');
 const DeliveryRequest = require('../models/DeliveryRequest');
+const PageView = require('../models/PageView');
 const Page = require('../models/Page');
 const BlogPost = require('../models/BlogPost');
+const LandingPage = require('../models/LandingPage');
+const ShortLandingPage = require('../models/ShortLandingPage');
+const LandingCheckout = require('../models/LandingCheckout');
+const AdvanceLandingPage = require('../models/AdvanceLandingPage');
+const DeliveryZone = require('../models/DeliveryZone');
+const CourierSetup = require('../models/CourierSetup');
+const { getPaymentSettings, updatePaymentSettingCard } = require('../models/PaymentSetting');
+const { getInvoiceSettings, updateInvoiceSettings } = require('../models/InvoiceSetting');
+const CustomPage = require('../models/CustomPage');
+const Coupon = require('../models/Coupon');
 const { getSettings, setSetting } = require('../models/Setting');
 const { getOrderSettings, updateOrderSettingCard } = require('../models/OrderSetting');
 const { getMarketingSettings, updateMarketingSettingCard } = require('../models/MarketingSetting');
@@ -74,20 +85,13 @@ router.use(requireAdminLogin);
    click, every one of those links renders this same friendly "coming
    soon" page until its real backend is built, module by module.
    Real, working modules (Products, Category, Orders — the full pipeline
-   below, Manage Delivery, Staff, Marketing, Customers, Settings, Blog,
-   Pages) are NOT in this list — they have their own routes.
+   below, Manage Delivery, Staff, Marketing, Analytics, Customers,
+   Settings, Blog, Pages) are NOT in this list — they have their own routes.
    Registered FIRST (before any /orders/:id-style wildcard route further
    down) so an exact path like /orders/incomplete is never swallowed by
    a wildcard route meant for a real order id.
    ===================================================================== */
 const COMING_SOON_PAGES = {
-  '/analytics': 'Analytics',
-
-  '/landing-page/main': 'Main Landing Page',
-  '/landing-page/short': 'Short Landing Page',
-  '/landing-page/checkout': 'Landing Checkout',
-  '/landing-page/advance': 'Advance Landing Page',
-
   '/customization': 'Customization',
 
   '/inventory': 'Inventory',
@@ -1476,6 +1480,615 @@ router.get('/categories/delete/:id', async (req, res, next) => {
 });
 
 /* =====================================================================
+   LANDING PAGE — MAIN LANDING
+   A standalone campaign page: banner + slider, product highlights, a
+   "Customer Review" product gallery, and its own order-button /
+   delivery / payment rules. Uses the same Add-New-list-with-edit CRUD
+   shape as Category/Brand, just with more fields.
+   ===================================================================== */
+router.get('/landing-page/main', async (req, res, next) => {
+  try {
+    const landingPages = await LandingPage.find().sort({ createdAt: -1 });
+    res.render('admin/landing-main', { adminPageTitle: 'Main Landing Page', landingPages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function renderLandingForm(res, { landing, errors, formData }) {
+  const products = await Product.find({ status: true })
+    .select('name slug price salePrice stock')
+    .sort({ name: 1 });
+  res.render('admin/landing-main-form', {
+    adminPageTitle: landing && landing._id ? 'Edit Landing Page' : 'Add Landing',
+    landing: landing || {},
+    products,
+    errors: errors || [],
+    formData: formData || {},
+  });
+}
+
+router.get('/landing-page/main/new', async (req, res, next) => {
+  try {
+    await renderLandingForm(res, { landing: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/landing-page/main/:id/edit', async (req, res, next) => {
+  try {
+    const landing = await LandingPage.findById(req.params.id);
+    if (!landing) {
+      req.flash('danger', 'Landing page not found.');
+      return res.redirect('/admin/landing-page/main');
+    }
+    await renderLandingForm(res, { landing });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CSRF is checked manually below (not via the verifyCsrf middleware) because
+// multer's upload.fields() is what parses multipart/form-data — req.body
+// (and so req.body.csrfToken) isn't populated until after it runs. Same
+// pattern as saveCategory/saveBrand.
+const landingUpload = upload.fields([
+  { name: 'mainBanner', maxCount: 1 },
+  { name: 'sliderImages', maxCount: 12 },
+  { name: 'reviewImages', maxCount: 12 },
+]);
+
+// Multer/urlencoded parsing gives a single value when a repeated-name field
+// (youtubeTitle[], descTitle[], etc.) appears exactly once, and an array
+// otherwise. Normalize to an array either way so the zip-by-index logic
+// below always works.
+function toArray(v) {
+  if (v === undefined || v === null || v === '') return [];
+  return Array.isArray(v) ? v : [v];
+}
+
+async function saveLandingPage(req, res, next, existingId) {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/landing-page/main');
+    }
+    const {
+      title, slug: slugInput, sliderTitle, sliderView,
+      instructionMessage, contactTitle, phoneNumber,
+      orderButtonText, orderButtonTextColor, orderButtonBgColor,
+      reviewSectionTitle, reviewView, reviewProductSelectMode,
+      titleColor, titleIconColor, deliveryChargeMode,
+    } = req.body;
+
+    const errors = [];
+    if (!title || !title.trim()) errors.push('Page title is required.');
+
+    const existing = existingId ? await LandingPage.findById(existingId) : null;
+    const files = req.files || {};
+
+    let mainBannerName = existing ? existing.mainBanner : null;
+    if (files.mainBanner && files.mainBanner[0]) mainBannerName = files.mainBanner[0].filename;
+
+    let sliderImageNames = existing ? existing.sliderImages : [];
+    if (files.sliderImages && files.sliderImages.length) {
+      sliderImageNames = files.sliderImages.map((f) => f.filename);
+    }
+
+    let reviewImageNames = existing ? existing.reviewImages : [];
+    if (files.reviewImages && files.reviewImages.length) {
+      reviewImageNames = files.reviewImages.map((f) => f.filename);
+    }
+
+    if (errors.length) {
+      return renderLandingForm(res, {
+        landing: {
+          ...(existing ? existing.toObject() : {}),
+          ...req.body,
+          mainBanner: mainBannerName,
+          sliderImages: sliderImageNames,
+          reviewImages: reviewImageNames,
+        },
+        errors,
+        formData: req.body,
+      });
+    }
+
+    const youtubeTitles = toArray(req.body.youtubeTitle);
+    const youtubeLinks = toArray(req.body.youtubeLink);
+    const youtubeVideos = youtubeTitles
+      .map((t, i) => ({ title: (t || '').trim(), link: ((youtubeLinks[i] || '')).trim() }))
+      .filter((v) => v.title || v.link);
+
+    const descTitles = toArray(req.body.descTitle);
+    const descValues = toArray(req.body.descValue);
+    const descriptionBlocks = descTitles
+      .map((t, i) => ({ title: (t || '').trim(), value: ((descValues[i] || '')).trim() }))
+      .filter((v) => v.title || v.value);
+
+    const reviewProductIds = toArray(req.body.reviewProductIds);
+    const autoCartIds = new Set(toArray(req.body.autoCartProductIds));
+    const reviewProducts = reviewProductIds
+      .filter(Boolean)
+      .map((id) => ({ product: id, autoCart: autoCartIds.has(id) }));
+
+    const data = {
+      title: title.trim(),
+      status: !!req.body.status,
+      mainBanner: mainBannerName,
+      sliderTitle: (sliderTitle || '').trim(),
+      sliderImages: sliderImageNames,
+      sliderView: sliderView === 'grid' ? 'grid' : 'slide',
+      instructionMessage: instructionMessage || '',
+      modernUi: !!req.body.modernUi,
+      showNumber: !!req.body.showNumber,
+      productsLayoutGrid: !!req.body.productsLayoutGrid,
+      contactTitle: (contactTitle || '').trim(),
+      phoneNumber: (phoneNumber || '').trim(),
+      orderButtonText: (orderButtonText || '').trim() || 'Order Now',
+      orderButtonTextColor: orderButtonTextColor || '#ffffff',
+      orderButtonBgColor: orderButtonBgColor || '#e74c3c',
+      youtubeVideos,
+      descriptionBlocks,
+      reviewSectionTitle: (reviewSectionTitle || '').trim(),
+      reviewImages: reviewImageNames,
+      reviewView: reviewView === 'grid' ? 'grid' : 'slide',
+      reviewProductSelectMode: reviewProductSelectMode === 'single' ? 'single' : 'multiple',
+      reviewProducts,
+      titleColor: titleColor || '#1e3a5f',
+      titleIconColor: titleIconColor || '#d4a537',
+      deliveryChargeMode: ['required', 'optional', 'free'].includes(deliveryChargeMode) ? deliveryChargeMode : 'required',
+      paymentCod: !!req.body.paymentCod,
+      paymentBkash: !!req.body.paymentBkash,
+      paymentManual: !!req.body.paymentManual,
+    };
+
+    if (existing) {
+      data.slug = await ensureUniqueSlug(LandingPage, slugify((slugInput && slugInput.trim()) || title), existingId);
+      await LandingPage.updateOne({ _id: existingId }, data);
+      req.flash('success', 'Landing page updated successfully.');
+    } else {
+      data.slug = await ensureUniqueSlug(LandingPage, slugify((slugInput && slugInput.trim()) || title), null);
+      await LandingPage.create(data);
+      req.flash('success', 'New landing page added successfully.');
+    }
+    res.redirect('/admin/landing-page/main');
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post('/landing-page/main/new', landingUpload, (req, res, next) => saveLandingPage(req, res, next, null));
+router.post('/landing-page/main/:id/edit', landingUpload, (req, res, next) => saveLandingPage(req, res, next, req.params.id));
+
+router.get('/landing-page/main/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/landing-page/main');
+    }
+    await LandingPage.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Landing page deleted successfully.');
+    res.redirect('/admin/landing-page/main');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   LANDING PAGE — SHORT LANDING
+   Lighter than Main Landing: one image, a title/title2 pair, and a list of
+   highlighted products, each with its own Main Title + colour styling
+   (rendered as a repeatable row in the form, "items[<i>][...]" so it
+   arrives at req.body.items as a real array — same bracket-notation
+   pattern multer/busboy already gives the product-variant rows above).
+   ===================================================================== */
+router.get('/landing-page/short', async (req, res, next) => {
+  try {
+    const shortLandingPages = await ShortLandingPage.find().sort({ createdAt: -1 });
+    res.render('admin/landing-short', { adminPageTitle: 'Short Landing Page', shortLandingPages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function renderShortLandingForm(res, { landing, errors, formData }) {
+  const products = await Product.find({ status: true })
+    .select('name slug price salePrice stock')
+    .sort({ name: 1 });
+  res.render('admin/landing-short-form', {
+    adminPageTitle: landing && landing._id ? 'Edit Short Landing Page' : 'Add Landing Page',
+    landing: landing || {},
+    products,
+    errors: errors || [],
+    formData: formData || {},
+  });
+}
+
+router.get('/landing-page/short/new', async (req, res, next) => {
+  try {
+    await renderShortLandingForm(res, { landing: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/landing-page/short/:id/edit', async (req, res, next) => {
+  try {
+    const landing = await ShortLandingPage.findById(req.params.id);
+    if (!landing) {
+      req.flash('danger', 'Short landing page not found.');
+      return res.redirect('/admin/landing-page/short');
+    }
+    await renderShortLandingForm(res, { landing });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CSRF is checked manually below (not via the verifyCsrf middleware) because
+// multer's upload.single() is what parses multipart/form-data — req.body
+// (and so req.body.csrfToken) isn't populated until after it runs.
+async function saveShortLandingPage(req, res, next, existingId) {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/landing-page/short');
+    }
+    const { title, slug: slugInput, title2, deliveryChargeMode } = req.body;
+
+    const errors = [];
+    if (!title || !title.trim()) errors.push('Title is required.');
+    if (!title2 || !title2.trim()) errors.push('Title 2 is required.');
+
+    const existing = existingId ? await ShortLandingPage.findById(existingId) : null;
+    let imageName = existing ? existing.image : null;
+    if (req.file) imageName = req.file.filename;
+
+    if (errors.length) {
+      return renderShortLandingForm(res, {
+        landing: { ...(existing ? existing.toObject() : {}), ...req.body, image: imageName },
+        errors,
+        formData: req.body,
+      });
+    }
+
+    // req.body.items arrives as a real array — multer/busboy turns
+    // "items[0][mainTitle]", "items[0][product]", "items[1][...]" style
+    // field names into req.body.items = [{ mainTitle, product, ... }, ...]
+    // the same way it already does for the product-variant rows above.
+    const itemsRaw = Array.isArray(req.body.items) ? req.body.items : [];
+    const items = itemsRaw
+      .filter((it) => it && it.product)
+      .map((it) => ({
+        mainTitle: (it.mainTitle || '').trim(),
+        mainTitleColor: it.mainTitleColor || '#1e3a5f',
+        mainTitleBgColor: it.mainTitleBgColor || '#ffffff',
+        product: it.product,
+        autoCart: !!it.autoCart,
+      }));
+
+    const data = {
+      title: title.trim(),
+      title2: title2.trim(),
+      status: !!req.body.status,
+      image: imageName,
+      items,
+      deliveryChargeMode: ['required', 'optional', 'free'].includes(deliveryChargeMode) ? deliveryChargeMode : 'required',
+    };
+
+    if (existing) {
+      data.slug = await ensureUniqueSlug(ShortLandingPage, slugify((slugInput && slugInput.trim()) || title), existingId);
+      await ShortLandingPage.updateOne({ _id: existingId }, data);
+      req.flash('success', 'Short landing page updated successfully.');
+    } else {
+      data.slug = await ensureUniqueSlug(ShortLandingPage, slugify((slugInput && slugInput.trim()) || title), null);
+      await ShortLandingPage.create(data);
+      req.flash('success', 'New short landing page added successfully.');
+    }
+    res.redirect('/admin/landing-page/short');
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post('/landing-page/short/new', upload.single('image'), (req, res, next) => saveShortLandingPage(req, res, next, null));
+router.post('/landing-page/short/:id/edit', upload.single('image'), (req, res, next) => saveShortLandingPage(req, res, next, req.params.id));
+
+router.get('/landing-page/short/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/landing-page/short');
+    }
+    await ShortLandingPage.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Short landing page deleted successfully.');
+    res.redirect('/admin/landing-page/short');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   LANDING PAGE — LANDING CHECKOUT
+   The lightest of the three: no image, just a title/slug, a product-select
+   mode (single vs multiple, optionally mandatory), a picker table
+   (Product / Is Auto Cart / Best Sell / Action), and delivery settings.
+   ===================================================================== */
+router.get('/landing-page/checkout', async (req, res, next) => {
+  try {
+    const landingCheckouts = await LandingCheckout.find().sort({ createdAt: -1 });
+    res.render('admin/landing-checkout', { adminPageTitle: 'Landing Checkout', landingCheckouts });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function renderLandingCheckoutForm(res, { landing, errors, formData }) {
+  const products = await Product.find({ status: true })
+    .select('name slug')
+    .sort({ name: 1 });
+  res.render('admin/landing-checkout-form', {
+    adminPageTitle: landing && landing._id ? 'Edit Landing Checkout' : 'Create Landing',
+    landing: landing || {},
+    products,
+    errors: errors || [],
+    formData: formData || {},
+  });
+}
+
+router.get('/landing-page/checkout/new', async (req, res, next) => {
+  try {
+    await renderLandingCheckoutForm(res, { landing: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/landing-page/checkout/:id/edit', async (req, res, next) => {
+  try {
+    const landing = await LandingCheckout.findById(req.params.id);
+    if (!landing) {
+      req.flash('danger', 'Landing checkout page not found.');
+      return res.redirect('/admin/landing-page/checkout');
+    }
+    await renderLandingCheckoutForm(res, { landing });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// No file upload on this form, so CSRF is checked the same way as any other
+// plain POST — via the verifyCsrf middleware.
+async function saveLandingCheckout(req, res, next, existingId) {
+  try {
+    const { title, slug: slugInput, productSelectMode, deliveryChargeMode } = req.body;
+
+    const errors = [];
+    if (!title || !title.trim()) errors.push('Title is required.');
+
+    const existing = existingId ? await LandingCheckout.findById(existingId) : null;
+
+    if (errors.length) {
+      return renderLandingCheckoutForm(res, {
+        landing: { ...(existing ? existing.toObject() : {}), ...req.body },
+        errors,
+        formData: req.body,
+      });
+    }
+
+    // req.body.items arrives as a real array — express.urlencoded turns
+    // "items[0][product]", "items[1][...]" style field names into
+    // req.body.items = [{ product, autoCart, bestSell }, ...], same as the
+    // multipart bracket-notation rows used on the other landing forms.
+    const itemsRaw = Array.isArray(req.body.items) ? req.body.items : [];
+    const items = itemsRaw
+      .filter((it) => it && it.product)
+      .map((it) => ({
+        product: it.product,
+        autoCart: !!it.autoCart,
+        bestSell: !!it.bestSell,
+      }));
+
+    const data = {
+      title: title.trim(),
+      status: !!req.body.status,
+      productSelectMode: productSelectMode === 'single' ? 'single' : 'multiple',
+      instantSelectRequired: !!req.body.instantSelectRequired,
+      items,
+      deliveryChargeMode: ['required', 'optional', 'free'].includes(deliveryChargeMode) ? deliveryChargeMode : 'required',
+    };
+
+    if (existing) {
+      data.slug = await ensureUniqueSlug(LandingCheckout, slugify((slugInput && slugInput.trim()) || title), existingId);
+      await LandingCheckout.updateOne({ _id: existingId }, data);
+      req.flash('success', 'Landing checkout page updated successfully.');
+    } else {
+      data.slug = await ensureUniqueSlug(LandingCheckout, slugify((slugInput && slugInput.trim()) || title), null);
+      await LandingCheckout.create(data);
+      req.flash('success', 'New landing checkout page published successfully.');
+    }
+    res.redirect('/admin/landing-page/checkout');
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post('/landing-page/checkout/new', verifyCsrf, (req, res, next) => saveLandingCheckout(req, res, next, null));
+router.post('/landing-page/checkout/:id/edit', verifyCsrf, (req, res, next) => saveLandingCheckout(req, res, next, req.params.id));
+
+router.get('/landing-page/checkout/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/landing-page/checkout');
+    }
+    await LandingCheckout.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Landing checkout page deleted successfully.');
+    res.redirect('/admin/landing-page/checkout');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   LANDING PAGE — ADVANCE LANDING
+   The richest of the four: banner + background styling, a row of page
+   effect toggles, one or more repeatable "Design" blocks (each its own
+   product-picker section with a design type, product-select mode,
+   instruction message and colour styling), plus delivery/payment settings.
+   ===================================================================== */
+router.get('/landing-page/advance', async (req, res, next) => {
+  try {
+    const advanceLandingPages = await AdvanceLandingPage.find().sort({ createdAt: -1 });
+    res.render('admin/landing-advance', { adminPageTitle: 'Advance Landing Page', advanceLandingPages });
+  } catch (err) {
+    next(err);
+  }
+});
+
+async function renderAdvanceLandingForm(res, { landing, errors, formData }) {
+  const products = await Product.find({ status: true })
+    .select('name slug')
+    .sort({ name: 1 });
+  res.render('admin/landing-advance-form', {
+    adminPageTitle: landing && landing._id ? 'Edit Advance Landing' : 'Advanced Landing',
+    landing: landing || {},
+    products,
+    DESIGN_TYPES: AdvanceLandingPage.DESIGN_TYPES,
+    errors: errors || [],
+    formData: formData || {},
+  });
+}
+
+router.get('/landing-page/advance/new', async (req, res, next) => {
+  try {
+    await renderAdvanceLandingForm(res, { landing: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/landing-page/advance/:id/edit', async (req, res, next) => {
+  try {
+    const landing = await AdvanceLandingPage.findById(req.params.id);
+    if (!landing) {
+      req.flash('danger', 'Advance landing page not found.');
+      return res.redirect('/admin/landing-page/advance');
+    }
+    await renderAdvanceLandingForm(res, { landing });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CSRF is checked manually below (not via the verifyCsrf middleware) because
+// multer's upload.fields() is what parses multipart/form-data — req.body
+// (and so req.body.csrfToken) isn't populated until after it runs.
+const advanceLandingUpload = upload.fields([{ name: 'bannerImage', maxCount: 1 }]);
+
+async function saveAdvanceLandingPage(req, res, next, existingId) {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/landing-page/advance');
+    }
+    const { title, slug: slugInput, backgroundColor, deliveryChargeMode } = req.body;
+
+    const errors = [];
+    if (!title || !title.trim()) errors.push('Title is required.');
+
+    const existing = existingId ? await AdvanceLandingPage.findById(existingId) : null;
+    const files = req.files || {};
+    let bannerImageName = existing ? existing.bannerImage : null;
+    if (files.bannerImage && files.bannerImage[0]) bannerImageName = files.bannerImage[0].filename;
+
+    if (errors.length) {
+      return renderAdvanceLandingForm(res, {
+        landing: { ...(existing ? existing.toObject() : {}), ...req.body, bannerImage: bannerImageName },
+        errors,
+        formData: req.body,
+      });
+    }
+
+    // req.body.designs arrives as a real array of objects, each with its own
+    // nested `products` array — multer/busboy resolves bracket-notation
+    // field names ("designs[0][products][0][product]", etc.) into that
+    // shape directly, the same as the single-level "items[i][...]" rows
+    // used on the other landing forms.
+    const designsRaw = Array.isArray(req.body.designs) ? req.body.designs : [];
+    const designs = designsRaw
+      .map((d) => {
+        const productsRaw = d && Array.isArray(d.products) ? d.products : [];
+        return {
+          designType: AdvanceLandingPage.DESIGN_TYPES.includes(d && d.designType) ? d.designType : '',
+          productSelectMode: d && d.productSelectMode === 'single' ? 'single' : 'multiple',
+          products: productsRaw
+            .filter((p) => p && p.product)
+            .map((p) => ({ product: p.product, autoCart: !!p.autoCart, bestSale: !!p.bestSale })),
+          instructionMessage: ((d && d.instructionMessage) || '').trim(),
+          messageOnOff: !!(d && d.messageOnOff),
+          showNumber: !!(d && d.showNumber),
+          productBgColor: (d && d.productBgColor) || '#ffffff',
+          productBorderColor: (d && d.productBorderColor) || '#c0554e',
+        };
+      })
+      .filter((d) => d.designType || d.products.length || d.instructionMessage);
+
+    const data = {
+      title: title.trim(),
+      status: !!req.body.status,
+      buttonEffect: !!req.body.buttonEffect,
+      showLogo: !!req.body.showLogo,
+      showTopCountdown: !!req.body.showTopCountdown,
+      showVoice: !!req.body.showVoice,
+      backgroundEnabled: !!req.body.backgroundEnabled,
+      backgroundColor: backgroundColor || '#ffffff',
+      backgroundEffect: !!req.body.backgroundEffect,
+      bannerEnabled: !!req.body.bannerEnabled,
+      bannerImage: bannerImageName,
+      designEnabled: !!req.body.designEnabled,
+      designs,
+      deliveryChargeMode: ['required', 'optional', 'free'].includes(deliveryChargeMode) ? deliveryChargeMode : 'required',
+      paymentCod: !!req.body.paymentCod,
+      paymentBkash: !!req.body.paymentBkash,
+      paymentManual: !!req.body.paymentManual,
+    };
+
+    if (existing) {
+      data.slug = await ensureUniqueSlug(AdvanceLandingPage, slugify((slugInput && slugInput.trim()) || title), existingId);
+      await AdvanceLandingPage.updateOne({ _id: existingId }, data);
+      req.flash('success', 'Advance landing page updated successfully.');
+    } else {
+      data.slug = await ensureUniqueSlug(AdvanceLandingPage, slugify((slugInput && slugInput.trim()) || title), null);
+      await AdvanceLandingPage.create(data);
+      req.flash('success', 'New advance landing page saved successfully.');
+    }
+    res.redirect('/admin/landing-page/advance');
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post('/landing-page/advance/new', advanceLandingUpload, (req, res, next) => saveAdvanceLandingPage(req, res, next, null));
+router.post('/landing-page/advance/:id/edit', advanceLandingUpload, (req, res, next) => saveAdvanceLandingPage(req, res, next, req.params.id));
+
+router.get('/landing-page/advance/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/landing-page/advance');
+    }
+    await AdvanceLandingPage.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Advance landing page deleted successfully.');
+    res.redirect('/admin/landing-page/advance');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
    ORDERS — single order detail / update
    ===================================================================== */
 router.get('/orders/:id', async (req, res, next) => {
@@ -2111,6 +2724,201 @@ router.post('/marketing/sms/test', verifyCsrf, async (req, res, next) => {
 });
 
 /* =====================================================================
+   ANALYTICS
+   ---------------------------------------------------------------------
+   Seven report cards, matching the reference design. Each "Manage" link
+   opens a real, live report — no placeholder numbers: product/stock
+   reports read straight from Product, sales reports aggregate real
+   Order data, and the two store-traffic reports read from PageView
+   (see middleware/trackPageView.js, which logs every real storefront
+   page load).
+   ===================================================================== */
+const ANALYTICS_CARDS = ['productReports', 'productAnalytics', 'lowStock', 'mostSoldItems', 'topCategory', 'storeVisitors', 'storeTopClicks'];
+const ANALYTICS_CARD_META = {
+  productReports: { title: 'Product Reports', path: 'product-reports', icon: 'bi-clipboard-data', color: '#f0ad4e' },
+  productAnalytics: { title: 'Product Analytics', path: 'product-analytics', icon: 'bi-bar-chart-fill', color: '#337ab7' },
+  lowStock: { title: 'Low Stock Products', path: 'low-stock', icon: 'bi-exclamation-triangle-fill', color: '#212529' },
+  mostSoldItems: { title: 'Product Most Sold Items', path: 'most-sold', icon: 'bi-fire', color: '#7c3aed' },
+  topCategory: { title: 'Top Category', path: 'top-category', icon: 'bi-tags-fill', color: '#2e9e5b' },
+  storeVisitors: { title: 'Store Visitors', path: 'store-visitors', icon: 'bi-people-fill', color: '#16a085' },
+  storeTopClicks: { title: 'Store Top Clicks', path: 'store-top-clicks', icon: 'bi-cursor-fill', color: '#d6336c' },
+};
+
+// Same from/to date-range convention as the existing Sales Report page
+// (GET /reports below) — default to the last 30 days. fromDate/toDate are
+// built as explicit UTC instants (not server-local time): MongoDB's
+// $dateToString (used for the Store Visitors daily chart) groups in UTC
+// by default, so parsing "YYYY-MM-DD" as local time here would silently
+// shift day boundaries by the server's UTC offset — e.g. under
+// Asia/Dhaka (UTC+6) a day's traffic could split across two different
+// $dateToString buckets. Treating from/to as UTC calendar dates keeps
+// every date comparison and grouping in the same frame of reference.
+function resolveDateRange(req) {
+  const from = req.query.from || new Date(Date.now() - 29 * 86400000).toISOString().slice(0, 10);
+  const to = req.query.to || new Date().toISOString().slice(0, 10);
+  return { from, to, fromDate: new Date(`${from}T00:00:00.000Z`), toDate: new Date(`${to}T23:59:59.999Z`) };
+}
+
+router.get('/analytics', (req, res) => {
+  res.render('admin/analytics', { adminPageTitle: 'Analytics Settings', ANALYTICS_CARDS, ANALYTICS_CARD_META });
+});
+
+router.get('/analytics/product-reports', async (req, res, next) => {
+  try {
+    const products = await Product.find().populate('category').sort({ createdAt: -1 });
+    res.render('admin/analytics-product-reports', {
+      adminPageTitle: 'Product Reports',
+      meta: ANALYTICS_CARD_META.productReports,
+      products,
+      totalProducts: products.length,
+      totalStockUnits: products.reduce((s, p) => s + (p.stock || 0), 0),
+      totalStockValue: products.reduce((s, p) => s + (p.stock || 0) * (p.price || 0), 0),
+      outOfStockCount: products.filter((p) => (p.stock || 0) <= 0).length,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/analytics/product-analytics', async (req, res, next) => {
+  try {
+    const { from, to, fromDate, toDate } = resolveDateRange(req);
+    const rows = await Order.aggregate([
+      { $match: { createdAt: { $gte: fromDate, $lte: toDate }, isDeleted: false } },
+      { $unwind: '$items' },
+      { $group: { _id: { name: '$items.productName', image: '$items.productImage' }, qtySold: { $sum: '$items.qty' }, revenue: { $sum: '$items.lineTotal' }, orderCount: { $sum: 1 } } },
+      { $sort: { revenue: -1 } },
+    ]);
+    res.render('admin/analytics-product-analytics', {
+      adminPageTitle: 'Product Analytics',
+      meta: ANALYTICS_CARD_META.productAnalytics,
+      from, to, rows,
+      totalUnits: rows.reduce((s, r) => s + r.qtySold, 0),
+      totalRevenue: rows.reduce((s, r) => s + r.revenue, 0),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/analytics/low-stock', async (req, res, next) => {
+  try {
+    const products = await Product.find({ $expr: { $lte: ['$stock', '$stockAlert'] } }).populate('category').sort({ stock: 1 });
+    res.render('admin/analytics-low-stock', {
+      adminPageTitle: 'Low Stock Products',
+      meta: ANALYTICS_CARD_META.lowStock,
+      products,
+      outOfStockCount: products.filter((p) => (p.stock || 0) <= 0).length,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/analytics/most-sold', async (req, res, next) => {
+  try {
+    const { from, to, fromDate, toDate } = resolveDateRange(req);
+    const rows = await Order.aggregate([
+      { $match: { createdAt: { $gte: fromDate, $lte: toDate }, isDeleted: false } },
+      { $unwind: '$items' },
+      { $group: { _id: { name: '$items.productName', image: '$items.productImage' }, qtySold: { $sum: '$items.qty' }, revenue: { $sum: '$items.lineTotal' } } },
+      { $sort: { qtySold: -1 } },
+      { $limit: 50 },
+    ]);
+    res.render('admin/analytics-most-sold', {
+      adminPageTitle: 'Product Most Sold Items',
+      meta: ANALYTICS_CARD_META.mostSoldItems,
+      from, to, rows,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/analytics/top-category', async (req, res, next) => {
+  try {
+    const { from, to, fromDate, toDate } = resolveDateRange(req);
+    const rows = await Order.aggregate([
+      { $match: { createdAt: { $gte: fromDate, $lte: toDate }, isDeleted: false } },
+      { $unwind: '$items' },
+      { $lookup: { from: 'products', localField: 'items.product', foreignField: '_id', as: 'productDoc' } },
+      { $unwind: { path: '$productDoc', preserveNullAndEmptyArrays: true } },
+      { $lookup: { from: 'categories', localField: 'productDoc.category', foreignField: '_id', as: 'categoryDoc' } },
+      { $unwind: { path: '$categoryDoc', preserveNullAndEmptyArrays: true } },
+      { $group: { _id: { $ifNull: ['$categoryDoc.name', 'Uncategorized'] }, revenue: { $sum: '$items.lineTotal' }, qty: { $sum: '$items.qty' } } },
+      { $sort: { revenue: -1 } },
+    ]);
+    res.render('admin/analytics-top-category', {
+      adminPageTitle: 'Top Category',
+      meta: ANALYTICS_CARD_META.topCategory,
+      from, to, rows,
+      totalRevenue: rows.reduce((s, r) => s + r.revenue, 0),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/analytics/store-visitors', async (req, res, next) => {
+  try {
+    const { from, to, fromDate, toDate } = resolveDateRange(req);
+    const [dailyRows, uniqueVisitors] = await Promise.all([
+      PageView.aggregate([
+        { $match: { createdAt: { $gte: fromDate, $lte: toDate } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, views: { $sum: 1 }, uniques: { $addToSet: '$sessionKey' } } },
+      ]),
+      PageView.distinct('sessionKey', { createdAt: { $gte: fromDate, $lte: toDate }, sessionKey: { $ne: '' } }),
+    ]);
+    const dailyMap = {};
+    dailyRows.forEach((r) => { dailyMap[r._id] = { views: r.views, uniques: r.uniques.filter(Boolean).length }; });
+
+    const labels = [];
+    const viewsData = [];
+    const uniquesData = [];
+    // UTC-stepped on purpose (setUTCDate, not setDate) — matches the UTC
+    // calendar days $dateToString grouped dailyRows by above, so a day
+    // never lands one bucket off from what it's displayed as (see
+    // resolveDateRange's comment for why local-time stepping would drift).
+    for (let d = new Date(fromDate); d <= toDate; d.setUTCDate(d.getUTCDate() + 1)) {
+      const key = d.toISOString().slice(0, 10);
+      labels.push(d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' }));
+      viewsData.push((dailyMap[key] && dailyMap[key].views) || 0);
+      uniquesData.push((dailyMap[key] && dailyMap[key].uniques) || 0);
+    }
+
+    res.render('admin/analytics-store-visitors', {
+      adminPageTitle: 'Store Visitors',
+      meta: ANALYTICS_CARD_META.storeVisitors,
+      from, to, labels, viewsData, uniquesData,
+      totalViews: viewsData.reduce((a, b) => a + b, 0),
+      totalUniqueVisitors: uniqueVisitors.length,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/analytics/store-top-clicks', async (req, res, next) => {
+  try {
+    const { from, to, fromDate, toDate } = resolveDateRange(req);
+    const rows = await PageView.aggregate([
+      { $match: { createdAt: { $gte: fromDate, $lte: toDate } } },
+      { $group: { _id: '$path', views: { $sum: 1 } } },
+      { $sort: { views: -1 } },
+      { $limit: 50 },
+    ]);
+    res.render('admin/analytics-store-top-clicks', {
+      adminPageTitle: 'Store Top Clicks',
+      meta: ANALYTICS_CARD_META.storeTopClicks,
+      from, to, rows,
+      totalViews: rows.reduce((s, r) => s + r.views, 0),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
    CUSTOMERS
    ===================================================================== */
 router.get('/customers', async (req, res, next) => {
@@ -2227,26 +3035,481 @@ router.get('/reports', async (req, res, next) => {
 });
 
 /* =====================================================================
-   SETTINGS
+   SETTINGS — hub grid
+   ---------------------------------------------------------------------
+   /admin/settings used to BE the flat site-info form directly; that form
+   now lives at /admin/settings/general (all the same fields, unchanged
+   behavior) so this path can become the card-grid hub matching the
+   reference design, same grid pattern as Marketing/Analytics.
    ===================================================================== */
-router.get('/settings', async (req, res, next) => {
+const SETTINGS_CARDS = ['deliveryCharge', 'courier', 'payment', 'offer', 'blog', 'invoice', 'pageBuilder', 'coupon', 'general'];
+const SETTINGS_CARD_META = {
+  deliveryCharge: { title: 'Delivery Charge', path: '/admin/settings/delivery-charge', icon: 'bi-truck', color: '#337ab7' },
+  courier: { title: 'Courier', path: '/admin/settings/courier', icon: 'bi-box-seam', color: '#7c3aed' },
+  payment: { title: 'Payment Methods', path: '/admin/settings/payment', icon: 'bi-credit-card', color: '#28a745' },
+  offer: { title: 'Manage Offer', path: '/admin/offer', icon: 'bi-gift', color: '#212529' },
+  blog: { title: 'Blog Setting', path: '/admin/blog', icon: 'bi-journal-richtext', color: '#f0ad4e' },
+  invoice: { title: 'Invoice Setting', path: '/admin/settings/invoice', icon: 'bi-receipt', color: '#6f42c1' },
+  pageBuilder: { title: 'Page Builder', path: '/admin/settings/page-builder', icon: 'bi-file-earmark-richtext', color: '#2e9e5b' },
+  coupon: { title: 'Product Coupon', path: '/admin/settings/coupon', icon: 'bi-ticket-perforated', color: '#d6336c' },
+  general: { title: 'General Settings', path: '/admin/settings/general', icon: 'bi-sliders', color: '#495057' },
+};
+
+router.get('/settings', (req, res) => {
+  res.render('admin/settings', { adminPageTitle: 'Settings', SETTINGS_CARDS, SETTINGS_CARD_META });
+});
+
+router.get('/settings/general', async (req, res, next) => {
   try {
     const settings = await getSettings();
-    res.render('admin/settings', { adminPageTitle: 'Site Settings', settingsData: settings });
+    res.render('admin/settings-general', { adminPageTitle: 'General Settings', settingsData: settings });
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/settings', verifyCsrf, async (req, res, next) => {
+router.post('/settings/general', verifyCsrf, async (req, res, next) => {
   try {
     const keys = ['site_name', 'site_tagline', 'currency_symbol', 'flat_shipping_fee', 'bkash_number', 'phone', 'email', 'address'];
     await Promise.all(keys.map((key) => (req.body[key] !== undefined ? setSetting(key, req.body[key]) : null)));
     req.flash('success', 'Settings saved successfully.');
-    res.redirect('/admin/settings');
+    res.redirect('/admin/settings/general');
   } catch (err) {
     next(err);
   }
+});
+
+/* =====================================================================
+   SETTINGS — Delivery Charge (zones + rates)
+   ===================================================================== */
+router.get('/settings/delivery-charge', async (req, res, next) => {
+  try {
+    const zones = await DeliveryZone.find().sort({ name: 1 });
+    res.render('admin/settings-delivery-charge', { adminPageTitle: 'Delivery Rate', zones });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/delivery-charge/type', verifyCsrf, async (req, res, next) => {
+  try {
+    const name = (req.body.name || '').trim();
+    if (!name) {
+      req.flash('danger', 'Location name is required.');
+      return res.redirect('/admin/settings/delivery-charge');
+    }
+    const existing = await DeliveryZone.findOne({ name });
+    if (existing) {
+      req.flash('danger', 'That location already exists.');
+      return res.redirect('/admin/settings/delivery-charge');
+    }
+    await DeliveryZone.create({ name });
+    req.flash('success', 'Delivery location added successfully.');
+    res.redirect('/admin/settings/delivery-charge');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/delivery-charge/rate', verifyCsrf, async (req, res, next) => {
+  try {
+    const { location, amount } = req.body;
+    if (!location || amount === undefined || amount === '') {
+      req.flash('danger', 'Pick a location and enter an amount.');
+      return res.redirect('/admin/settings/delivery-charge');
+    }
+    const zone = await DeliveryZone.findById(location);
+    if (!zone) {
+      req.flash('danger', 'Location not found.');
+      return res.redirect('/admin/settings/delivery-charge');
+    }
+    zone.rate = parseFloat(amount) || 0;
+    await zone.save();
+    req.flash('success', 'Delivery rate saved successfully.');
+    res.redirect('/admin/settings/delivery-charge');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/settings/delivery-charge/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/settings/delivery-charge');
+    }
+    await DeliveryZone.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Delivery location deleted successfully.');
+    res.redirect('/admin/settings/delivery-charge');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   SETTINGS — Courier setups
+   ===================================================================== */
+router.get('/settings/courier', async (req, res, next) => {
+  try {
+    const couriers = await CourierSetup.find().sort({ createdAt: -1 });
+    res.render('admin/settings-courier', { adminPageTitle: 'Courier Setups', couriers, COURIERS });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/courier/new', verifyCsrf, async (req, res, next) => {
+  try {
+    const { courier, apiKey, secretKey, storeId, webhookUrl } = req.body;
+    if (!courier || !courier.trim()) {
+      req.flash('danger', 'Pick a courier.');
+      return res.redirect('/admin/settings/courier');
+    }
+    await CourierSetup.create({
+      courier: courier.trim(),
+      apiKey: (apiKey || '').trim(),
+      secretKey: (secretKey || '').trim(),
+      storeId: (storeId || '').trim(),
+      webhookUrl: (webhookUrl || '').trim(),
+      status: !!req.body.status,
+    });
+    req.flash('success', 'Courier setup added successfully.');
+    res.redirect('/admin/settings/courier');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/courier/:id/edit', verifyCsrf, async (req, res, next) => {
+  try {
+    const { courier, apiKey, secretKey, storeId, webhookUrl } = req.body;
+    await CourierSetup.updateOne(
+      { _id: req.params.id },
+      {
+        courier: (courier || '').trim(),
+        apiKey: (apiKey || '').trim(),
+        secretKey: (secretKey || '').trim(),
+        storeId: (storeId || '').trim(),
+        webhookUrl: (webhookUrl || '').trim(),
+        status: !!req.body.status,
+      }
+    );
+    req.flash('success', 'Courier setup updated successfully.');
+    res.redirect('/admin/settings/courier');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/settings/courier/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/settings/courier');
+    }
+    await CourierSetup.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Courier setup deleted successfully.');
+    res.redirect('/admin/settings/courier');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   SETTINGS — Payment Methods (grid + 3 manage pages)
+   ===================================================================== */
+const PAYMENT_CARDS = ['bkash', 'manual', 'sslcommerz'];
+const PAYMENT_CARD_META = {
+  bkash: { title: 'Bkash Payment', path: 'bkash', icon: 'bi-phone', color: '#337ab7' },
+  manual: { title: 'Manual Payment', path: 'manual', icon: 'bi-chat-dots', color: '#7c3aed' },
+  sslcommerz: { title: 'SSL Commerz Payment', path: 'ssl', icon: 'bi-shield-check', color: '#28a745' },
+};
+
+router.get('/settings/payment', async (req, res, next) => {
+  try {
+    const payment = await getPaymentSettings();
+    res.render('admin/settings-payment', { adminPageTitle: 'Payment Settings', payment, PAYMENT_CARDS, PAYMENT_CARD_META });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/settings/payment/bkash', async (req, res, next) => {
+  try {
+    const payment = await getPaymentSettings();
+    res.render('admin/settings-payment-bkash', { adminPageTitle: 'Bkash Online Payment', payment });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/payment/bkash', verifyCsrf, async (req, res, next) => {
+  try {
+    const { username, password, appKey, appSecret } = req.body;
+    await updatePaymentSettingCard('bkash', {
+      username: (username || '').trim(),
+      password: password || '',
+      appKey: (appKey || '').trim(),
+      appSecret: appSecret || '',
+      status: !!req.body.status,
+    });
+    req.flash('success', 'Bkash online payment settings saved successfully.');
+    res.redirect('/admin/settings/payment/bkash');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/settings/payment/manual', async (req, res, next) => {
+  try {
+    const payment = await getPaymentSettings();
+    res.render('admin/settings-payment-manual', { adminPageTitle: 'Manual Payment Settings', payment });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/payment/manual', verifyCsrf, async (req, res, next) => {
+  try {
+    const { bkashNumber, nagadNumber, rocketNumber } = req.body;
+    await updatePaymentSettingCard('manual', {
+      bkashNumber: (bkashNumber || '').trim(),
+      nagadNumber: (nagadNumber || '').trim(),
+      rocketNumber: (rocketNumber || '').trim(),
+      status: !!req.body.status,
+    });
+    // The manual bKash number doubles as the storefront's existing
+    // Setting.js bkash_number key (already used elsewhere on the site), so
+    // saving it here keeps that value in sync instead of creating a second,
+    // conflicting source of truth for the same number.
+    if (bkashNumber !== undefined && bkashNumber.trim()) {
+      await setSetting('bkash_number', bkashNumber.trim());
+    }
+    req.flash('success', 'Manual payment settings saved successfully.');
+    res.redirect('/admin/settings/payment/manual');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/settings/payment/ssl', async (req, res, next) => {
+  try {
+    const payment = await getPaymentSettings();
+    res.render('admin/settings-payment-ssl', { adminPageTitle: 'SSLcommerz Online Payment', payment });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/payment/ssl', verifyCsrf, async (req, res, next) => {
+  try {
+    const { storeId, storePassword, transactionPrefix, appSecret } = req.body;
+    await updatePaymentSettingCard('sslcommerz', {
+      storeId: (storeId || '').trim(),
+      storePassword: storePassword || '',
+      transactionPrefix: (transactionPrefix || '').trim(),
+      appSecret: appSecret || '',
+      status: !!req.body.status,
+    });
+    req.flash('success', 'SSLcommerz online payment settings saved successfully.');
+    res.redirect('/admin/settings/payment/ssl');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   SETTINGS — Invoice Setting
+   ===================================================================== */
+router.get('/settings/invoice', async (req, res, next) => {
+  try {
+    const invoice = await getInvoiceSettings();
+    res.render('admin/settings-invoice', { adminPageTitle: 'Invoice Setting', invoice });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/invoice', verifyCsrf, async (req, res, next) => {
+  try {
+    const { invoicePrefix, startingNumber, companyName, companyAddress, footerNote, taxPercent } = req.body;
+    await updateInvoiceSettings({
+      invoicePrefix: (invoicePrefix || '').trim() || 'INV-',
+      startingNumber: parseInt(startingNumber, 10) || 0,
+      companyName: (companyName || '').trim(),
+      companyAddress: (companyAddress || '').trim(),
+      footerNote: (footerNote || '').trim(),
+      taxPercent: parseFloat(taxPercent) || 0,
+      showLogo: !!req.body.showLogo,
+    });
+    req.flash('success', 'Invoice settings saved successfully.');
+    res.redirect('/admin/settings/invoice');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   SETTINGS — Page Builder (arbitrary custom pages; separate from the
+   fixed-key /admin/pages editor above)
+   ===================================================================== */
+router.get('/settings/page-builder', async (req, res, next) => {
+  try {
+    const customPages = await CustomPage.find().sort({ createdAt: -1 });
+    res.render('admin/settings-page-builder', { adminPageTitle: 'Page Builder Settings', customPages, editPage: null });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/settings/page-builder/:id/edit', async (req, res, next) => {
+  try {
+    const customPages = await CustomPage.find().sort({ createdAt: -1 });
+    const editPage = await CustomPage.findById(req.params.id);
+    if (!editPage) {
+      req.flash('danger', 'Page not found.');
+      return res.redirect('/admin/settings/page-builder');
+    }
+    res.render('admin/settings-page-builder', { adminPageTitle: 'Page Builder Settings', customPages, editPage });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/page-builder', verifyCsrf, async (req, res, next) => {
+  try {
+    const { slug: slugInput, name, title, content } = req.body;
+    if (!name || !name.trim() || !title || !title.trim()) {
+      req.flash('danger', 'Page Name and Page Title are required.');
+      return res.redirect('/admin/settings/page-builder');
+    }
+    const baseSlug = slugify((slugInput && slugInput.trim()) || name);
+    const slug = await ensureUniqueSlug(CustomPage, baseSlug, null);
+    await CustomPage.create({
+      slug,
+      name: name.trim(),
+      title: title.trim(),
+      content: content || '',
+      status: true,
+    });
+    req.flash('success', 'New page saved successfully.');
+    res.redirect('/admin/settings/page-builder');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/page-builder/:id/edit', verifyCsrf, async (req, res, next) => {
+  try {
+    const { slug: slugInput, name, title, content } = req.body;
+    if (!name || !name.trim() || !title || !title.trim()) {
+      req.flash('danger', 'Page Name and Page Title are required.');
+      return res.redirect(`/admin/settings/page-builder/${req.params.id}/edit`);
+    }
+    const baseSlug = slugify((slugInput && slugInput.trim()) || name);
+    const slug = await ensureUniqueSlug(CustomPage, baseSlug, req.params.id);
+    await CustomPage.updateOne(
+      { _id: req.params.id },
+      { slug, name: name.trim(), title: title.trim(), content: content || '', status: !!req.body.status }
+    );
+    req.flash('success', 'Page updated successfully.');
+    res.redirect('/admin/settings/page-builder');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/settings/page-builder/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/settings/page-builder');
+    }
+    await CustomPage.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Page deleted successfully.');
+    res.redirect('/admin/settings/page-builder');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   SETTINGS — Product Coupon
+   ===================================================================== */
+router.get('/settings/coupon', async (req, res, next) => {
+  try {
+    const coupons = await Coupon.find().sort({ createdAt: -1 });
+    res.render('admin/settings-coupon', { adminPageTitle: 'Product Coupons', coupons, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/settings/coupon', verifyCsrf, async (req, res, next) => {
+  try {
+    const { name, discountType, discountValue, limit, code } = req.body;
+    const errors = [];
+    if (!name || !name.trim()) errors.push('Coupon name is required.');
+    if (!code || !code.trim()) errors.push('Coupon code is required.');
+    const normalizedCode = (code || '').trim().toUpperCase();
+    if (normalizedCode) {
+      const existing = await Coupon.findOne({ code: normalizedCode });
+      if (existing) errors.push('That coupon code is already in use.');
+    }
+
+    if (errors.length) {
+      const coupons = await Coupon.find().sort({ createdAt: -1 });
+      return res.render('admin/settings-coupon', { adminPageTitle: 'Product Coupons', coupons, errors });
+    }
+
+    await Coupon.create({
+      name: name.trim(),
+      code: normalizedCode,
+      discountType: discountType === 'flat' ? 'flat' : 'percent',
+      discountValue: parseFloat(discountValue) || 0,
+      limit: parseInt(limit, 10) || 0,
+      status: true,
+    });
+    req.flash('success', 'New coupon added successfully.');
+    res.redirect('/admin/settings/coupon');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/settings/coupon/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/settings/coupon');
+    }
+    await Coupon.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Coupon deleted successfully.');
+    res.redirect('/admin/settings/coupon');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   MANAGE OFFER — grid page linking to the existing /offer/* sub-pages
+   (registered above via COMING_SOON_PAGES; unchanged — no design/spec was
+   given for those individual offer-type pages, only for this grid).
+   ===================================================================== */
+const OFFER_CARDS = ['flashSale', 'combo', 'bestSale', 'popular', 'hotDeal', 'special', 'latest', 'popup'];
+const OFFER_CARD_META = {
+  flashSale: { title: 'Flash Sale', path: '/admin/offer/flash-sale', icon: 'bi-lightning-charge-fill', color: '#f0ad4e' },
+  combo: { title: 'Combo Offer', path: '/admin/offer/combo', icon: 'bi-box-seam-fill', color: '#7c3aed' },
+  bestSale: { title: 'Best Sale Product', path: '/admin/offer/best-sale', icon: 'bi-award-fill', color: '#28a745' },
+  popular: { title: 'Popular Product', path: '/admin/offer/popular', icon: 'bi-star-fill', color: '#212529' },
+  hotDeal: { title: 'Hot Deal', path: '/admin/offer/hot-deal', icon: 'bi-fire', color: '#337ab7' },
+  special: { title: 'Special Offer', path: '/admin/offer/special', icon: 'bi-gift-fill', color: '#d6336c' },
+  latest: { title: 'Latest Product', path: '/admin/offer/latest', icon: 'bi-stars', color: '#5b9bd5' },
+  popup: { title: 'PopUp Offer', path: '/admin/offer/popup', icon: 'bi-window-stack', color: '#f4a460' },
+};
+
+router.get('/offer', (req, res) => {
+  res.render('admin/offer', { adminPageTitle: 'Offer Settings', OFFER_CARDS, OFFER_CARD_META });
 });
 
 /* =====================================================================

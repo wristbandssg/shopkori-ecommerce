@@ -1,0 +1,220 @@
+<%
+  const d = landing || {};
+  const isEdit = !!(d && d._id);
+  const formAction = isEdit ? `/admin/landing-page/short/${d._id}/edit` : '/admin/landing-page/short/new';
+  const deliveryModeValue = ['required', 'optional', 'free'].includes(d.deliveryChargeMode) ? d.deliveryChargeMode : 'required';
+  const itemsInitial = (d.items && d.items.length) ? d.items : [];
+%>
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+<% } %>
+
+<form method="post" action="<%= formAction %>" enctype="multipart/form-data" id="shortLandingForm">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-globe2 text-brand"></i> <%= isEdit ? 'Edit Landing Page' : 'Add Landing Page' %></h4>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="status" id="shortLandingStatus" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
+        <label class="form-check-label" for="shortLandingStatus">Active</label>
+      </div>
+      <a href="/admin/landing-page/short" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+    </div>
+  </div>
+
+  <!-- ---------- Basic Information ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-card-text"></i> Basic Information</h5>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Title *</label>
+        <input type="text" name="title" class="form-control" required value="<%= d.title || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Slug *</label>
+        <input type="text" name="slug" class="form-control" placeholder="e.g. summer-combo-offer" value="<%= d.slug || '' %>">
+        <div class="form-text">Leave blank to auto-generate from the Title.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Title 2 *</label>
+        <input type="text" name="title2" class="form-control" required value="<%= d.title2 || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Image (900x900)</label>
+        <input type="file" name="image" class="form-control" accept="image/*">
+        <% if (d.image) { %><img src="<%= landingImageUrl(d.image) %>" class="admin-thumb mt-2"><% } %>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Highlighted Products ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-bag-star"></i> Highlighted Products</h5>
+    <div id="itemRows">
+      <% itemsInitial.forEach(function (it, i) { %>
+        <% const pid = String(it.product && it.product._id ? it.product._id : it.product || ''); %>
+        <div class="row g-2 align-items-end mb-2 item-row border rounded p-2">
+          <div class="col-md-3">
+            <label class="form-label mb-1 small">Main Title</label>
+            <input type="text" name="items[<%= i %>][mainTitle]" class="form-control form-control-sm item-main-title" value="<%= it.mainTitle || '' %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1 small">Main Title Color</label>
+            <input type="color" name="items[<%= i %>][mainTitleColor]" class="form-control form-control-sm form-control-color w-100" value="<%= it.mainTitleColor || '#1e3a5f' %>">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label mb-1 small">Main Title Bg Color</label>
+            <input type="color" name="items[<%= i %>][mainTitleBgColor]" class="form-control form-control-sm form-control-color w-100" value="<%= it.mainTitleBgColor || '#ffffff' %>">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label mb-1 small">Choose Product</label>
+            <select name="items[<%= i %>][product]" class="form-select form-select-sm item-product-select">
+              <option value="">Select Product</option>
+              <% products.forEach(function (p) { %>
+                <option value="<%= p._id %>" <%= pid === String(p._id) ? 'selected' : '' %>><%= p.name %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="col-md-1">
+            <div class="form-check">
+              <input class="form-check-input item-auto-cart" type="checkbox" name="items[<%= i %>][autoCart]" id="itemAutoCart<%= i %>" <%= it.autoCart ? 'checked' : '' %>>
+              <label class="form-check-label small" for="itemAutoCart<%= i %>">Auto Cart</label>
+            </div>
+          </div>
+          <div class="col-md-1">
+            <button type="button" class="btn btn-sm btn-outline-danger js-remove-item-row"><i class="bi bi-trash"></i></button>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="addItemRow"><i class="bi bi-plus-lg"></i> Add Product</button>
+
+    <div class="table-responsive mt-3">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>Product</th><th>Is Auto Cart?</th><th>Sale Price</th><th>Price</th><th>Stock</th><th>Remove</th></tr></thead>
+        <tbody id="itemsSummaryBody">
+          <tr><td colspan="6" class="text-center text-muted">No products selected yet.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ---------- Delivery Settings ---------- -->
+  <div class="admin-card mb-3">
+    <h5><i class="bi bi-truck"></i> Delivery Settings</h5>
+    <div class="btn-group flex-wrap" role="group">
+      <input type="radio" class="btn-check" name="deliveryChargeMode" id="scDcRequired" value="required" autocomplete="off" <%= deliveryModeValue === 'required' ? 'checked' : '' %>>
+      <label class="btn btn-outline-primary btn-sm" for="scDcRequired">Delivery Charge Required</label>
+      <input type="radio" class="btn-check" name="deliveryChargeMode" id="scDcOptional" value="optional" autocomplete="off" <%= deliveryModeValue === 'optional' ? 'checked' : '' %>>
+      <label class="btn btn-outline-primary btn-sm" for="scDcOptional">Delivery Charge Optional</label>
+      <input type="radio" class="btn-check" name="deliveryChargeMode" id="scDcFree" value="free" autocomplete="off" <%= deliveryModeValue === 'free' ? 'checked' : '' %>>
+      <label class="btn btn-outline-primary btn-sm" for="scDcFree">Free Delivery</label>
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Submit</button>
+    <a href="/admin/landing-page/short" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var PRODUCTS = <%- JSON.stringify(products.map(function (p) { return { id: String(p._id), name: p.name, salePrice: p.salePrice, price: p.price, stock: p.stock }; })) %>;
+  var PRODUCT_OPTIONS_HTML = '<option value="">Select Product</option>' + PRODUCTS.map(function (p) {
+    return '<option value="' + p.id + '">' + p.name.replace(/</g, '&lt;') + '</option>';
+  }).join('');
+
+  var wrap = document.getElementById('itemRows');
+  var itemRowIndex = document.querySelectorAll('#itemRows .item-row').length;
+
+  function addItemRow() {
+    var i = itemRowIndex++;
+    var row = document.createElement('div');
+    row.className = 'row g-2 align-items-end mb-2 item-row border rounded p-2';
+    row.innerHTML =
+      '<div class="col-md-3"><label class="form-label mb-1 small">Main Title</label>' +
+      '<input type="text" name="items[' + i + '][mainTitle]" class="form-control form-control-sm item-main-title"></div>' +
+      '<div class="col-md-2"><label class="form-label mb-1 small">Main Title Color</label>' +
+      '<input type="color" name="items[' + i + '][mainTitleColor]" class="form-control form-control-sm form-control-color w-100" value="#1e3a5f"></div>' +
+      '<div class="col-md-2"><label class="form-label mb-1 small">Main Title Bg Color</label>' +
+      '<input type="color" name="items[' + i + '][mainTitleBgColor]" class="form-control form-control-sm form-control-color w-100" value="#ffffff"></div>' +
+      '<div class="col-md-3"><label class="form-label mb-1 small">Choose Product</label>' +
+      '<select name="items[' + i + '][product]" class="form-select form-select-sm item-product-select">' + PRODUCT_OPTIONS_HTML + '</select></div>' +
+      '<div class="col-md-1"><div class="form-check"><input class="form-check-input item-auto-cart" type="checkbox" name="items[' + i + '][autoCart]" id="itemAutoCart' + i + '">' +
+      '<label class="form-check-label small" for="itemAutoCart' + i + '">Auto Cart</label></div></div>' +
+      '<div class="col-md-1"><button type="button" class="btn btn-sm btn-outline-danger js-remove-item-row"><i class="bi bi-trash"></i></button></div>';
+    wrap.appendChild(row);
+    refreshSummary();
+  }
+
+  document.getElementById('addItemRow').addEventListener('click', addItemRow);
+
+  wrap.addEventListener('click', function (e) {
+    var btn = e.target.closest('.js-remove-item-row');
+    if (btn) {
+      btn.closest('.item-row').remove();
+      refreshSummary();
+    }
+  });
+  wrap.addEventListener('change', function (e) {
+    if (e.target.classList.contains('item-product-select') || e.target.classList.contains('item-auto-cart') || e.target.classList.contains('item-main-title')) {
+      refreshSummary();
+    }
+  });
+  wrap.addEventListener('input', function (e) {
+    if (e.target.classList.contains('item-main-title')) refreshSummary();
+  });
+
+  function currency(n) {
+    return '৳' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function refreshSummary() {
+    var body = document.getElementById('itemsSummaryBody');
+    var rows = wrap.querySelectorAll('.item-row');
+    var html = '';
+    rows.forEach(function (row) {
+      var select = row.querySelector('.item-product-select');
+      var pid = select ? select.value : '';
+      if (!pid) return;
+      var product = PRODUCTS.find(function (p) { return p.id === pid; });
+      if (!product) return;
+      var autoCart = row.querySelector('.item-auto-cart').checked;
+      html += '<tr>' +
+        '<td>' + product.name + '</td>' +
+        '<td>' + (autoCart ? '<span class="badge bg-success">Yes</span>' : '<span class="badge bg-secondary">No</span>') + '</td>' +
+        '<td>' + (product.salePrice ? currency(product.salePrice) : '—') + '</td>' +
+        '<td>' + currency(product.price) + '</td>' +
+        '<td>' + product.stock + '</td>' +
+        '<td><button type="button" class="btn btn-sm btn-outline-danger js-remove-summary-row"><i class="bi bi-trash"></i></button></td>' +
+        '</tr>';
+    });
+    body.innerHTML = html || '<tr><td colspan="6" class="text-center text-muted">No products selected yet.</td></tr>';
+
+    // Wire each summary row's Remove button back to its source item-row,
+    // matched by position (summary only lists rows that have a product
+    // chosen, so this walks the same filtered set in the same order).
+    var summaryButtons = body.querySelectorAll('.js-remove-summary-row');
+    var sourceRows = Array.prototype.filter.call(rows, function (row) {
+      var select = row.querySelector('.item-product-select');
+      return select && select.value;
+    });
+    summaryButtons.forEach(function (btn, idx) {
+      btn.addEventListener('click', function () {
+        var target = sourceRows[idx];
+        if (target) target.remove();
+        refreshSummary();
+      });
+    });
+  }
+
+  refreshSummary();
+});
+</script>
+
+<%- include('partials/admin-footer') %>

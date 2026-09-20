@@ -1,0 +1,61 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/analytics" class="text-decoration-none">Analytics Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted"><%= meta.title %></span>
+</nav>
+
+<p class="small text-muted">Real traffic, logged from every storefront page load — not a placeholder. A "visitor" is one browser session (a new session starts the first time someone opens the site, or their cookie expires).</p>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex gap-2 align-items-end flex-wrap">
+    <div>
+      <label class="form-label">Start Date</label>
+      <input type="date" name="from" class="form-control" value="<%= from %>">
+    </div>
+    <div>
+      <label class="form-label">End Date</label>
+      <input type="date" name="to" class="form-control" value="<%= to %>">
+    </div>
+    <button class="btn btn-brand">Filter</button>
+  </form>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#16a085;"><i class="bi bi-people-fill"></i></div>
+      <div><span class="stat-value"><%= totalUniqueVisitors %></span><span class="stat-label">Unique Visitors (Selected Period)</span></div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#337ab7;"><i class="bi bi-eye-fill"></i></div>
+      <div><span class="stat-value"><%= totalViews %></span><span class="stat-label">Total Page Views</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card">
+  <h5>Daily Traffic</h5>
+  <canvas id="visitorsChart" height="110"></canvas>
+</div>
+
+<script>
+new Chart(document.getElementById('visitorsChart'), {
+  type: 'line',
+  data: {
+    labels: <%- JSON.stringify(labels) %>,
+    datasets: [
+      { label: 'Page Views', data: <%- JSON.stringify(viewsData) %>, borderColor: '#337ab7', backgroundColor: 'rgba(51,122,183,0.1)', tension: 0.3, fill: true },
+      { label: 'Unique Visitors', data: <%- JSON.stringify(uniquesData) %>, borderColor: '#16a085', backgroundColor: 'rgba(22,160,133,0.1)', tension: 0.3, fill: true },
+    ]
+  },
+  options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+});
+</script>
+
+<%- include('partials/admin-footer') %>

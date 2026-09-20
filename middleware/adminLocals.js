@@ -15,6 +15,7 @@ async function adminLocals(req, res, next) {
     res.locals.currency = currencyFormatter(settings.currency_symbol || '৳');
     res.locals.productImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/product-placeholder.svg');
     res.locals.categoryImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/category-placeholder.svg');
+    res.locals.landingImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/product-placeholder.svg');
     res.locals.flashes = res.locals.flashes || [];
     res.locals.currentAdmin = null;
     // Made available on every admin page so views never need to remember

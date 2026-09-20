@@ -1,0 +1,51 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/settings" class="text-decoration-none">Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/settings/payment" class="text-decoration-none">Payment Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">SSLCommerz</span>
+</nav>
+
+<div class="admin-card" style="max-width:700px">
+  <h5 class="mb-3"><i class="bi bi-shield-check"></i> SSLcommerz Online Payment</h5>
+  <form method="post" action="/admin/settings/payment/ssl">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">SSLCommerz Store Id</label>
+        <input type="text" name="storeId" class="form-control" value="<%= payment.sslcommerz.storeId %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">SSLCommerz Store Password</label>
+        <input type="password" name="storePassword" class="form-control" value="<%= payment.sslcommerz.storePassword %>" autocomplete="new-password">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Payment Transaction ID Prefix</label>
+        <input type="text" name="transactionPrefix" class="form-control" value="<%= payment.sslcommerz.transactionPrefix %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">App Secret</label>
+        <input type="password" name="appSecret" class="form-control" value="<%= payment.sslcommerz.appSecret %>" autocomplete="new-password">
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="status" id="sslStatus" <%= payment.sslcommerz.status ? 'checked' : '' %>>
+        <label class="form-check-label" for="sslStatus">Payment Status</label>
+      </div>
+      <span class="badge bg-<%= payment.sslcommerz.status ? 'success' : 'secondary' %>"><%= payment.sslcommerz.status ? 'Active' : 'Inactive' %></span>
+    </div>
+
+    <p class="text-muted small">This one is live: turning Payment Status on with a Store Id filled in makes checkout use these credentials instead of the <code>.env</code> file's SSLCommerz settings.</p>
+
+    <button type="submit" class="btn btn-brand">Save Changes</button>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

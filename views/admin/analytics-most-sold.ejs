@@ -1,0 +1,45 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/analytics" class="text-decoration-none">Analytics Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted"><%= meta.title %></span>
+</nav>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex gap-2 align-items-end flex-wrap">
+    <div>
+      <label class="form-label">Start Date</label>
+      <input type="date" name="from" class="form-control" value="<%= from %>">
+    </div>
+    <div>
+      <label class="form-label">End Date</label>
+      <input type="date" name="to" class="form-control" value="<%= to %>">
+    </div>
+    <button class="btn btn-brand">Filter</button>
+  </form>
+</div>
+
+<div class="admin-card">
+  <h5>Top 50 Best-Selling Products</h5>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>#</th><th>Product</th><th>Units Sold</th><th>Revenue</th></tr></thead>
+      <tbody>
+        <% rows.forEach(function (r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td class="d-flex align-items-center gap-2"><img src="<%= productImageUrl(r._id.image) %>" class="admin-thumb"><%= r._id.name %></td>
+            <td><span class="badge bg-primary"><%= r.qtySold %></span></td>
+            <td><%= currency(r.revenue) %></td>
+          </tr>
+        <% }); %>
+        <% if (!rows.length) { %><tr><td colspan="4" class="text-center text-muted py-4">No sales in this period.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

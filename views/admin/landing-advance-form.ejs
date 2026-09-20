@@ -1,0 +1,357 @@
+<%
+  const d = landing || {};
+  const isEdit = !!(d && d._id);
+  const formAction = isEdit ? `/admin/landing-page/advance/${d._id}/edit` : '/admin/landing-page/advance/new';
+  const deliveryModeValue = ['required', 'optional', 'free'].includes(d.deliveryChargeMode) ? d.deliveryChargeMode : 'required';
+  const designsInitial = (d.designs && d.designs.length) ? d.designs : [];
+  const DESIGN_TYPE_LABELS = { slider: 'Slider', grid: 'Grid', list: 'List', highlight: 'Highlight' };
+%>
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+<% } %>
+
+<form method="post" action="<%= formAction %>" enctype="multipart/form-data" id="advanceLandingForm">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-globe2 text-brand"></i> <%= isEdit ? 'Edit Advance Landing' : 'Advanced Landing' %></h4>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="status" id="advStatus" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
+        <label class="form-check-label" for="advStatus">Active</label>
+      </div>
+      <a href="/admin/landing-page/advance" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save Landing Page</button>
+    </div>
+  </div>
+
+  <!-- ---------- Basic Information ---------- -->
+  <div class="admin-card mb-3">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Title *</label>
+        <input type="text" name="title" class="form-control" placeholder="Enter page title" required value="<%= d.title || '' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Slug *</label>
+        <input type="text" name="slug" class="form-control" placeholder="Auto-generated slug" value="<%= d.slug || '' %>">
+      </div>
+    </div>
+    <div class="row g-3 mt-1">
+      <div class="col-md-3">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="buttonEffect" id="buttonEffect" <%= d.buttonEffect ? 'checked' : '' %>>
+          <label class="form-check-label" for="buttonEffect"><i class="bi bi-magic"></i> Button Effect</label>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="showLogo" id="showLogo" <%= d.showLogo ? 'checked' : '' %>>
+          <label class="form-check-label" for="showLogo"><i class="bi bi-badge-vo"></i> Show Logo</label>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="showTopCountdown" id="showTopCountdown" <%= d.showTopCountdown ? 'checked' : '' %>>
+          <label class="form-check-label" for="showTopCountdown"><i class="bi bi-stopwatch"></i> Show Top Countdown</label>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="showVoice" id="showVoice" <%= d.showVoice ? 'checked' : '' %>>
+          <label class="form-check-label" for="showVoice"><i class="bi bi-mic"></i> Show Voice</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Background ---------- -->
+  <div class="admin-card mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0"><i class="bi bi-palette2"></i> Background</h5>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="backgroundEnabled" id="backgroundEnabled" <%= (d.backgroundEnabled === undefined || d.backgroundEnabled) ? 'checked' : '' %>>
+        <label class="form-check-label" for="backgroundEnabled">Enable</label>
+      </div>
+    </div>
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Background Color</label>
+        <input type="color" name="backgroundColor" class="form-control form-control-color w-100" value="<%= d.backgroundColor || '#ffffff' %>">
+      </div>
+      <div class="col-md-6">
+        <label class="form-label d-block">Background Effect</label>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="backgroundEffect" id="backgroundEffect" <%= d.backgroundEffect ? 'checked' : '' %>>
+          <label class="form-check-label" for="backgroundEffect">Enable animated background effect</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- Banner ---------- -->
+  <div class="admin-card mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0"><i class="bi bi-image"></i> Banner</h5>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="bannerEnabled" id="bannerEnabled" <%= (d.bannerEnabled === undefined || d.bannerEnabled) ? 'checked' : '' %>>
+        <label class="form-check-label" for="bannerEnabled">Enable</label>
+      </div>
+    </div>
+    <label class="form-label">Banner Image</label>
+    <input type="file" name="bannerImage" class="form-control" accept="image/*">
+    <% if (d.bannerImage) { %><img src="<%= landingImageUrl(d.bannerImage) %>" class="admin-thumb mt-2"><% } %>
+  </div>
+
+  <!-- ---------- Add Design ---------- -->
+  <div class="admin-card mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h5 class="mb-0"><i class="bi bi-brush"></i> Add Design</h5>
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="designEnabled" id="designEnabled" <%= (d.designEnabled === undefined || d.designEnabled) ? 'checked' : '' %>>
+        <label class="form-check-label" for="designEnabled">Enable</label>
+      </div>
+    </div>
+
+    <div id="designBlocks">
+      <% designsInitial.forEach(function (block, i) { %>
+        <div class="design-block border rounded p-3 mb-3" data-index="<%= i %>">
+          <div class="d-flex justify-content-between align-items-center mb-3 gap-2">
+            <select name="designs[<%= i %>][designType]" class="form-select design-type-select">
+              <option value="">— Select Design Type —</option>
+              <% Object.keys(DESIGN_TYPE_LABELS).forEach(function (key) { %>
+                <option value="<%= key %>" <%= block.designType === key ? 'selected' : '' %>><%= DESIGN_TYPE_LABELS[key] %></option>
+              <% }); %>
+            </select>
+            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap js-remove-design-block"><i class="bi bi-x-circle"></i> Remove</button>
+          </div>
+
+          <label class="form-label d-block">Product Select</label>
+          <div class="btn-group mb-3" role="group">
+            <input type="radio" class="btn-check" name="designs[<%= i %>][productSelectMode]" id="pm<%= i %>Single" value="single" autocomplete="off" <%= block.productSelectMode === 'single' ? 'checked' : '' %>>
+            <label class="btn btn-outline-primary btn-sm" for="pm<%= i %>Single">User Can Select Only 1 Product</label>
+            <input type="radio" class="btn-check" name="designs[<%= i %>][productSelectMode]" id="pm<%= i %>Multiple" value="multiple" autocomplete="off" <%= block.productSelectMode !== 'single' ? 'checked' : '' %>>
+            <label class="btn btn-outline-primary btn-sm" for="pm<%= i %>Multiple">User Can Select Multiple Product</label>
+          </div>
+
+          <label class="form-label">Select Product</label>
+          <select class="form-select mb-2 design-product-picker">
+            <option value="">- Choose Product -</option>
+            <% products.forEach(function (p) { %>
+              <option value="<%= p._id %>" data-name="<%= p.name %>"><%= p.name %></option>
+            <% }); %>
+          </select>
+
+          <div class="table-responsive">
+            <table class="table table-sm align-middle">
+              <thead><tr><th>Product</th><th>Is Auto Cart</th><th>Best Sale</th><th>Action</th></tr></thead>
+              <tbody class="design-products-body">
+                <% (block.products || []).forEach(function (it, j) { %>
+                  <% const pid = String(it.product && it.product._id ? it.product._id : it.product || ''); %>
+                  <% const pname = it.product && it.product.name ? it.product.name : pid; %>
+                  <tr>
+                    <td><%= pname %><input type="hidden" name="designs[<%= i %>][products][<%= j %>][product]" value="<%= pid %>"></td>
+                    <td><input type="checkbox" class="form-check-input" name="designs[<%= i %>][products][<%= j %>][autoCart]" <%= it.autoCart ? 'checked' : '' %>></td>
+                    <td><input type="checkbox" class="form-check-input" name="designs[<%= i %>][products][<%= j %>][bestSale]" <%= it.bestSale ? 'checked' : '' %>></td>
+                    <td><button type="button" class="btn btn-sm btn-outline-danger js-remove-design-product"><i class="bi bi-trash"></i></button></td>
+                  </tr>
+                <% }); %>
+                <% if (!(block.products || []).length) { %><tr class="js-empty-row"><td colspan="4" class="text-center text-muted">No products selected yet.</td></tr><% } %>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="row g-3 mt-1">
+            <div class="col-md-6">
+              <label class="form-label">Instruction Message</label>
+              <textarea name="designs[<%= i %>][instructionMessage]" class="form-control" rows="2"><%= block.instructionMessage || '' %></textarea>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check form-switch mt-4">
+                <input class="form-check-input" type="checkbox" name="designs[<%= i %>][messageOnOff]" id="msgOnOff<%= i %>" <%= block.messageOnOff ? 'checked' : '' %>>
+                <label class="form-check-label" for="msgOnOff<%= i %>">Message On/Off</label>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-check form-switch mt-4">
+                <input class="form-check-input" type="checkbox" name="designs[<%= i %>][showNumber]" id="showNum<%= i %>" <%= block.showNumber ? 'checked' : '' %>>
+                <label class="form-check-label" for="showNum<%= i %>">Show Number</label>
+              </div>
+            </div>
+          </div>
+
+          <h6 class="text-center mt-3">Product Style</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Product Bg Color</label>
+              <input type="color" name="designs[<%= i %>][productBgColor]" class="form-control form-control-color w-100" value="<%= block.productBgColor || '#ffffff' %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Product Border Color</label>
+              <input type="color" name="designs[<%= i %>][productBorderColor]" class="form-control form-control-color w-100" value="<%= block.productBorderColor || '#c0554e' %>">
+            </div>
+          </div>
+        </div>
+      <% }); %>
+    </div>
+
+    <div class="text-end">
+      <button type="button" class="btn btn-sm btn-outline-primary" id="addDesignBlock"><i class="bi bi-plus-lg"></i> Add More Design</button>
+    </div>
+  </div>
+
+  <!-- ---------- Delivery Settings & Payment Methods ---------- -->
+  <div class="row g-3 mb-3">
+    <div class="col-lg-6">
+      <div class="admin-card h-100">
+        <h5><i class="bi bi-truck"></i> Delivery Settings</h5>
+        <div class="btn-group flex-wrap" role="group">
+          <input type="radio" class="btn-check" name="deliveryChargeMode" id="advDcRequired" value="required" autocomplete="off" <%= deliveryModeValue === 'required' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="advDcRequired">Delivery Charge Required</label>
+          <input type="radio" class="btn-check" name="deliveryChargeMode" id="advDcOptional" value="optional" autocomplete="off" <%= deliveryModeValue === 'optional' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="advDcOptional">Delivery Charge Optional</label>
+          <input type="radio" class="btn-check" name="deliveryChargeMode" id="advDcFree" value="free" autocomplete="off" <%= deliveryModeValue === 'free' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="advDcFree">Free Delivery</label>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="admin-card h-100">
+        <h5><i class="bi bi-credit-card"></i> Payment Methods</h5>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="paymentCod" id="advPaymentCod" <%= (d.paymentCod === undefined || d.paymentCod) ? 'checked' : '' %>>
+          <label class="form-check-label" for="advPaymentCod">Cash On Delivery</label>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="paymentBkash" id="advPaymentBkash" <%= d.paymentBkash ? 'checked' : '' %>>
+          <label class="form-check-label" for="advPaymentBkash">bKash Payment</label>
+        </div>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="paymentManual" id="advPaymentManual" <%= d.paymentManual ? 'checked' : '' %>>
+          <label class="form-check-label" for="advPaymentManual">Manual Payment</label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save Landing Page</button>
+    <a href="/admin/landing-page/advance" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var PRODUCTS = <%- JSON.stringify(products.map(function (p) { return { id: String(p._id), name: p.name }; })) %>;
+  var DESIGN_TYPE_OPTIONS = <%- JSON.stringify(Object.entries(DESIGN_TYPE_LABELS)) %>;
+  var wrap = document.getElementById('designBlocks');
+  var blockIndex = document.querySelectorAll('#designBlocks .design-block').length;
+
+  function productOptionsHtml() {
+    return '<option value="">- Choose Product -</option>' + PRODUCTS.map(function (p) {
+      return '<option value="' + p.id + '" data-name="' + p.name.replace(/"/g, '&quot;') + '">' + p.name + '</option>';
+    }).join('');
+  }
+
+  function designTypeOptionsHtml() {
+    return '<option value="">— Select Design Type —</option>' + DESIGN_TYPE_OPTIONS.map(function (entry) {
+      return '<option value="' + entry[0] + '">' + entry[1] + '</option>';
+    }).join('');
+  }
+
+  function addDesignBlock() {
+    var i = blockIndex++;
+    var div = document.createElement('div');
+    div.className = 'design-block border rounded p-3 mb-3';
+    div.setAttribute('data-index', i);
+    div.innerHTML =
+      '<div class="d-flex justify-content-between align-items-center mb-3 gap-2">' +
+        '<select name="designs[' + i + '][designType]" class="form-select design-type-select">' + designTypeOptionsHtml() + '</select>' +
+        '<button type="button" class="btn btn-sm btn-outline-danger text-nowrap js-remove-design-block"><i class="bi bi-x-circle"></i> Remove</button>' +
+      '</div>' +
+      '<label class="form-label d-block">Product Select</label>' +
+      '<div class="btn-group mb-3" role="group">' +
+        '<input type="radio" class="btn-check" name="designs[' + i + '][productSelectMode]" id="pm' + i + 'Single" value="single" autocomplete="off">' +
+        '<label class="btn btn-outline-primary btn-sm" for="pm' + i + 'Single">User Can Select Only 1 Product</label>' +
+        '<input type="radio" class="btn-check" name="designs[' + i + '][productSelectMode]" id="pm' + i + 'Multiple" value="multiple" autocomplete="off" checked>' +
+        '<label class="btn btn-outline-primary btn-sm" for="pm' + i + 'Multiple">User Can Select Multiple Product</label>' +
+      '</div>' +
+      '<label class="form-label">Select Product</label>' +
+      '<select class="form-select mb-2 design-product-picker">' + productOptionsHtml() + '</select>' +
+      '<div class="table-responsive"><table class="table table-sm align-middle">' +
+        '<thead><tr><th>Product</th><th>Is Auto Cart</th><th>Best Sale</th><th>Action</th></tr></thead>' +
+        '<tbody class="design-products-body"><tr class="js-empty-row"><td colspan="4" class="text-center text-muted">No products selected yet.</td></tr></tbody>' +
+      '</table></div>' +
+      '<div class="row g-3 mt-1">' +
+        '<div class="col-md-6"><label class="form-label">Instruction Message</label>' +
+        '<textarea name="designs[' + i + '][instructionMessage]" class="form-control" rows="2"></textarea></div>' +
+        '<div class="col-md-3"><div class="form-check form-switch mt-4">' +
+        '<input class="form-check-input" type="checkbox" name="designs[' + i + '][messageOnOff]" id="msgOnOff' + i + '">' +
+        '<label class="form-check-label" for="msgOnOff' + i + '">Message On/Off</label></div></div>' +
+        '<div class="col-md-3"><div class="form-check form-switch mt-4">' +
+        '<input class="form-check-input" type="checkbox" name="designs[' + i + '][showNumber]" id="showNum' + i + '">' +
+        '<label class="form-check-label" for="showNum' + i + '">Show Number</label></div></div>' +
+      '</div>' +
+      '<h6 class="text-center mt-3">Product Style</h6>' +
+      '<div class="row g-3">' +
+        '<div class="col-md-6"><label class="form-label">Product Bg Color</label>' +
+        '<input type="color" name="designs[' + i + '][productBgColor]" class="form-control form-control-color w-100" value="#ffffff"></div>' +
+        '<div class="col-md-6"><label class="form-label">Product Border Color</label>' +
+        '<input type="color" name="designs[' + i + '][productBorderColor]" class="form-control form-control-color w-100" value="#c0554e"></div>' +
+      '</div>';
+    wrap.appendChild(div);
+  }
+
+  document.getElementById('addDesignBlock').addEventListener('click', addDesignBlock);
+  if (!wrap.querySelector('.design-block')) addDesignBlock();
+
+  wrap.addEventListener('click', function (e) {
+    var removeBlockBtn = e.target.closest('.js-remove-design-block');
+    if (removeBlockBtn) {
+      removeBlockBtn.closest('.design-block').remove();
+      return;
+    }
+    var removeProductBtn = e.target.closest('.js-remove-design-product');
+    if (removeProductBtn) {
+      var body = removeProductBtn.closest('.design-products-body');
+      removeProductBtn.closest('tr').remove();
+      if (!body.querySelectorAll('tr:not(.js-empty-row)').length) {
+        body.innerHTML = '<tr class="js-empty-row"><td colspan="4" class="text-center text-muted">No products selected yet.</td></tr>';
+      }
+    }
+  });
+
+  wrap.addEventListener('change', function (e) {
+    if (!e.target.classList.contains('design-product-picker')) return;
+    var picker = e.target;
+    var block = picker.closest('.design-block');
+    var blockIdx = block.getAttribute('data-index');
+    var body = block.querySelector('.design-products-body');
+    var opt = picker.options[picker.selectedIndex];
+    if (!opt || !opt.value) return;
+    var pid = opt.value;
+    var pname = opt.getAttribute('data-name') || opt.textContent;
+    if (body.querySelector('input[type="hidden"][value="' + pid + '"]')) { picker.value = ''; return; }
+
+    var singleMode = block.querySelector('input[name="designs[' + blockIdx + '][productSelectMode]"]:checked');
+    if (singleMode && singleMode.value === 'single') body.innerHTML = '';
+
+    var empty = body.querySelector('.js-empty-row');
+    if (empty) empty.remove();
+
+    var existingRows = body.querySelectorAll('tr').length;
+    var tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + pname + '<input type="hidden" name="designs[' + blockIdx + '][products][' + existingRows + '][product]" value="' + pid + '"></td>' +
+      '<td><input type="checkbox" class="form-check-input" name="designs[' + blockIdx + '][products][' + existingRows + '][autoCart]"></td>' +
+      '<td><input type="checkbox" class="form-check-input" name="designs[' + blockIdx + '][products][' + existingRows + '][bestSale]"></td>' +
+      '<td><button type="button" class="btn btn-sm btn-outline-danger js-remove-design-product"><i class="bi bi-trash"></i></button></td>';
+    body.appendChild(tr);
+    picker.value = '';
+  });
+});
+</script>
+
+<%- include('partials/admin-footer') %>

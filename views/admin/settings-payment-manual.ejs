@@ -1,0 +1,47 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/settings" class="text-decoration-none">Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/settings/payment" class="text-decoration-none">Payment Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Manual Payment</span>
+</nav>
+
+<div class="admin-card" style="max-width:700px">
+  <h5 class="mb-3"><i class="bi bi-chat-dots"></i> Manual Payment Settings</h5>
+  <form method="post" action="/admin/settings/payment/manual">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label class="form-label">Bkash Number</label>
+        <input type="text" name="bkashNumber" class="form-control" value="<%= payment.manual.bkashNumber %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Nagad Number</label>
+        <input type="text" name="nagadNumber" class="form-control" value="<%= payment.manual.nagadNumber %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Rocket Number</label>
+        <input type="text" name="rocketNumber" class="form-control" value="<%= payment.manual.rocketNumber %>">
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 mb-3">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" name="status" id="manualStatus" <%= payment.manual.status ? 'checked' : '' %>>
+        <label class="form-check-label" for="manualStatus">Status</label>
+      </div>
+      <span class="badge bg-<%= payment.manual.status ? 'success' : 'secondary' %>"><%= payment.manual.status ? 'Active' : 'Inactive' %></span>
+    </div>
+
+    <p class="text-muted small">The Bkash Number here is kept in sync with the storefront's existing bKash send-money number shown at checkout.</p>
+
+    <button type="submit" class="btn btn-brand">Save</button>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

@@ -1,0 +1,36 @@
+<%- include('partials/admin-header') %>
+
+<div class="admin-card mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-globe2 text-brand"></i> Main Landing</h4>
+    <a href="/admin/landing-page/main/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> Add Landing</a>
+  </div>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>#</th><th>Image</th><th>Title</th><th>Slug</th><th>Action</th></tr></thead>
+      <tbody>
+        <% landingPages.forEach(function (p, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><img src="<%= landingImageUrl(p.mainBanner) %>" class="admin-thumb"></td>
+            <td>
+              <%= p.title %>
+              <span class="badge bg-<%= p.status ? 'success' : 'secondary' %> ms-1"><%= p.status ? 'Active' : 'Hidden' %></span>
+            </td>
+            <td><code><%= p.slug %></code></td>
+            <td class="text-nowrap">
+              <a href="/admin/landing-page/main/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+              <a href="/admin/landing-page/main/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this landing page?" title="Delete"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!landingPages.length) { %><tr><td colspan="5" class="text-center text-muted">No landing pages yet.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>
