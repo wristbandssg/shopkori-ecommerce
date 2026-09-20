@@ -1,0 +1,23 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/offer" class="text-decoration-none">Offer Setting</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Latest Products</span>
+</nav>
+
+<form method="post" action="/admin/offer/latest">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+  <div class="admin-card">
+    <div class="form-check form-switch mb-3">
+      <input class="form-check-input" type="checkbox" role="switch" name="enabled" value="1" id="latestEnabled" <%= card.enabled ? 'checked' : '' %>>
+      <label class="form-check-label" for="latestEnabled">Latest Product Show in Shop</label>
+    </div>
+    <p class="form-text">Shows or hides the homepage's "নতুন সংযোজন" (New Arrivals) section — the store's most recently added products. There's no separate product list to pick here since it's always just "whatever's newest".</p>
+    <button type="submit" class="btn btn-brand">Save Now</button>
+  </div>
+</form>
+
+<%- include('partials/admin-footer') %>

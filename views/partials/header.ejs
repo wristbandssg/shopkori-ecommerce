@@ -152,6 +152,34 @@
 </div>
 <% } %>
 
+<!-- Admin > Offer Setting > PopUp Offer — shown once per browser session
+     (sessionStorage, so it doesn't reappear on every page nav) when a
+     popup has been saved with an image. -->
+<% if (typeof offerSettings !== 'undefined' && offerSettings.popup && offerSettings.popup.enabled && offerSettings.popup.image) { %>
+<div class="modal fade" id="popupOfferModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:12px;overflow:hidden;">
+      <button type="button" class="btn-close position-absolute top-0 end-0 m-2 bg-white rounded-circle p-2" style="z-index:2;" data-bs-dismiss="modal" aria-label="Close"></button>
+      <% if (offerSettings.popup.url) { %><a href="<%= offerSettings.popup.url %>"><% } %>
+        <img src="<%= productImageUrl(offerSettings.popup.image) %>" alt="<%= offerSettings.popup.title || 'অফার' %>" style="width:100%;display:block;">
+      <% if (offerSettings.popup.url) { %></a><% } %>
+      <% if (offerSettings.popup.title) { %><div class="p-2 text-center fw-semibold"><%= offerSettings.popup.title %></div><% } %>
+    </div>
+  </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    if (sessionStorage.getItem('popupOfferShown')) return;
+  } catch (e) {}
+  var el = document.getElementById('popupOfferModal');
+  if (!el || typeof bootstrap === 'undefined') return;
+  new bootstrap.Modal(el).show();
+  try { sessionStorage.setItem('popupOfferShown', '1'); } catch (e) {}
+});
+</script>
+<% } %>
+
 <!-- Sticky header: single row (logo + search + icon-links), stays pinned on scroll along with the category bar below it -->
 <header class="main-header">
   <div class="container header-row">

@@ -1,0 +1,103 @@
+<!-- Shared: "pick some products" table + "+Add" picker modal.
+     Included by admin/offer-collection.ejs and admin/offer-timer-collection.ejs.
+     Expects locals: `products` (all active products, for the picker) and
+     `selected` (this card's already-saved, populated product list). -->
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <label class="form-label mb-0">Products</label>
+  <button type="button" class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#offerProductModal"><i class="bi bi-plus-lg"></i> Add</button>
+</div>
+<div class="table-responsive mb-1">
+  <table class="table table-sm align-middle">
+    <thead><tr><th style="width:50px;">SL</th><th>SKU</th><th>Products Name</th><th style="width:60px;">Action</th></tr></thead>
+    <tbody id="offerProductsBody">
+      <% (selected || []).filter(function (row) { return row && row.product; }).forEach(function (row, i) { %>
+        <tr>
+          <td class="offer-row-sl"><%= i + 1 %></td>
+          <td><%= row.product.sku || '—' %></td>
+          <td><%= row.product.name %><input type="hidden" name="productIds[]" value="<%= row.product._id %>"></td>
+          <td><button type="button" class="btn btn-sm btn-outline-danger offer-row-remove"><i class="bi bi-trash"></i></button></td>
+        </tr>
+      <% }); %>
+    </tbody>
+  </table>
+</div>
+<p class="text-center text-muted py-2 mb-3" id="offerProductsEmpty" style="<%= (selected || []).filter(function (row) { return row && row.product; }).length ? 'display:none;' : '' %>">No products selected</p>
+
+<!-- Product Modal -->
+<div class="modal fade" id="offerProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title mb-0">Product Modal</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="text" id="offerProductSearch" class="form-control mb-3" placeholder="Search...">
+        <div class="table-responsive" style="max-height:320px;overflow:auto;">
+          <table class="table table-sm align-middle">
+            <tbody id="offerProductPickList"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  var ALL_PRODUCTS = <%- JSON.stringify(products.map(function (p) { return { id: String(p._id), name: p.name, sku: p.sku || '' }; })) %>;
+  var body = document.getElementById('offerProductsBody');
+  var emptyMsg = document.getElementById('offerProductsEmpty');
+  var pickList = document.getElementById('offerProductPickList');
+  var searchInput = document.getElementById('offerProductSearch');
+  var modalEl = document.getElementById('offerProductModal');
+
+  function selectedIds() {
+    var ids = [];
+    body.querySelectorAll('input[name="productIds[]"]').forEach(function (inp) { ids.push(inp.value); });
+    return ids;
+  }
+  function renumber() {
+    body.querySelectorAll('tr').forEach(function (tr, i) { tr.querySelector('.offer-row-sl').textContent = i + 1; });
+    emptyMsg.style.display = body.querySelectorAll('tr').length ? 'none' : '';
+  }
+  function wireRemove(tr) {
+    tr.querySelector('.offer-row-remove').addEventListener('click', function () { tr.remove(); renumber(); });
+  }
+  body.querySelectorAll('tr').forEach(wireRemove);
+
+  function addProduct(p) {
+    if (selectedIds().indexOf(p.id) !== -1) return;
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td class="offer-row-sl"></td>' +
+      '<td>' + (p.sku || '—') + '</td>' +
+      '<td>' + p.name + '<input type="hidden" name="productIds[]" value="' + p.id + '"></td>' +
+      '<td><button type="button" class="btn btn-sm btn-outline-danger offer-row-remove"><i class="bi bi-trash"></i></button></td>';
+    body.appendChild(tr);
+    wireRemove(tr);
+    renumber();
+  }
+
+  function renderPickList(filter) {
+    var q = (filter || '').trim().toLowerCase();
+    var matches = ALL_PRODUCTS.filter(function (p) {
+      return !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1;
+    }).slice(0, 50);
+    pickList.innerHTML = matches.map(function (p) {
+      return '<tr><td>' + (p.sku || '—') + '</td><td>' + p.name + '</td>' +
+        '<td class="text-end"><button type="button" class="btn btn-sm btn-outline-primary pick-add-btn" data-id="' + p.id + '">Add</button></td></tr>';
+    }).join('') || '<tr><td class="text-center text-muted py-3" colspan="3">No products found.</td></tr>';
+    pickList.querySelectorAll('.pick-add-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var match = ALL_PRODUCTS.filter(function (x) { return x.id === btn.getAttribute('data-id'); });
+        if (match[0]) addProduct(match[0]);
+      });
+    });
+  }
+  searchInput.addEventListener('input', function () { renderPickList(searchInput.value); });
+  modalEl.addEventListener('show.bs.modal', function () { searchInput.value = ''; renderPickList(''); });
+})();
+</script>

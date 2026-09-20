@@ -3,6 +3,7 @@ const Customer = require('../models/Customer');
 const { getSettings } = require('../models/Setting');
 const { getMarketingSettings } = require('../models/MarketingSetting');
 const { getThemeCustomizer } = require('../models/ThemeCustomizer');
+const { getOfferSetting } = require('../models/OfferSetting');
 const { currencyFormatter, nl2br } = require('./helpers');
 const { cartCount } = require('./cart');
 
@@ -13,11 +14,12 @@ const { cartCount } = require('./cart');
  */
 async function storeLocals(req, res, next) {
   try {
-    const [settings, allCategories, marketing, themeCustomizer] = await Promise.all([
+    const [settings, allCategories, marketing, themeCustomizer, offerSettings] = await Promise.all([
       getSettings(),
       Category.find({ status: true }).sort({ sortOrder: 1, name: 1 }).lean(),
       getMarketingSettings(),
       getThemeCustomizer(),
+      getOfferSetting(),
     ]);
 
     // Build a 2-level tree (parent -> children) so the header can render a
@@ -43,6 +45,9 @@ async function storeLocals(req, res, next) {
     // Admin > Customization > Advance Theme Setup (see views/partials/header.ejs
     // for the <style> block this drives).
     res.locals.themeCustomizer = themeCustomizer;
+    // Admin > Offer Setting (see views/index.ejs for the homepage sections
+    // this gates, and views/partials/header.ejs for the popup).
+    res.locals.offerSettings = offerSettings;
     res.locals.currency = currencyFormatter(settings.currency_symbol || '৳');
     // Absolute site URL, used to build canonical links and the absolute
     // URLs schema.org JSON-LD structured data requires (Organization/WebSite

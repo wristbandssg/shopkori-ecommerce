@@ -28,6 +28,7 @@ const CustomPage = require('../models/CustomPage');
 const Coupon = require('../models/Coupon');
 const { getStoreCustomization, updateStoreCustomization } = require('../models/StoreCustomization');
 const { getThemeCustomizer, updateThemeCustomizer } = require('../models/ThemeCustomizer');
+const { getOfferSettingPopulated, updateOfferSetting } = require('../models/OfferSetting');
 const Purchase = require('../models/Purchase');
 const PixelSetting = require('../models/PixelSetting');
 const HomeSetting = require('../models/HomeSetting');
@@ -104,14 +105,8 @@ const COMING_SOON_PAGES = {
   '/customization/sliders': 'Manage Sliders',
   '/customization/product-view': 'Product View Setting',
 
-  '/offer/flash-sale': 'Flash Sale',
-  '/offer/combo': 'Combo Offer',
-  '/offer/best-sale': 'Best Sale Products',
-  '/offer/popular': 'Popular Products',
-  '/offer/hot-deal': 'Hot Deal',
-  '/offer/special': 'Special Offer',
-  '/offer/latest': 'Latest Products',
-  '/offer/popup': 'PopUp Offer',
+  // '/offer/*' sub-pages are now real (see the OFFER SETTING section
+  // below) — removed from here.
 
   '/accounting/income': 'Income',
   '/accounting/expenses': 'Expenses',
@@ -3499,9 +3494,7 @@ router.get('/settings/coupon/delete/:id', async (req, res, next) => {
 });
 
 /* =====================================================================
-   MANAGE OFFER — grid page linking to the existing /offer/* sub-pages
-   (registered above via COMING_SOON_PAGES; unchanged — no design/spec was
-   given for those individual offer-type pages, only for this grid).
+   MANAGE OFFER — grid page linking to the 8 real /offer/* sub-pages below.
    ===================================================================== */
 const OFFER_CARDS = ['flashSale', 'combo', 'bestSale', 'popular', 'hotDeal', 'special', 'latest', 'popup'];
 const OFFER_CARD_META = {
@@ -3517,6 +3510,271 @@ const OFFER_CARD_META = {
 
 router.get('/offer', (req, res) => {
   res.render('admin/offer', { adminPageTitle: 'Offer Settings', OFFER_CARDS, OFFER_CARD_META });
+});
+
+/* =====================================================================
+   OFFER SETTING — the 8 real sub-pages (see models/OfferSetting.js for
+   the full LIVE vs SAVE-ONLY breakdown per card). Flash Sale, Hot Deal
+   and Special Offer share one view (admin/offer-timer-collection.ejs —
+   product list + countdown timer + colors); Combo, Best Sale and Popular
+   share another (admin/offer-collection.ejs — product list only); both
+   include the shared product-picker modal partial. Latest Products and
+   PopUp Offer have their own dedicated views since their fields don't
+   match either shape.
+   ===================================================================== */
+const TIMER_UNIT_MS = { days: 86400000, hours: 3600000, minutes: 60000 };
+function computeEndsAt(timerEnabled, timerType, duration) {
+  if (!timerEnabled) return null;
+  const dur = parseInt(duration, 10) || 0;
+  if (dur <= 0) return null;
+  const unitMs = TIMER_UNIT_MS[timerType] || TIMER_UNIT_MS.days;
+  return new Date(Date.now() + dur * unitMs);
+}
+function parseOfferProductIds(req) {
+  let ids = req.body.productIds;
+  if (!ids) return [];
+  if (!Array.isArray(ids)) ids = [ids];
+  return ids.filter(Boolean).map((id) => ({ product: id }));
+}
+async function allActiveProductsForPicker() {
+  return Product.find({ status: true }).select('_id name sku').sort({ name: 1 }).lean();
+}
+
+// ---- Flash Sale (LIVE — drives Product.isFlashSale + the homepage section) ----
+router.get('/offer/flash-sale', async (req, res, next) => {
+  try {
+    const [offer, products] = await Promise.all([getOfferSettingPopulated(), allActiveProductsForPicker()]);
+    res.render('admin/offer-timer-collection', {
+      adminPageTitle: 'Flash Sale', cardKey: 'flashSale', card: offer.flashSale, products,
+      postPath: '/admin/offer/flash-sale',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+router.post('/offer/flash-sale', verifyCsrf, async (req, res, next) => {
+  try {
+    const productsList = parseOfferProductIds(req);
+    const timerEnabled = !!req.body.timerEnabled;
+    const timerType = ['days', 'hours', 'minutes'].includes(req.body.timerType) ? req.body.timerType : 'days';
+    const duration = parseInt(req.body.duration, 10) || 0;
+    await updateOfferSetting({
+      flashSale: {
+        enabled: !!req.body.enabled,
+        products: productsList,
+        timerEnabled, timerType, duration,
+        endsAt: computeEndsAt(timerEnabled, timerType, duration),
+        textColor: req.body.textColor || '#ffffff',
+        borderColor: req.body.borderColor || '#EC0E8C',
+        backgroundColor: req.body.backgroundColor || '#EC0E8C',
+      },
+    });
+    // LIVE sync: Product.isFlashSale is the same flag routes/store.js's
+    // homepage query already reads for the "ফ্ল্যাশ সেল" section.
+    const ids = productsList.map((p) => p.product);
+    await Product.updateMany({ isFlashSale: true, _id: { $nin: ids } }, { isFlashSale: false });
+    if (ids.length) await Product.updateMany({ _id: { $in: ids } }, { isFlashSale: true });
+    req.flash('success', 'Flash Sale saved successfully.');
+    res.redirect('/admin/offer/flash-sale');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Hot Deal (SAVE-ONLY — no homepage section exists for it yet) ----
+router.get('/offer/hot-deal', async (req, res, next) => {
+  try {
+    const [offer, products] = await Promise.all([getOfferSettingPopulated(), allActiveProductsForPicker()]);
+    res.render('admin/offer-timer-collection', {
+      adminPageTitle: 'Hot Deal', cardKey: 'hotDeal', card: offer.hotDeal, products,
+      postPath: '/admin/offer/hot-deal',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+router.post('/offer/hot-deal', verifyCsrf, async (req, res, next) => {
+  try {
+    const productsList = parseOfferProductIds(req);
+    const timerEnabled = !!req.body.timerEnabled;
+    const timerType = ['days', 'hours', 'minutes'].includes(req.body.timerType) ? req.body.timerType : 'days';
+    const duration = parseInt(req.body.duration, 10) || 0;
+    await updateOfferSetting({
+      hotDeal: {
+        enabled: !!req.body.enabled,
+        products: productsList,
+        timerEnabled, timerType, duration,
+        endsAt: computeEndsAt(timerEnabled, timerType, duration),
+        textColor: req.body.textColor || '#ffffff',
+        borderColor: req.body.borderColor || '#EC0E8C',
+        backgroundColor: req.body.backgroundColor || '#EC0E8C',
+      },
+    });
+    req.flash('success', 'Hot Deal saved successfully.');
+    res.redirect('/admin/offer/hot-deal');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Special Offer (SAVE-ONLY — no homepage section exists for it yet) ----
+router.get('/offer/special', async (req, res, next) => {
+  try {
+    const [offer, products] = await Promise.all([getOfferSettingPopulated(), allActiveProductsForPicker()]);
+    res.render('admin/offer-timer-collection', {
+      adminPageTitle: 'Special Offer', cardKey: 'special', card: offer.special, products,
+      postPath: '/admin/offer/special',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+router.post('/offer/special', verifyCsrf, async (req, res, next) => {
+  try {
+    const productsList = parseOfferProductIds(req);
+    const timerEnabled = !!req.body.timerEnabled;
+    const timerType = ['days', 'hours', 'minutes'].includes(req.body.timerType) ? req.body.timerType : 'days';
+    const duration = parseInt(req.body.duration, 10) || 0;
+    await updateOfferSetting({
+      special: {
+        enabled: !!req.body.enabled,
+        products: productsList,
+        timerEnabled, timerType, duration,
+        endsAt: computeEndsAt(timerEnabled, timerType, duration),
+        textColor: req.body.textColor || '#ffffff',
+        borderColor: req.body.borderColor || '#EC0E8C',
+        backgroundColor: req.body.backgroundColor || '#EC0E8C',
+      },
+    });
+    req.flash('success', 'Special Offer saved successfully.');
+    res.redirect('/admin/offer/special');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Combo Offer (SAVE-ONLY — no homepage section exists for it yet) ----
+router.get('/offer/combo', async (req, res, next) => {
+  try {
+    const [offer, products] = await Promise.all([getOfferSettingPopulated(), allActiveProductsForPicker()]);
+    res.render('admin/offer-collection', {
+      adminPageTitle: 'Combo Offer', cardKey: 'combo', card: offer.combo, products, postPath: '/admin/offer/combo',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+router.post('/offer/combo', verifyCsrf, async (req, res, next) => {
+  try {
+    await updateOfferSetting({ combo: { enabled: !!req.body.enabled, products: parseOfferProductIds(req) } });
+    req.flash('success', 'Combo Offer saved successfully.');
+    res.redirect('/admin/offer/combo');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Best Sale Products (SAVE-ONLY — no homepage section exists for it yet) ----
+router.get('/offer/best-sale', async (req, res, next) => {
+  try {
+    const [offer, products] = await Promise.all([getOfferSettingPopulated(), allActiveProductsForPicker()]);
+    res.render('admin/offer-collection', {
+      adminPageTitle: 'Best Sale Products', cardKey: 'bestSale', card: offer.bestSale, products, postPath: '/admin/offer/best-sale',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+router.post('/offer/best-sale', verifyCsrf, async (req, res, next) => {
+  try {
+    await updateOfferSetting({ bestSale: { enabled: !!req.body.enabled, products: parseOfferProductIds(req) } });
+    req.flash('success', 'Best Sale Products saved successfully.');
+    res.redirect('/admin/offer/best-sale');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Popular Products (LIVE — drives Product.isFeatured + the homepage section) ----
+router.get('/offer/popular', async (req, res, next) => {
+  try {
+    const [offer, products] = await Promise.all([getOfferSettingPopulated(), allActiveProductsForPicker()]);
+    res.render('admin/offer-collection', {
+      adminPageTitle: 'Popular Products', cardKey: 'popular', card: offer.popular, products, postPath: '/admin/offer/popular',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+router.post('/offer/popular', verifyCsrf, async (req, res, next) => {
+  try {
+    const productsList = parseOfferProductIds(req);
+    await updateOfferSetting({ popular: { enabled: !!req.body.enabled, products: productsList } });
+    // LIVE sync: Product.isFeatured is the same flag routes/store.js's
+    // homepage query already reads for the "জনপ্রিয় প্রোডাক্ট" section.
+    const ids = productsList.map((p) => p.product);
+    await Product.updateMany({ isFeatured: true, _id: { $nin: ids } }, { isFeatured: false });
+    if (ids.length) await Product.updateMany({ _id: { $in: ids } }, { isFeatured: true });
+    req.flash('success', 'Popular Products saved successfully.');
+    res.redirect('/admin/offer/popular');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- Latest Products (LIVE — toggles the homepage "New Arrivals" section) ----
+router.get('/offer/latest', async (req, res, next) => {
+  try {
+    const offer = await getOfferSettingPopulated();
+    res.render('admin/offer-latest', { adminPageTitle: 'Latest Products', card: offer.latest });
+  } catch (err) {
+    next(err);
+  }
+});
+router.post('/offer/latest', verifyCsrf, async (req, res, next) => {
+  try {
+    await updateOfferSetting({ latest: { enabled: !!req.body.enabled } });
+    req.flash('success', 'Latest Products setting saved successfully.');
+    res.redirect('/admin/offer/latest');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---- PopUp Offer (LIVE — shown as a real dismissible popup, see header.ejs) ----
+router.get('/offer/popup', async (req, res, next) => {
+  try {
+    const offer = await getOfferSettingPopulated();
+    res.render('admin/offer-popup', { adminPageTitle: 'PopUp Offer', card: offer.popup });
+  } catch (err) {
+    next(err);
+  }
+});
+// CSRF checked manually (not via verifyCsrf) because multer's
+// upload.single('image') is what parses multipart/form-data — req.body
+// isn't populated until after it runs (same as saveCategory above).
+router.post('/offer/popup', upload.single('image'), async (req, res, next) => {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/offer/popup');
+    }
+    const offer = await getOfferSettingPopulated();
+    let imageName = offer.popup.image;
+    if (req.file) imageName = req.file.filename;
+    await updateOfferSetting({
+      popup: {
+        enabled: !!req.body.enabled,
+        title: (req.body.title || '').trim(),
+        image: imageName,
+        url: (req.body.url || '').trim(),
+      },
+    });
+    req.flash('success', 'PopUp Offer saved successfully.');
+    res.redirect('/admin/offer/popup');
+  } catch (err) {
+    next(err);
+  }
 });
 
 /* =====================================================================

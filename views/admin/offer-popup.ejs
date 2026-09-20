@@ -1,0 +1,59 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/offer" class="text-decoration-none">Offer Setting</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">PopUp Offer</span>
+</nav>
+
+<form method="post" action="/admin/offer/popup" enctype="multipart/form-data">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+  <div class="admin-card">
+    <div class="form-check form-switch mb-3">
+      <input class="form-check-input" type="checkbox" role="switch" name="enabled" value="1" id="popupEnabled" <%= card.enabled ? 'checked' : '' %>>
+      <label class="form-check-label" for="popupEnabled">Status — <%= card.enabled ? 'Active' : 'Inactive' %></label>
+    </div>
+
+    <label class="form-label">Title *</label>
+    <input type="text" name="title" class="form-control mb-3" value="<%= card.title || '' %>" placeholder="Enter Title">
+
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label class="form-label">Image (600X600)</label>
+        <div class="border border-2 rounded p-4 text-center text-muted" style="border-style:dashed;cursor:pointer;" onclick="document.getElementById('popupImageInput').click()">
+          <i class="bi bi-cloud-arrow-up fs-2 d-block mb-1"></i>
+          Click or Drag &amp; Drop Your Image Here
+          <input type="file" name="image" id="popupImageInput" accept="image/*" class="d-none">
+        </div>
+      </div>
+      <div class="col-md-6 d-flex align-items-center justify-content-center border rounded" id="popupImagePreview" style="min-height:120px;">
+        <% if (card.image) { %>
+          <img src="<%= productImageUrl(card.image) %>" style="max-width:100%;max-height:160px;object-fit:contain;">
+        <% } else { %>
+          <span class="text-muted"><i class="bi bi-image"></i> Upload Image</span>
+        <% } %>
+      </div>
+    </div>
+
+    <label class="form-label">Url</label>
+    <input type="text" name="url" class="form-control mb-3" value="<%= card.url || '' %>" placeholder="Enter Url">
+
+    <button type="submit" class="btn btn-brand">Save</button>
+  </div>
+</form>
+
+<script>
+document.getElementById('popupImageInput').addEventListener('change', function () {
+  var f = this.files[0];
+  if (!f) return;
+  var reader = new FileReader();
+  reader.onload = function (e) {
+    document.getElementById('popupImagePreview').innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:160px;object-fit:contain;">';
+  };
+  reader.readAsDataURL(f);
+});
+</script>
+
+<%- include('partials/admin-footer') %>

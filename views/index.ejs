@@ -31,21 +31,58 @@
   </div>
 </section>
 
-<% if (flashSale.length) { %>
+<%
+  // Admin > Offer Setting drives these 3 sections: Flash Sale/Popular
+  // Products select which products get isFlashSale/isFeatured (see
+  // routes/admin.js), and each card's "Show/Hide" toggle (`enabled`) can
+  // hide the whole section even if products are flagged. Latest Products'
+  // toggle gates New Arrivals, which has no separate product list of its
+  // own (it's just "most recently added").
+  const fsCard = offerSettings.flashSale;
+  const fsEndsAt = fsCard.timerEnabled && fsCard.endsAt ? new Date(fsCard.endsAt) : null;
+  const fsCountdownLive = fsEndsAt && fsEndsAt.getTime() > Date.now();
+%>
+<% if (fsCard.enabled && flashSale.length) { %>
 <!-- Flash sale -->
 <section class="section flash-sale-section">
   <div class="container">
     <div class="section-heading">
       <h2><i class="bi bi-lightning-charge-fill text-warning"></i> ফ্ল্যাশ সেল</h2>
-      <span class="countdown-badge">সীমিত সময়ের অফার!</span>
+      <% if (fsCountdownLive) { %>
+        <span class="countdown-badge" id="flashSaleCountdown" data-ends-at="<%= fsEndsAt.toISOString() %>"
+          style="color:<%= fsCard.textColor %>;border-color:<%= fsCard.borderColor %>;background:<%= fsCard.backgroundColor %>;">--:--:--</span>
+      <% } else { %>
+        <span class="countdown-badge">সীমিত সময়ের অফার!</span>
+      <% } %>
     </div>
     <div class="product-grid">
       <% flashSale.forEach(function (p) { %><%- include('partials/product-card', { p }) %><% }); %>
     </div>
   </div>
 </section>
+<% if (fsCountdownLive) { %>
+<script>
+(function () {
+  var el = document.getElementById('flashSaleCountdown');
+  if (!el) return;
+  var endsAt = new Date(el.getAttribute('data-ends-at')).getTime();
+  function tick() {
+    var diff = endsAt - Date.now();
+    if (diff <= 0) { el.textContent = 'অফার শেষ'; return; }
+    var d = Math.floor(diff / 86400000);
+    var h = Math.floor((diff % 86400000) / 3600000);
+    var m = Math.floor((diff % 3600000) / 60000);
+    var s = Math.floor((diff % 60000) / 1000);
+    el.textContent = d + 'দিন ' + h + ':' + (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    setTimeout(tick, 1000);
+  }
+  tick();
+})();
+</script>
+<% } %>
 <% } %>
 
+<% if (offerSettings.popular.enabled) { %>
 <!-- Featured products -->
 <section class="section">
   <div class="container">
@@ -57,7 +94,9 @@
     </div>
   </div>
 </section>
+<% } %>
 
+<% if (offerSettings.latest.enabled) { %>
 <!-- New arrivals -->
 <section class="section bg-light-section">
   <div class="container">
@@ -69,6 +108,7 @@
     </div>
   </div>
 </section>
+<% } %>
 
 <!-- Trust badges -->
 <section class="section">
