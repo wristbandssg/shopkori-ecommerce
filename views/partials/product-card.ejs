@@ -2,6 +2,10 @@
   const hasVariants = !!(p.hasVariants && p.variants && p.variants.length);
   const displayPrice = hasVariants ? p.startingPrice() : p.effectivePrice;
   const rating = p.rating || 4.5;
+  // Admin > Customization > Advance Theme Setup — button text + optional icons.
+  const tcProduct = (typeof themeCustomizer !== 'undefined' && themeCustomizer) ? themeCustomizer.product : null;
+  const addToCartLabel = (tcProduct && tcProduct.addToCartName) ? tcProduct.addToCartName : 'আরো কিনুন';
+  const buyNowLabel = (tcProduct && tcProduct.buyNowName) ? tcProduct.buyNowName : 'এখনই কিনুন';
 %>
 <div class="product-card">
   <a href="/product/<%= p.slug %>" class="product-card-img">
@@ -31,8 +35,12 @@
       <% if (hasVariants) { %>
         <a href="/product/<%= p.slug %>" class="btn btn-buy-now w-100">ভ্যারিয়েন্ট দেখুন</a>
       <% } else { %>
-        <button class="btn btn-add-cart" data-add-cart data-id="<%= p._id %>">আরো কিনুন</button>
-        <a href="/checkout?buyNow=<%= p._id %>" class="btn btn-buy-now">এখনই কিনুন</a>
+        <button class="btn btn-add-cart" data-add-cart data-id="<%= p._id %>">
+          <% if (tcProduct && tcProduct.showAddToCartIcon) { %><i class="bi bi-cart-plus"></i> <% } %><%= addToCartLabel %>
+        </button>
+        <a href="/checkout?buyNow=<%= p._id %>" class="btn btn-buy-now">
+          <% if (tcProduct && tcProduct.showBuyNowIcon) { %><i class="bi bi-lightning-charge-fill"></i> <% } %><%= buyNowLabel %>
+        </a>
       <% } %>
     </div>
   </div>

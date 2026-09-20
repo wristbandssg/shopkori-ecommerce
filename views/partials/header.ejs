@@ -32,6 +32,62 @@
 <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link href="/css/style.css" rel="stylesheet">
 
+<!-- Admin > Customization > Advance Theme Setup — overrides public/css/style.css's
+     variables/selectors with the admin's saved theme. Only fields documented as
+     LIVE in models/ThemeCustomizer.js are applied here; the rest are saved-only. -->
+<% if (typeof themeCustomizer !== 'undefined' && themeCustomizer) {
+  var th = themeCustomizer;
+  var catCols = parseInt(th.category.rowItem, 10) || 6;
+  var tabletCatCols = Math.max(2, Math.min(4, catCols));
+  var mobileCatCols = Math.max(2, Math.min(3, catCols));
+%>
+<style id="theme-customizer">
+  :root {
+    --brand-pink: <%- th.navMenu.backgroundColor || '#EC0E8C' %>;
+    --brand-blue: <%- th.product.buyNowColor || '#2F5FE0' %>;
+    --text-dark: <%- th.product.nameColor || '#222222' %>;
+  }
+  <% if (th.topHeader.text) { %>
+  .theme-top-header {
+    background: <%- th.topHeader.backgroundColor %>;
+    color: <%- th.topHeader.color %>;
+    text-align: <%- th.topHeader.textAlign %>;
+    font-weight: <%- th.topHeader.bold ? '700' : '400' %>;
+    padding: 6px 16px;
+    font-size: 13px;
+    <% if (th.topHeader.scrollingMarquee) { %>white-space: nowrap; overflow: hidden;<% } %>
+  }
+  <% if (th.topHeader.scrollingMarquee) { %>
+  .theme-top-header marquee { display: inline; }
+  <% } %>
+  <% } %>
+  .main-header { background: <%- th.header.backgroundColor %>; }
+  .brand-logo, .brand-logo i { color: <%- th.header.textColor %>; }
+  .category-nav { background: <%- th.navMenu.backgroundColor %>; }
+  .category-nav .nav-list li a, .nav-toggle, .nav-home-link { color: <%- th.navMenu.linksColor %>; font-family: <%- th.navMenu.fontFamily %>; }
+  .category-nav .nav-list > li > a:hover, .category-nav .nav-list > li:hover > a { color: <%- th.navMenu.linkHoverColor %>; }
+  .category-grid { grid-template-columns: repeat(<%- catCols %>, 1fr); }
+  @media (max-width: 991px) { .category-grid { grid-template-columns: repeat(<%- tabletCatCols %>, 1fr); } }
+  @media (max-width: 575px) { .category-grid { grid-template-columns: repeat(<%- mobileCatCols %>, 1fr); } }
+  .category-tile { background: <%- th.category.rowBackgroundColor %>; border-color: <%- th.category.borderColor %>; }
+  .category-tile-img { border-radius: <%- th.category.bodyShape %>; background: <%- th.category.previewBackgroundColor %>; }
+  .category-tile span { color: <%- th.category.previewTextColor %>; }
+  .product-grid { grid-template-columns: repeat(<%- th.home.productsDesktop %>, 1fr); }
+  @media (max-width: 991px) { .product-grid { grid-template-columns: repeat(<%- th.home.productsTablet %>, 1fr); } }
+  @media (max-width: 767px) { .product-grid { grid-template-columns: repeat(<%- th.home.productsMobile %>, 1fr); } }
+  .product-title { color: <%- th.product.nameColor %>; font-size: <%- th.product.nameSize %>; }
+  .price-now { color: <%- th.product.priceColor %>; font-size: <%- th.product.priceTextSize %>; }
+  .price-old { color: <%- th.product.discountPriceTextColor %>; font-size: <%- th.product.discountPriceTextSize %>; }
+  .badge-discount { background: <%- th.product.discountBarBgColor %>; color: <%- th.product.discountBarTextColor %>; }
+  .product-card { border-color: <%- th.product.cardBorderColor %>; border-width: <%- th.product.cardBorderSize %>; <%- th.product.boxStyle === 'without' ? 'border-style: none; box-shadow: none;' : 'border-style: solid;' %> }
+  .btn-add-cart { background: <%- th.product.addToCartColor %>; color: <%- th.product.addToCartTextColor %>; order: <%- th.product.buttonOrder === 'buy-then-cart' ? '2' : '1' %>; }
+  .btn-buy-now { background: <%- th.product.buyNowColor %>; color: <%- th.product.buyNowTextColor %>; order: <%- th.product.buttonOrder === 'buy-then-cart' ? '1' : '2' %>; }
+  .product-actions { flex-direction: <%- th.product.buttonLayout === 'vertical' ? 'column' : 'row' %>; }
+  .site-footer { background: <%- th.footer.backgroundColor %>; color: <%- th.footer.textColor %>; }
+  .footer-links a, .footer-brand, .social-icons a { color: <%- th.footer.textColor %>; }
+</style>
+<% } %>
+
 <!-- Sitewide structured data (schema.org): every page carries Organization +
      WebSite (with a Sitelinks Search Box action) so Google can attribute
      search results to the right business and offer an in-SERP search box.
@@ -84,6 +140,16 @@
 <% if (typeof marketing !== 'undefined' && marketing.googleTagManager && marketing.googleTagManager.status && marketing.googleTagManager.containerId) { %>
 <!-- Google Tag Manager (noscript) -->
 <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=<%- marketing.googleTagManager.containerId %>" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<% } %>
+
+<% if (typeof themeCustomizer !== 'undefined' && themeCustomizer && themeCustomizer.topHeader.text) { %>
+<div class="theme-top-header">
+  <% if (themeCustomizer.topHeader.scrollingMarquee) { %>
+    <marquee><%= themeCustomizer.topHeader.text %></marquee>
+  <% } else { %>
+    <%= themeCustomizer.topHeader.text %>
+  <% } %>
+</div>
 <% } %>
 
 <!-- Sticky header: single row (logo + search + icon-links), stays pinned on scroll along with the category bar below it -->

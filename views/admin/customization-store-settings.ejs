@@ -1,0 +1,428 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/customization" class="text-decoration-none">Customize Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Store Settings</span>
+</nav>
+
+<%
+  var DATE_FORMATS = ['MMM D, YYYY', 'DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'];
+  var TIME_FORMATS = ['h:mm A', 'HH:mm'];
+  var TIMEZONES = [
+    '(GMT+6:00) Asia/Dhaka',
+    '(GMT+5:30) Asia/Kolkata (India Standard Time)',
+    '(GMT+0:00) UTC',
+    '(GMT-5:00) America/New_York',
+    '(GMT+1:00) Europe/London',
+    '(GMT+8:00) Asia/Singapore',
+  ];
+  var COLORS = ['#e0348b', '#7c3aed', '#337ab7', '#28a745', '#f0ad4e', '#dc3545', '#16a085', '#212529', '#8b5a2b', '#5b9bd5'];
+%>
+
+<ul class="nav nav-tabs mb-3" id="storeSettingsTabs">
+  <li class="nav-item">
+    <button class="nav-link <%= activeTab === 'brand' ? 'active' : '' %>" data-bs-toggle="tab" data-bs-target="#tabBrand" type="button">Brand Settings</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link <%= activeTab === 'store' ? 'active' : '' %>" data-bs-toggle="tab" data-bs-target="#tabStore" type="button">Store Settings</button>
+  </li>
+  <li class="nav-item">
+    <button class="nav-link <%= activeTab === 'pixel' ? 'active' : '' %>" data-bs-toggle="tab" data-bs-target="#tabPixel" type="button">Pixel Settings</button>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  <!-- ================= BRAND SETTINGS ================= -->
+  <div class="tab-pane fade <%= activeTab === 'brand' ? 'show active' : '' %>" id="tabBrand">
+    <form method="post" action="/admin/customization/store-settings/brand" enctype="multipart/form-data">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+      <div class="admin-card mb-3" id="logoFavicon">
+        <h5 class="mb-3"><i class="bi bi-images"></i> Logo &amp; Favicon</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Logo dark</label>
+            <% if (storeAssetUrl(custom.brand.logoDark)) { %><img src="<%= storeAssetUrl(custom.brand.logoDark) %>" class="admin-thumb d-block mb-2" style="max-height:60px"><% } %>
+            <input type="file" name="logoDark" class="form-control" accept="image/*">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Logo Light</label>
+            <% if (storeAssetUrl(custom.brand.logoLight)) { %><img src="<%= storeAssetUrl(custom.brand.logoLight) %>" class="admin-thumb d-block mb-2" style="max-height:60px"><% } %>
+            <input type="file" name="logoLight" class="form-control" accept="image/*">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Favicon</label>
+            <% if (storeAssetUrl(custom.brand.favicon)) { %><img src="<%= storeAssetUrl(custom.brand.favicon) %>" class="admin-thumb d-block mb-2" style="max-height:60px"><% } %>
+            <input type="file" name="favicon" class="form-control" accept="image/*">
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="textFormat">
+        <h5 class="mb-3"><i class="bi bi-fonts"></i> Text &amp; Format Settings</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Title Text</label>
+            <input type="text" name="titleText" class="form-control" value="<%= custom.text.titleText %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Footer Text</label>
+            <input type="text" name="footerText" class="form-control" value="<%= custom.text.footerText %>">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Date Format</label>
+            <select name="dateFormat" class="form-select">
+              <% DATE_FORMATS.forEach(function (f) { %><option value="<%= f %>" <%= custom.text.dateFormat === f ? 'selected' : '' %>><%= f %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Time Format</label>
+            <select name="timeFormat" class="form-select">
+              <% TIME_FORMATS.forEach(function (f) { %><option value="<%= f %>" <%= custom.text.timeFormat === f ? 'selected' : '' %>><%= f %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Timezone</label>
+            <select name="timezone" class="form-select">
+              <% TIMEZONES.forEach(function (tz) { %><option value="<%= tz %>" <%= custom.text.timezone === tz ? 'selected' : '' %>><%= tz %></option><% }); %>
+              <% if (TIMEZONES.indexOf(custom.text.timezone) === -1) { %><option value="<%= custom.text.timezone %>" selected><%= custom.text.timezone %></option><% } %>
+            </select>
+          </div>
+          <div class="col-12">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="enableRtl" id="enableRtl" <%= custom.text.enableRtl ? 'checked' : '' %>>
+              <label class="form-check-label" for="enableRtl">Enable RTL</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="themeCustomizer">
+        <h5 class="mb-3"><i class="bi bi-palette"></i> Theme Customizer</h5>
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="transparentLayout" id="transparentLayout" <%= custom.theme.transparentLayout ? 'checked' : '' %>>
+              <label class="form-check-label" for="transparentLayout">Transparent Layout</label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="darkLayout" id="darkLayout" <%= custom.theme.darkLayout ? 'checked' : '' %>>
+              <label class="form-check-label" for="darkLayout">Dark Layout</label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="navigationOnOff" id="navigationOnOff" <%= custom.theme.navigationOnOff ? 'checked' : '' %>>
+              <label class="form-check-label" for="navigationOnOff">Phone Navigation</label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="showCartOnOff" id="showCartOnOff" <%= custom.theme.showCartOnOff ? 'checked' : '' %>>
+              <label class="form-check-label" for="showCartOnOff">Add To Cart</label>
+            </div>
+          </div>
+        </div>
+        <label class="form-label d-block">Primary Color Settings</label>
+        <input type="hidden" name="primaryColor" id="primaryColorInput" value="<%= custom.theme.primaryColor %>">
+        <div class="d-flex flex-wrap gap-2" id="colorSwatches">
+          <% COLORS.forEach(function (c) { %>
+            <button type="button" class="color-swatch-btn <%= custom.theme.primaryColor === c ? 'active' : '' %>" data-color="<%= c %>" style="width:32px;height:32px;border-radius:50%;background:<%= c %>;border:2px solid <%= custom.theme.primaryColor === c ? '#212529' : 'transparent' %>;"></button>
+          <% }); %>
+          <input type="color" id="primaryColorPicker" value="<%= custom.theme.primaryColor %>" class="form-control form-control-color" title="Custom color">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save Changes</button>
+    </form>
+  </div>
+
+  <!-- ================= STORE SETTINGS ================= -->
+  <div class="tab-pane fade <%= activeTab === 'store' ? 'show active' : '' %>" id="tabStore">
+    <form method="post" action="/admin/customization/store-settings/store" enctype="multipart/form-data" id="storeInfoForm">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+      <div class="text-end mb-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="generateWithAiBtn"><i class="bi bi-stars"></i> Generate with AI</button>
+      </div>
+
+      <div class="admin-card mb-3" id="logoSettings">
+        <h5 class="mb-3"><i class="bi bi-image"></i> Logo Settings</h5>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label">Store Logo</label>
+            <% if (storeAssetUrl(custom.store.storeLogo)) { %><img src="<%= storeAssetUrl(custom.store.storeLogo) %>" class="admin-thumb d-block mb-2" style="max-height:60px"><% } %>
+            <input type="file" name="storeLogo" class="form-control" accept="image/*">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Invoice Logo</label>
+            <% if (storeAssetUrl(custom.store.invoiceLogo)) { %><img src="<%= storeAssetUrl(custom.store.invoiceLogo) %>" class="admin-thumb d-block mb-2" style="max-height:60px"><% } %>
+            <input type="file" name="invoiceLogo" class="form-control" accept="image/*">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Meta Image</label>
+            <% if (storeAssetUrl(custom.store.metaImage)) { %><img src="<%= storeAssetUrl(custom.store.metaImage) %>" class="admin-thumb d-block mb-2" style="max-height:60px"><% } %>
+            <input type="file" name="metaImage" class="form-control" accept="image/*">
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3">
+        <h5 class="mb-3"><i class="bi bi-shop"></i> Store Information</h5>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label">Store Name</label><input type="text" name="storeName" id="aiStoreName" class="form-control" value="<%= settingsData.site_name %>"></div>
+          <div class="col-md-6"><label class="form-label">Email</label><input type="email" name="email" class="form-control" value="<%= settingsData.email %>"></div>
+          <div class="col-md-6"><label class="form-label">Tagline</label><input type="text" name="tagline" id="aiTagline" class="form-control" value="<%= custom.store.tagline %>"></div>
+          <div class="col-md-6"><label class="form-label">Address</label><input type="text" name="address" class="form-control" value="<%= settingsData.address %>"></div>
+          <div class="col-md-4"><label class="form-label">City</label><input type="text" name="city" class="form-control" value="<%= custom.store.city %>"></div>
+          <div class="col-md-4"><label class="form-label">State</label><input type="text" name="state" class="form-control" value="<%= custom.store.state %>"></div>
+          <div class="col-md-4"><label class="form-label">Zipcode</label><input type="text" name="zipcode" class="form-control" value="<%= custom.store.zipcode %>"></div>
+          <div class="col-md-6"><label class="form-label">Country</label><input type="text" name="country" class="form-control" value="<%= custom.store.country %>"></div>
+          <div class="col-md-6">
+            <label class="form-label">Store Language</label>
+            <select name="storeLanguage" class="form-select">
+              <% ['English', 'Bangla'].forEach(function (l) { %><option value="<%= l %>" <%= custom.store.storeLanguage === l ? 'selected' : '' %>><%= l %></option><% }); %>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="domainSettings">
+        <h5 class="mb-3"><i class="bi bi-globe"></i> Domain &amp; Store Link</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Store Link (slug)</label>
+            <div class="input-group">
+              <input type="text" name="storeSlug" id="storeSlugInput" class="form-control" value="<%= custom.domain.storeSlug %>" placeholder="e.g. giftbox">
+              <button type="button" class="btn btn-outline-secondary" id="copyStoreLinkBtn" title="Copy"><i class="bi bi-clipboard"></i></button>
+            </div>
+            <div class="form-text"><%= settingsData.site_name %>.test/store/<span id="storeSlugPreview"><%= custom.domain.storeSlug || 'your-store' %></span></div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Custom Domain</label>
+            <input type="text" name="customDomain" class="form-control" value="<%= custom.domain.customDomain %>" placeholder="e.g. www.yourstore.com">
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3">
+        <h5 class="mb-3"><i class="bi bi-toggles"></i> Features &amp; Settings</h5>
+        <div class="row g-3">
+          <div class="col-md-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="checkoutLoginRequired" id="checkoutLoginRequired" <%= custom.features.checkoutLoginRequired ? 'checked' : '' %>>
+              <label class="form-check-label" for="checkoutLoginRequired">Checkout Login Required</label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="blogMenuDisplay" id="blogMenuDisplay" <%= custom.features.blogMenuDisplay ? 'checked' : '' %>>
+              <label class="form-check-label" for="blogMenuDisplay">Blog Menu Display</label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="shippingMethod" id="shippingMethod" <%= custom.features.shippingMethod ? 'checked' : '' %>>
+              <label class="form-check-label" for="shippingMethod">Shipping Method</label>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" name="productRating" id="productRating" <%= custom.features.productRating ? 'checked' : '' %>>
+              <label class="form-check-label" for="productRating">Product Rating</label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3">
+        <h5 class="mb-3"><i class="bi bi-graph-up"></i> Analytics &amp; Meta Settings</h5>
+        <p class="text-muted small">Reference values only — the storefront's live Google Analytics / Facebook Pixel tracking is driven by Marketing &gt; Google Analytics / Facebook Pixel, not these fields.</p>
+        <div class="row g-3">
+          <div class="col-md-6"><label class="form-label">Google Analytic</label><input type="text" name="googleAnalytics" class="form-control" value="<%= custom.analyticsMeta.googleAnalytics %>" placeholder="UA-000000-0"></div>
+          <div class="col-md-6"><label class="form-label">Facebook Pixel</label><input type="text" name="facebookPixel" class="form-control" value="<%= custom.analyticsMeta.facebookPixel %>" placeholder="UA-000000-0"></div>
+          <div class="col-md-6"><label class="form-label">Meta Keywords</label><input type="text" name="metaKeywords" class="form-control" value="<%= custom.analyticsMeta.metaKeywords %>"></div>
+          <div class="col-md-6"><label class="form-label">Meta Description</label><textarea name="metaDescription" class="form-control" rows="2"><%= custom.analyticsMeta.metaDescription %></textarea></div>
+          <div class="col-md-4"><label class="form-label">Decimal Number Format</label><input type="number" name="decimalNumberFormat" class="form-control" value="<%= custom.analyticsMeta.decimalNumberFormat %>"></div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3">
+        <h5 class="mb-3"><i class="bi bi-code-slash"></i> Custom JS</h5>
+        <label class="form-label">Store Custom JS</label>
+        <textarea name="customJs" class="form-control" rows="4" placeholder="Add custom javascript here"><%= custom.customJs %></textarea>
+      </div>
+
+      <div class="d-flex justify-content-between">
+        <a href="/admin/customization/store-settings/delete-store" class="btn btn-outline-danger js-confirm" data-confirm="Delete this store? This cannot be undone."><i class="bi bi-trash"></i> Delete Store</a>
+        <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save Changes</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- ================= PIXEL SETTINGS ================= -->
+  <div class="tab-pane fade <%= activeTab === 'pixel' ? 'show active' : '' %>" id="tabPixel">
+    <div class="admin-card">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+          <h5 class="mb-0"><i class="bi bi-bullseye"></i> Pixel Fields Settings</h5>
+          <p class="text-muted small mb-0">Overview your Pixel Fields Settings</p>
+        </div>
+        <button class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addPixelModal"><i class="bi bi-plus-lg"></i></button>
+      </div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>Platform</th><th>Pixel ID</th><th>Pixel Access Token</th><th>Facebook Catalog ID</th><th>Test Event Code</th><th>Action</th></tr></thead>
+          <tbody>
+            <% pixels.forEach(function (px) { %>
+              <tr>
+                <td><%= px.platform %></td>
+                <td><code><%= px.pixelId || '—' %></code></td>
+                <td class="text-truncate" style="max-width:160px;"><%= px.pixelAccessToken ? '••••••••' : '—' %></td>
+                <td><%= px.facebookCatalogId || '—' %></td>
+                <td><%= px.testEventCode || '—' %></td>
+                <td class="text-nowrap">
+                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editPixel<%= px._id %>" title="Edit"><i class="bi bi-pencil"></i></button>
+                  <a href="/admin/customization/pixel/delete/<%= px._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this pixel?" title="Delete"><i class="bi bi-trash"></i></a>
+                </td>
+              </tr>
+
+              <div class="modal fade" id="editPixel<%= px._id %>" tabindex="-1">
+                <div class="modal-dialog">
+                  <div class="modal-content">
+                    <form method="post" action="/admin/customization/pixel/<%= px._id %>/edit">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <div class="modal-header">
+                        <h5 class="modal-title">Edit Pixel</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body">
+                        <div class="mb-3">
+                          <label class="form-label">Platform</label>
+                          <select name="platform" class="form-select" required>
+                            <% ['Facebook', 'TikTok', 'Google', 'Snapchat', 'Pinterest'].forEach(function (pl) { %>
+                              <option value="<%= pl %>" <%= px.platform === pl ? 'selected' : '' %>><%= pl %></option>
+                            <% }); %>
+                          </select>
+                        </div>
+                        <div class="mb-3"><label class="form-label">Pixel Id</label><input type="text" name="pixelId" class="form-control" value="<%= px.pixelId %>"></div>
+                        <div class="mb-3"><label class="form-label">Pixel Access Token</label><textarea name="pixelAccessToken" class="form-control" rows="2"><%= px.pixelAccessToken %></textarea></div>
+                        <div class="mb-3"><label class="form-label">Facebook Catalog ID</label><input type="text" name="facebookCatalogId" class="form-control" value="<%= px.facebookCatalogId %>"></div>
+                        <div class="mb-3"><label class="form-label">Test Event Code</label><input type="text" name="testEventCode" class="form-control" value="<%= px.testEventCode %>"></div>
+                        <div class="form-check form-switch">
+                          <input class="form-check-input" type="checkbox" name="status" id="pixelStatus<%= px._id %>" <%= px.status ? 'checked' : '' %>>
+                          <label class="form-check-label" for="pixelStatus<%= px._id %>">Active</label>
+                        </div>
+                      </div>
+                      <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-brand">Update</button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            <% }); %>
+            <% if (!pixels.length) { %><tr><td colspan="6" class="text-center text-muted py-4">No pixels configured yet.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="modal fade" id="addPixelModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/admin/customization/pixel/new">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="modal-header">
+          <h5 class="modal-title">Create New Pixel</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Platform</label>
+            <select name="platform" class="form-select" required>
+              <option value="">Please Select</option>
+              <% ['Facebook', 'TikTok', 'Google', 'Snapchat', 'Pinterest'].forEach(function (pl) { %><option value="<%= pl %>"><%= pl %></option><% }); %>
+            </select>
+          </div>
+          <div class="mb-3"><label class="form-label">Pixel Id</label><input type="text" name="pixelId" class="form-control" placeholder="Enter Pixel Id"></div>
+          <div class="mb-3"><label class="form-label">Pixel Access Token</label><textarea name="pixelAccessToken" class="form-control" rows="2" placeholder="Enter Pixel Access Token"></textarea></div>
+          <div class="mb-3"><label class="form-label">Facebook Catalog ID</label><input type="text" name="facebookCatalogId" class="form-control" placeholder="Enter Facebook Catalog ID"></div>
+          <div class="mb-3"><label class="form-label">Test Event Code</label><input type="text" name="testEventCode" class="form-control" placeholder="Enter Test Event Code"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  // Bootstrap-native scroll to the anchor a Customization grid card linked
+  // to (e.g. #logoFavicon), after the right tab is already showing.
+  if (window.location.hash) {
+    var target = document.querySelector(window.location.hash);
+    if (target) setTimeout(function () { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 200);
+  }
+
+  // ---- Primary color swatches ----
+  (function () {
+    var swatches = document.querySelectorAll('.color-swatch-btn');
+    var hidden = document.getElementById('primaryColorInput');
+    var picker = document.getElementById('primaryColorPicker');
+    swatches.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var color = btn.getAttribute('data-color');
+        hidden.value = color;
+        picker.value = color;
+        swatches.forEach(function (b) { b.style.border = '2px solid transparent'; });
+        btn.style.border = '2px solid #212529';
+      });
+    });
+    picker.addEventListener('input', function () {
+      hidden.value = picker.value;
+      swatches.forEach(function (b) { b.style.border = '2px solid transparent'; });
+    });
+  })();
+
+  // ---- Store Link preview + copy ----
+  (function () {
+    var input = document.getElementById('storeSlugInput');
+    var preview = document.getElementById('storeSlugPreview');
+    var copyBtn = document.getElementById('copyStoreLinkBtn');
+    if (input) {
+      input.addEventListener('input', function () { preview.textContent = input.value || 'your-store'; });
+    }
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function () {
+        var text = window.location.origin + '/store/' + (input.value || 'your-store');
+        navigator.clipboard && navigator.clipboard.writeText(text).catch(function () {});
+      });
+    }
+  })();
+
+  // ---- "Generate with AI" — local suggestion only, no external AI call ----
+  var aiBtn = document.getElementById('generateWithAiBtn');
+  if (aiBtn) {
+    aiBtn.addEventListener('click', function () {
+      var taglines = ['Your One-Stop Online Store', 'Quality You Can Trust', 'Shop Smart, Live Better', 'Everything You Need, Delivered'];
+      var taglineEl = document.getElementById('aiTagline');
+      if (taglineEl && !taglineEl.value) taglineEl.value = taglines[Math.floor(Math.random() * taglines.length)];
+    });
+  }
+});
+</script>
+
+<%- include('partials/admin-footer') %>

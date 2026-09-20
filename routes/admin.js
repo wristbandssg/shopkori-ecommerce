@@ -26,6 +26,11 @@ const { getPaymentSettings, updatePaymentSettingCard } = require('../models/Paym
 const { getInvoiceSettings, updateInvoiceSettings } = require('../models/InvoiceSetting');
 const CustomPage = require('../models/CustomPage');
 const Coupon = require('../models/Coupon');
+const { getStoreCustomization, updateStoreCustomization } = require('../models/StoreCustomization');
+const { getThemeCustomizer, updateThemeCustomizer } = require('../models/ThemeCustomizer');
+const PixelSetting = require('../models/PixelSetting');
+const HomeSetting = require('../models/HomeSetting');
+const OrderPageSetting = require('../models/OrderPageSetting');
 const { getSettings, setSetting } = require('../models/Setting');
 const { getOrderSettings, updateOrderSettingCard } = require('../models/OrderSetting');
 const { getMarketingSettings, updateMarketingSettingCard } = require('../models/MarketingSetting');
@@ -92,7 +97,11 @@ router.use(requireAdminLogin);
    a wildcard route meant for a real order id.
    ===================================================================== */
 const COMING_SOON_PAGES = {
-  '/customization': 'Customization',
+  // '/customization' itself is now a real hub (see the CUSTOMIZATION
+  // section below) — only its two sub-cards without any shown design
+  // (Manage Sliders, Product View Setting) still land here.
+  '/customization/sliders': 'Manage Sliders',
+  '/customization/product-view': 'Product View Setting',
 
   '/inventory': 'Inventory',
   '/inventory/purchase': 'Purchase',
@@ -3510,6 +3519,414 @@ const OFFER_CARD_META = {
 
 router.get('/offer', (req, res) => {
   res.render('admin/offer', { adminPageTitle: 'Offer Settings', OFFER_CARDS, OFFER_CARD_META });
+});
+
+/* =====================================================================
+   CUSTOMIZATION — grid hub + Store Settings (3-tab page: Brand / Store /
+   Pixel) + Home Setting + Order Page Setting.
+
+   Most of the 12 grid cards shown in the reference design (Store Logo,
+   Store Favicon, Store Title, Domain Setup, Branding Logo, Phone Screen
+   Navigation, Show Add To Cart In Screen, Footer Setting, Advance Theme
+   Setup) are not separate pages of their own — they're all fields that
+   live INSIDE the one Store Settings page's Brand/Store tabs (exactly as
+   shown in the screenshots). So instead of duplicating that data across
+   11 near-empty forms, each of those cards deep-links straight into the
+   Store Settings tab/section that already holds that field. Manage
+   Sliders and Product View Setting had no fields shown anywhere, so they
+   stay honest coming-soon stubs (registered above in COMING_SOON_PAGES).
+   Home Setting and Order Page Setting were shown as their own separate
+   pages with no sidebar entry of their own, so they're added here as two
+   extra cards on this grid (disclosed addition, same as General Settings
+   was added to the Settings hub).
+   ===================================================================== */
+const CUSTOMIZATION_CARDS = [
+  'storeSettings', 'storeLogo', 'storeFavicon', 'storeTitle', 'domainSetup', 'brandingLogo',
+  'phoneNavigation', 'addToCartScreen', 'manageSliders', 'footerSetting', 'productViewSetting',
+  'advanceTheme', 'homeSetting', 'orderPageSetting',
+];
+const CUSTOMIZATION_CARD_META = {
+  storeSettings: { title: 'Store Settings', path: '/admin/customization/store-settings', icon: 'bi-shop', color: '#337ab7' },
+  storeLogo: { title: 'Store Logo', path: '/admin/customization/store-settings?tab=store#logoSettings', icon: 'bi-image', color: '#28a745' },
+  storeFavicon: { title: 'Store Favicon', path: '/admin/customization/store-settings?tab=brand#logoFavicon', icon: 'bi-app', color: '#f0ad4e' },
+  storeTitle: { title: 'Store Title', path: '/admin/customization/store-settings?tab=brand#textFormat', icon: 'bi-type', color: '#7c3aed' },
+  domainSetup: { title: 'Domain Setup', path: '/admin/customization/store-settings?tab=store#domainSettings', icon: 'bi-globe', color: '#16a085' },
+  brandingLogo: { title: 'Branding Logo', path: '/admin/customization/store-settings?tab=brand#logoFavicon', icon: 'bi-award', color: '#d6336c' },
+  phoneNavigation: { title: 'Phone Screen Navigation', path: '/admin/customization/store-settings?tab=brand#themeCustomizer', icon: 'bi-phone', color: '#212529' },
+  addToCartScreen: { title: 'Show Add To Cart In Screen', path: '/admin/customization/store-settings?tab=brand#themeCustomizer', icon: 'bi-cart-plus', color: '#5b9bd5' },
+  manageSliders: { title: 'Manage Sliders', path: '/admin/customization/sliders', icon: 'bi-images', color: '#f4a460' },
+  footerSetting: { title: 'Footer Setting', path: '/admin/customization/store-settings?tab=brand#textFormat', icon: 'bi-layout-text-window-reverse', color: '#337ab7' },
+  productViewSetting: { title: 'Product View Setting', path: '/admin/customization/product-view', icon: 'bi-eye', color: '#28a745' },
+  advanceTheme: { title: 'Advance Theme Setup', path: '/admin/customization/theme', icon: 'bi-palette', color: '#f0ad4e' },
+  homeSetting: { title: 'Home Setting', path: '/admin/customization/home-setting', icon: 'bi-house-gear', color: '#7c3aed' },
+  orderPageSetting: { title: 'Order Page Setting', path: '/admin/customization/order-page', icon: 'bi-bag-check', color: '#d6336c' },
+};
+
+router.get('/customization', (req, res) => {
+  res.render('admin/customization', { adminPageTitle: 'Customize Settings', CUSTOMIZATION_CARDS, CUSTOMIZATION_CARD_META });
+});
+
+const storeSettingsUpload = upload.fields([
+  { name: 'logoDark', maxCount: 1 },
+  { name: 'logoLight', maxCount: 1 },
+  { name: 'favicon', maxCount: 1 },
+  { name: 'storeLogo', maxCount: 1 },
+  { name: 'invoiceLogo', maxCount: 1 },
+  { name: 'metaImage', maxCount: 1 },
+]);
+
+router.get('/customization/store-settings', async (req, res, next) => {
+  try {
+    const custom = await getStoreCustomization();
+    const settingsData = await getSettings();
+    const pixels = await PixelSetting.find().sort({ createdAt: -1 });
+    const activeTab = ['brand', 'store', 'pixel'].includes(req.query.tab) ? req.query.tab : 'brand';
+    res.render('admin/customization-store-settings', {
+      adminPageTitle: 'Store Settings', custom, settingsData, pixels, activeTab,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/customization/store-settings/brand', storeSettingsUpload, async (req, res, next) => {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/customization/store-settings?tab=brand');
+    }
+    const files = req.files || {};
+    const custom = await getStoreCustomization();
+    const brand = {
+      logoDark: files.logoDark && files.logoDark[0] ? files.logoDark[0].filename : custom.brand.logoDark,
+      logoLight: files.logoLight && files.logoLight[0] ? files.logoLight[0].filename : custom.brand.logoLight,
+      favicon: files.favicon && files.favicon[0] ? files.favicon[0].filename : custom.brand.favicon,
+    };
+    const text = {
+      titleText: (req.body.titleText || '').trim(),
+      footerText: (req.body.footerText || '').trim(),
+      dateFormat: req.body.dateFormat || custom.text.dateFormat,
+      timeFormat: req.body.timeFormat || custom.text.timeFormat,
+      timezone: req.body.timezone || custom.text.timezone,
+      enableRtl: !!req.body.enableRtl,
+    };
+    const theme = {
+      transparentLayout: !!req.body.transparentLayout,
+      darkLayout: !!req.body.darkLayout,
+      navigationOnOff: !!req.body.navigationOnOff,
+      showCartOnOff: !!req.body.showCartOnOff,
+      primaryColor: req.body.primaryColor || custom.theme.primaryColor,
+    };
+    await updateStoreCustomization({ brand, text, theme });
+    req.flash('success', 'Brand settings saved successfully.');
+    res.redirect('/admin/customization/store-settings?tab=brand');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/customization/store-settings/store', storeSettingsUpload, async (req, res, next) => {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/customization/store-settings?tab=store');
+    }
+    const files = req.files || {};
+    const custom = await getStoreCustomization();
+    const store = {
+      storeLogo: files.storeLogo && files.storeLogo[0] ? files.storeLogo[0].filename : custom.store.storeLogo,
+      invoiceLogo: files.invoiceLogo && files.invoiceLogo[0] ? files.invoiceLogo[0].filename : custom.store.invoiceLogo,
+      metaImage: files.metaImage && files.metaImage[0] ? files.metaImage[0].filename : custom.store.metaImage,
+      tagline: (req.body.tagline || '').trim(),
+      city: (req.body.city || '').trim(),
+      state: (req.body.state || '').trim(),
+      zipcode: (req.body.zipcode || '').trim(),
+      country: (req.body.country || '').trim(),
+      storeLanguage: req.body.storeLanguage || custom.store.storeLanguage,
+    };
+    const domain = {
+      storeSlug: (req.body.storeSlug || '').trim(),
+      customDomain: (req.body.customDomain || '').trim(),
+    };
+    const features = {
+      checkoutLoginRequired: !!req.body.checkoutLoginRequired,
+      blogMenuDisplay: !!req.body.blogMenuDisplay,
+      shippingMethod: !!req.body.shippingMethod,
+      productRating: !!req.body.productRating,
+    };
+    const analyticsMeta = {
+      googleAnalytics: (req.body.googleAnalytics || '').trim(),
+      facebookPixel: (req.body.facebookPixel || '').trim(),
+      metaKeywords: (req.body.metaKeywords || '').trim(),
+      metaDescription: (req.body.metaDescription || '').trim(),
+      decimalNumberFormat: parseInt(req.body.decimalNumberFormat, 10) || 0,
+    };
+    await updateStoreCustomization({ store, domain, features, analyticsMeta, customJs: req.body.customJs || '' });
+
+    // Store Name / Email / Address stay owned by models/Setting.js (the
+    // existing General Settings source of truth) instead of a second copy
+    // here — same write-through pattern used for Manual Payment's bKash number.
+    if (req.body.storeName !== undefined) await setSetting('site_name', (req.body.storeName || '').trim());
+    if (req.body.email !== undefined) await setSetting('email', (req.body.email || '').trim());
+    if (req.body.address !== undefined) await setSetting('address', (req.body.address || '').trim());
+
+    req.flash('success', 'Store settings saved successfully.');
+    res.redirect('/admin/customization/store-settings?tab=store');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// "Delete Store" — deliberately NOT wired to delete anything for real (no
+// spec for what it should cascade-delete in a single-tenant admin app,
+// and permanently deleting data is out of scope for this build).
+router.get('/customization/store-settings/delete-store', (req, res) => {
+  req.flash('danger', "Store deletion isn't available from the admin panel. Please contact hosting support if you need to remove all store data.");
+  res.redirect('/admin/customization/store-settings?tab=store');
+});
+
+router.post('/customization/pixel/new', verifyCsrf, async (req, res, next) => {
+  try {
+    const { platform, pixelId, pixelAccessToken, facebookCatalogId, testEventCode } = req.body;
+    if (!platform) {
+      req.flash('danger', 'Please select a platform.');
+      return res.redirect('/admin/customization/store-settings?tab=pixel');
+    }
+    await PixelSetting.create({
+      platform,
+      pixelId: (pixelId || '').trim(),
+      pixelAccessToken: pixelAccessToken || '',
+      facebookCatalogId: (facebookCatalogId || '').trim(),
+      testEventCode: (testEventCode || '').trim(),
+      status: true,
+    });
+    req.flash('success', 'Pixel added successfully.');
+    res.redirect('/admin/customization/store-settings?tab=pixel');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/customization/pixel/:id/edit', verifyCsrf, async (req, res, next) => {
+  try {
+    const { platform, pixelId, pixelAccessToken, facebookCatalogId, testEventCode } = req.body;
+    await PixelSetting.updateOne(
+      { _id: req.params.id },
+      {
+        platform,
+        pixelId: (pixelId || '').trim(),
+        pixelAccessToken: pixelAccessToken || '',
+        facebookCatalogId: (facebookCatalogId || '').trim(),
+        testEventCode: (testEventCode || '').trim(),
+        status: !!req.body.status,
+      }
+    );
+    req.flash('success', 'Pixel updated successfully.');
+    res.redirect('/admin/customization/store-settings?tab=pixel');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/customization/pixel/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/customization/store-settings?tab=pixel');
+    }
+    await PixelSetting.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Pixel deleted successfully.');
+    res.redirect('/admin/customization/store-settings?tab=pixel');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/customization/home-setting', async (req, res, next) => {
+  try {
+    const homeSetting = await HomeSetting.findOne({});
+    const showForm = !!homeSetting || req.query.new === '1';
+    res.render('admin/customization-home-setting', { adminPageTitle: 'Home Setting', homeSetting, showForm });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const homeSettingUpload = upload.fields([{ name: 'logo', maxCount: 1 }]);
+
+router.post('/customization/home-setting', homeSettingUpload, async (req, res, next) => {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/customization/home-setting');
+    }
+    const existing = await HomeSetting.findOne({});
+    const files = req.files || {};
+    const logoName = files.logo && files.logo[0] ? files.logo[0].filename : (existing ? existing.logo : null);
+    const data = {
+      header: (req.body.header || '').trim(),
+      phone: (req.body.phone || '').trim(),
+      email: (req.body.email || '').trim(),
+      address: (req.body.address || '').trim(),
+      twitter: (req.body.twitter || '').trim(),
+      facebook: (req.body.facebook || '').trim(),
+      youtube: (req.body.youtube || '').trim(),
+      whatsapp: (req.body.whatsapp || '').trim(),
+      messenger: (req.body.messenger || '').trim(),
+      logo: logoName,
+    };
+    if (existing) {
+      await HomeSetting.updateOne({ _id: existing._id }, data);
+    } else {
+      await HomeSetting.create(data);
+    }
+    req.flash('success', 'Home settings saved successfully.');
+    res.redirect('/admin/customization/home-setting');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/customization/order-page', async (req, res, next) => {
+  try {
+    const orderPage = await OrderPageSetting.findOne({});
+    const showForm = !!orderPage || req.query.new === '1';
+    res.render('admin/customization-order-page', { adminPageTitle: 'Order Page Setting', orderPage, showForm });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/customization/order-page', verifyCsrf, async (req, res, next) => {
+  try {
+    const existing = await OrderPageSetting.findOne({});
+    const data = {
+      buyMore: (req.body.buyMore || '').trim(),
+      orderNow: (req.body.orderNow || '').trim(),
+      callCenter: (req.body.callCenter || '').trim(),
+      callCenterNumber: (req.body.callCenterNumber || '').trim(),
+      support: (req.body.support || '').trim(),
+      supportNumber: (req.body.supportNumber || '').trim(),
+      whatsapp: (req.body.whatsapp || '').trim(),
+      whatsappNumber: (req.body.whatsappNumber || '').trim(),
+      messenger: (req.body.messenger || '').trim(),
+      messengerLink: (req.body.messengerLink || '').trim(),
+      delivery: (req.body.delivery || '').trim(),
+      status: req.body.status !== 'Off',
+    };
+    if (existing) {
+      await OrderPageSetting.updateOne({ _id: existing._id }, data);
+    } else {
+      await OrderPageSetting.create(data);
+    }
+    req.flash('success', 'Order page settings saved successfully.');
+    res.redirect('/admin/customization/order-page');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   CUSTOMIZATION — Advance Theme Setup (dedicated rich theme customizer,
+   separate from the simple toggle set on the Store Settings > Brand tab).
+   Most color/font/size fields here are LIVE — saving them changes an
+   injected <style> block that overrides public/css/style.css on every
+   storefront page (see middleware/storeLocals.js + views/partials/header.ejs).
+   A few structural fields (category heading text/colors, button icon/order
+   details beyond a simple swap, currency sign, swipe behavior, homepage
+   category selection) are saved for real but not wired into rendering yet
+   — see the "SAVE-ONLY" comments in models/ThemeCustomizer.js for exactly
+   which ones and why.
+   ===================================================================== */
+router.get('/customization/theme', async (req, res, next) => {
+  try {
+    const theme = await getThemeCustomizer();
+    const categories = await Category.find({ status: true }).sort({ name: 1 });
+    res.render('admin/customization-theme', { adminPageTitle: 'Customize Your Theme', theme, categories });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/customization/theme', verifyCsrf, async (req, res, next) => {
+  try {
+    const b = req.body;
+    const topHeader = {
+      color: b.topHeaderColor || '#ffffff',
+      text: (b.topHeaderText || '').trim(),
+      bold: !!b.topHeaderBold,
+      textAlign: b.topHeaderTextAlign || 'center',
+      scrollingMarquee: !!b.topHeaderScrollingMarquee,
+      backgroundColor: b.topHeaderBackgroundColor || '#EC0E8C',
+    };
+    const header = {
+      textColor: b.headerTextColor || '#222222',
+      backgroundColor: b.headerBackgroundColor || '#ffffff',
+    };
+    const navMenu = {
+      linksColor: b.navLinksColor || '#ffe6f5',
+      backgroundColor: b.navBackgroundColor || '#EC0E8C',
+      linkHoverColor: b.navLinkHoverColor || '#ffffff',
+      fontFamily: b.navFontFamily || "'Hind Siliguri', sans-serif",
+    };
+    const category = {
+      headerBackgroundColor: b.catHeaderBackgroundColor || '#ffffff',
+      headerTitleColor: b.catHeaderTitleColor || '#222222',
+      headerTitleText: (b.catHeaderTitleText || '').trim(),
+      headerFontFamily: b.catHeaderFontFamily || "'Poppins', sans-serif",
+      navFontSize: b.catNavFontSize || '14px',
+      bodyLayout: b.catBodyLayout || 'Fixed Layout',
+      bodyShape: b.catBodyShape || '50%',
+      rowItem: b.catRowItem || '6-item',
+      rowBackgroundColor: b.catRowBackgroundColor || 'transparent',
+      borderColor: b.catBorderColor || '#f6d5ea',
+      namePosition: b.catNamePosition || 'Box Style',
+      previewBackgroundColor: b.catPreviewBackgroundColor || 'transparent',
+      previewTextColor: b.catPreviewTextColor || '#222222',
+    };
+    const product = {
+      nameColor: b.productNameColor || '#222222',
+      priceColor: b.productPriceColor || '#EC0E8C',
+      boxStyle: b.productBoxStyle === 'with' ? 'with' : 'without',
+      nameSize: b.productNameSize || '14px',
+      priceTextSize: b.productPriceTextSize || '16px',
+      discountBarBgColor: b.discountBarBgColor || '#E63946',
+      discountBarTextColor: b.discountBarTextColor || '#ffffff',
+      cardBorderColor: b.productCardBorderColor || '#f7d3ea',
+      cardBorderSize: b.productCardBorderSize || '1px',
+      addToCartName: (b.addToCartName || '').trim() || 'আরো কিনুন',
+      buyNowName: (b.buyNowName || '').trim() || 'এখনই কিনুন',
+      addToCartColor: b.addToCartColor || '#EC0E8C',
+      addToCartTextColor: b.addToCartTextColor || '#ffffff',
+      buyNowColor: b.buyNowColor || '#2F5FE0',
+      buyNowTextColor: b.buyNowTextColor || '#ffffff',
+      discountPriceTextColor: b.discountPriceTextColor || '#999999',
+      discountPriceTextSize: b.discountPriceTextSize || '13px',
+      buttonOrder: b.buttonOrder === 'buy-then-cart' ? 'buy-then-cart' : 'cart-then-buy',
+      showAddToCartIcon: !!b.showAddToCartIcon,
+      showBuyNowIcon: !!b.showBuyNowIcon,
+      buttonLayout: b.buttonLayout === 'vertical' ? 'vertical' : 'horizontal',
+      currencySign: b.currencySign || 'Tk',
+      swipeOption: !!b.swipeOption,
+    };
+    const home = {
+      productsDesktop: parseInt(b.productsDesktop, 10) || 4,
+      productsTablet: parseInt(b.productsTablet, 10) || 3,
+      productsMobile: parseInt(b.productsMobile, 10) || 2,
+      clothingStyle: !!b.clothingStyle,
+      selectedCategories: Array.isArray(b.selectedCategories) ? b.selectedCategories : (b.selectedCategories ? [b.selectedCategories] : []),
+      showAllProductsCategory: !!b.showAllProductsCategory,
+    };
+    const footer = {
+      backgroundColor: b.footerBackgroundColor || '#EC0E8C',
+      textColor: b.footerTextColor || '#ffe6f5',
+    };
+    await updateThemeCustomizer({ themeName: b.themeName || 'Theme 1', topHeader, header, navMenu, category, product, home, footer });
+    req.flash('success', 'Theme settings saved successfully.');
+    res.redirect('/admin/customization/theme');
+  } catch (err) {
+    next(err);
+  }
 });
 
 /* =====================================================================

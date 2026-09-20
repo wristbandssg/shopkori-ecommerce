@@ -1,0 +1,50 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Customize Settings</span>
+</nav>
+
+<div class="admin-card mb-3">
+  <div class="d-flex gap-2 flex-wrap">
+    <input type="text" id="customizationSearch" class="form-control" style="max-width:260px" placeholder="Search...">
+    <button class="btn btn-outline-secondary" type="button"><i class="bi bi-search"></i></button>
+  </div>
+</div>
+
+<div class="row g-3" id="customizationGrid">
+  <% CUSTOMIZATION_CARDS.forEach(function (key) { %>
+    <% var m = CUSTOMIZATION_CARD_META[key]; %>
+    <div class="col-md-4 customization-grid-item" data-name="<%= m.title.toLowerCase() %>">
+      <a href="<%= m.path %>" class="text-decoration-none">
+        <div class="admin-card d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center justify-content-center rounded-circle text-white" style="width:44px;height:44px;background:<%= m.color %>;font-size:1.1rem;flex-shrink:0;">
+              <i class="bi <%= m.icon %>"></i>
+            </div>
+            <div>
+              <div class="fw-semibold text-dark"><%= m.title %></div>
+              <span class="small text-primary">Manage <i class="bi bi-arrow-right"></i></span>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+  <% }); %>
+</div>
+
+<script>
+  (function () {
+    var input = document.getElementById('customizationSearch');
+    if (!input) return;
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      document.querySelectorAll('#customizationGrid .customization-grid-item').forEach(function (item) {
+        item.style.display = !q || item.getAttribute('data-name').indexOf(q) !== -1 ? '' : 'none';
+      });
+    });
+  })();
+</script>
+
+<%- include('partials/admin-footer') %>

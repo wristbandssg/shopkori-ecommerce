@@ -1,0 +1,323 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/customization" class="text-decoration-none">Customize Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Advance Theme Setup</span>
+</nav>
+
+<%
+  var FONT_FAMILIES = ["'Hind Siliguri', sans-serif", "'Poppins', sans-serif", "Arial, sans-serif", "Georgia, serif"];
+  var TEXT_SIZES = ['10px', '12px', '13px', '14px', '16px', '18px', '20px', '26px'];
+  var BORDER_SIZES = ['0px', '1px', '2px', '3px'];
+  var SHAPES = ['0px', '4px', '8px', '12px', '50%'];
+  var ROW_ITEMS = ['2-item', '3-item', '4-item', '5-item', '6-item'];
+  var NAME_POSITIONS = ['Box Style', 'Overlay Style', 'Below Image'];
+  var LAYOUTS = ['Fixed Layout', 'Fluid Layout'];
+  var selectedCatIds = (theme.home.selectedCategories || []).map(function (c) { return String(c._id || c); });
+%>
+
+<h5 class="mb-3">Customize Your Theme</h5>
+
+<form method="post" action="/admin/customization/theme">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+  <div class="row g-3">
+    <!-- ================= SECTION JUMP NAV ================= -->
+    <div class="col-lg-2">
+      <div class="admin-card p-2 position-sticky" style="top:80px;">
+        <div class="small text-muted fw-semibold mb-1 px-2">SECTIONS</div>
+        <div class="d-flex flex-column">
+          <a href="#secTheme" class="p-2 text-decoration-none small">① Theme</a>
+          <a href="#secTopHeader" class="p-2 text-decoration-none small">② Top Header</a>
+          <a href="#secHeader" class="p-2 text-decoration-none small">③ Header</a>
+          <a href="#secNavMenu" class="p-2 text-decoration-none small">④ Nav Menu</a>
+          <a href="#secCategory" class="p-2 text-decoration-none small">⑤ Category</a>
+          <a href="#secProduct" class="p-2 text-decoration-none small">⑥ Product</a>
+          <a href="#secHome" class="p-2 text-decoration-none small">⑦ Home</a>
+          <a href="#secFooter" class="p-2 text-decoration-none small">⑧ Footer</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= SECTIONS ================= -->
+    <div class="col-lg-10">
+
+      <div class="admin-card mb-3" id="secTheme">
+        <h6 class="mb-3"><span class="badge rounded-pill bg-dark">1</span> Theme Information</h6>
+        <label class="form-label">Theme Name</label>
+        <select name="themeName" class="form-select" style="max-width:300px">
+          <% ['Theme 1', 'Theme 2', 'Theme 3'].forEach(function (t) { %>
+            <option value="<%= t %>" <%= theme.themeName === t ? 'selected' : '' %>><%= t %></option>
+          <% }); %>
+        </select>
+      </div>
+
+      <div class="admin-card mb-3" id="secTopHeader">
+        <h6 class="mb-3"><span class="badge rounded-pill bg-dark">2</span> Top Header Section</h6>
+        <div class="row g-3">
+          <div class="col-md-3"><label class="form-label">Top Header Color</label><input type="color" name="topHeaderColor" class="form-control form-control-color w-100" value="<%= theme.topHeader.color %>"></div>
+          <div class="col-md-5"><label class="form-label">Text</label><input type="text" name="topHeaderText" class="form-control" value="<%= theme.topHeader.text %>" placeholder="e.g. Free delivery over ৳999"></div>
+          <div class="col-md-2">
+            <label class="form-label d-block">Bold</label>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="topHeaderBold" id="topHeaderBold" <%= theme.topHeader.bold ? 'checked' : '' %>><label class="form-check-label" for="topHeaderBold">Enable Bold</label></div>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Text Alignment</label>
+            <select name="topHeaderTextAlign" class="form-select">
+              <% ['left', 'center', 'right'].forEach(function (a) { %><option value="<%= a %>" <%= theme.topHeader.textAlign === a ? 'selected' : '' %>><%= a %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label d-block">Scrolling (Marquee)</label>
+            <div class="form-check form-switch"><input class="form-check-input" type="checkbox" name="topHeaderScrollingMarquee" id="topHeaderScrollingMarquee" <%= theme.topHeader.scrollingMarquee ? 'checked' : '' %>><label class="form-check-label" for="topHeaderScrollingMarquee">Enable Scrolling</label></div>
+          </div>
+          <div class="col-md-4"><label class="form-label">Background Color</label><input type="color" name="topHeaderBackgroundColor" class="form-control form-control-color w-100" value="<%= theme.topHeader.backgroundColor %>"></div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="secHeader">
+        <h6 class="mb-3"><span class="badge rounded-pill bg-dark">3</span> Header Section</h6>
+        <div class="row g-3">
+          <div class="col-md-4"><label class="form-label">Header Text Color</label><input type="color" name="headerTextColor" class="form-control form-control-color w-100" value="<%= theme.header.textColor %>"></div>
+          <div class="col-md-4"><label class="form-label">Header Background Color</label><input type="color" name="headerBackgroundColor" class="form-control form-control-color w-100" value="<%= theme.header.backgroundColor %>"></div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="secNavMenu">
+        <h6 class="mb-3"><span class="badge rounded-pill bg-dark">4</span> Nav Menu Section</h6>
+        <div class="row g-3">
+          <div class="col-md-3"><label class="form-label">Nav Links Color</label><input type="color" name="navLinksColor" class="form-control form-control-color w-100" value="<%= theme.navMenu.linksColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Nav Background Color</label><input type="color" name="navBackgroundColor" class="form-control form-control-color w-100" value="<%= theme.navMenu.backgroundColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Nav Link Hover</label><input type="color" name="navLinkHoverColor" class="form-control form-control-color w-100" value="<%= theme.navMenu.linkHoverColor %>"></div>
+          <div class="col-md-3">
+            <label class="form-label">Font Family</label>
+            <select name="navFontFamily" class="form-select">
+              <% FONT_FAMILIES.forEach(function (f) { %><option value="<%= f %>" <%= theme.navMenu.fontFamily === f ? 'selected' : '' %>><%= f %></option><% }); %>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="secCategory">
+        <h6 class="mb-3"><span class="badge rounded-pill bg-dark">5</span> Category Section</h6>
+        <div class="text-uppercase small text-muted fw-semibold mb-2">Header</div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-3"><label class="form-label">Background Color</label><input type="color" name="catHeaderBackgroundColor" class="form-control form-control-color w-100" value="<%= theme.category.headerBackgroundColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Title Color</label><input type="color" name="catHeaderTitleColor" class="form-control form-control-color w-100" value="<%= theme.category.headerTitleColor %>"></div>
+          <div class="col-md-6"><label class="form-label">Title Text</label><input type="text" name="catHeaderTitleText" class="form-control" value="<%= theme.category.headerTitleText %>"></div>
+          <div class="col-md-6">
+            <label class="form-label">Font Family</label>
+            <select name="catHeaderFontFamily" class="form-select">
+              <% FONT_FAMILIES.forEach(function (f) { %><option value="<%= f %>" <%= theme.category.headerFontFamily === f ? 'selected' : '' %>><%= f %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Nav Font Size</label>
+            <select name="catNavFontSize" class="form-select">
+              <% TEXT_SIZES.forEach(function (s) { %><option value="<%= s %>" <%= theme.category.navFontSize === s ? 'selected' : '' %>><%= s %></option><% }); %>
+            </select>
+          </div>
+        </div>
+        <div class="text-uppercase small text-muted fw-semibold mb-2">Body</div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label class="form-label">Category Layout</label>
+            <select name="catBodyLayout" class="form-select">
+              <% LAYOUTS.forEach(function (l) { %><option value="<%= l %>" <%= theme.category.bodyLayout === l ? 'selected' : '' %>><%= l %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Category Shape</label>
+            <select name="catBodyShape" class="form-select">
+              <% SHAPES.forEach(function (s) { %><option value="<%= s %>" <%= theme.category.bodyShape === s ? 'selected' : '' %>><%= s %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Row/Item</label>
+            <select name="catRowItem" class="form-select">
+              <% ROW_ITEMS.forEach(function (r) { %><option value="<%= r %>" <%= theme.category.rowItem === r ? 'selected' : '' %>><%= r %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3"><label class="form-label">Row Background Color</label><input type="color" name="catRowBackgroundColor" class="form-control form-control-color w-100" value="<%= theme.category.rowBackgroundColor === 'transparent' ? '#ffffff' : theme.category.rowBackgroundColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Cate. Border Color</label><input type="color" name="catBorderColor" class="form-control form-control-color w-100" value="<%= theme.category.borderColor %>"></div>
+          <div class="col-md-4">
+            <label class="form-label">Cate. Name Position</label>
+            <select name="catNamePosition" class="form-select">
+              <% NAME_POSITIONS.forEach(function (p) { %><option value="<%= p %>" <%= theme.category.namePosition === p ? 'selected' : '' %>><%= p %></option><% }); %>
+            </select>
+          </div>
+        </div>
+        <div class="border rounded p-3 bg-light-subtle" style="background:#f4f0ff">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Background Color</label><input type="color" name="catPreviewBackgroundColor" class="form-control form-control-color w-100" value="<%= theme.category.previewBackgroundColor === 'transparent' ? '#ffffff' : theme.category.previewBackgroundColor %>"></div>
+            <div class="col-md-6"><label class="form-label">Text Color</label><input type="color" name="catPreviewTextColor" class="form-control form-control-color w-100" value="<%= theme.category.previewTextColor %>"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="secProduct">
+        <h6 class="mb-3"><span class="badge rounded-pill bg-dark">6</span> Product Section</h6>
+        <div class="row g-3 mb-3">
+          <div class="col-md-3"><label class="form-label">Product Name Color</label><input type="color" name="productNameColor" class="form-control form-control-color w-100" value="<%= theme.product.nameColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Product Price Color</label><input type="color" name="productPriceColor" class="form-control form-control-color w-100" value="<%= theme.product.priceColor %>"></div>
+          <div class="col-md-6">
+            <label class="form-label d-block">Product Box Style</label>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="productBoxStyle" id="boxWithout" value="without" <%= theme.product.boxStyle === 'without' ? 'checked' : '' %>>
+              <label class="form-check-label" for="boxWithout">Without Box</label>
+            </div>
+            <div class="form-check form-check-inline">
+              <input class="form-check-input" type="radio" name="productBoxStyle" id="boxWith" value="with" <%= theme.product.boxStyle === 'with' ? 'checked' : '' %>>
+              <label class="form-check-label" for="boxWith">With Box</label>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <label class="form-label">Product Name Size</label>
+            <select name="productNameSize" class="form-select">
+              <% TEXT_SIZES.forEach(function (s) { %><option value="<%= s %>" <%= theme.product.nameSize === s ? 'selected' : '' %>><%= s %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Price Text Size</label>
+            <select name="productPriceTextSize" class="form-select">
+              <% TEXT_SIZES.forEach(function (s) { %><option value="<%= s %>" <%= theme.product.priceTextSize === s ? 'selected' : '' %>><%= s %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3"><label class="form-label">Discount-Bar Background Color</label><input type="color" name="discountBarBgColor" class="form-control form-control-color w-100" value="<%= theme.product.discountBarBgColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Discount-Bar Text Color</label><input type="color" name="discountBarTextColor" class="form-control form-control-color w-100" value="<%= theme.product.discountBarTextColor %>"></div>
+
+          <div class="col-md-3">
+            <label class="form-label">Tk Sign</label>
+            <select name="currencySign" class="form-select">
+              <% ['Tk', '৳', 'BDT'].forEach(function (c) { %><option value="<%= c %>" <%= theme.product.currencySign === c ? 'selected' : '' %>><%= c %></option><% }); %>
+            </select>
+            <div class="form-text">Saved for reference — the live currency symbol shown on the site still comes from Settings &gt; General.</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Swipe Option</label>
+            <select name="swipeOption" class="form-select">
+              <option value="1" <%= theme.product.swipeOption ? 'selected' : '' %>>Swipe ON</option>
+              <option value="" <%= !theme.product.swipeOption ? 'selected' : '' %>>Swipe OFF</option>
+            </select>
+          </div>
+          <div class="col-md-3"><label class="form-label">Product Card Border Color</label><input type="color" name="productCardBorderColor" class="form-control form-control-color w-100" value="<%= theme.product.cardBorderColor %>"></div>
+          <div class="col-md-3">
+            <label class="form-label">Product Card Border Size</label>
+            <select name="productCardBorderSize" class="form-select">
+              <% BORDER_SIZES.forEach(function (s) { %><option value="<%= s %>" <%= theme.product.cardBorderSize === s ? 'selected' : '' %>><%= s %></option><% }); %>
+            </select>
+          </div>
+        </div>
+
+        <hr>
+        <div class="row g-3">
+          <div class="col-md-3"><label class="form-label">Add to Cart Name</label><input type="text" name="addToCartName" class="form-control" value="<%= theme.product.addToCartName %>"></div>
+          <div class="col-md-3"><label class="form-label">Buy Now Name</label><input type="text" name="buyNowName" class="form-control" value="<%= theme.product.buyNowName %>"></div>
+          <div class="col-md-3"><label class="form-label">Add to Cart Color</label><input type="color" name="addToCartColor" class="form-control form-control-color w-100" value="<%= theme.product.addToCartColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Add to Cart Text Color</label><input type="color" name="addToCartTextColor" class="form-control form-control-color w-100" value="<%= theme.product.addToCartTextColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Buy Now Color</label><input type="color" name="buyNowColor" class="form-control form-control-color w-100" value="<%= theme.product.buyNowColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Buy Now Text Color</label><input type="color" name="buyNowTextColor" class="form-control form-control-color w-100" value="<%= theme.product.buyNowTextColor %>"></div>
+          <div class="col-md-3"><label class="form-label">Discount Price Text Color</label><input type="color" name="discountPriceTextColor" class="form-control form-control-color w-100" value="<%= theme.product.discountPriceTextColor %>"></div>
+          <div class="col-md-3">
+            <label class="form-label">Discount Price Text Size</label>
+            <select name="discountPriceTextSize" class="form-select">
+              <% TEXT_SIZES.forEach(function (s) { %><option value="<%= s %>" <%= theme.product.discountPriceTextSize === s ? 'selected' : '' %>><%= s %></option><% }); %>
+            </select>
+          </div>
+
+          <div class="col-md-4">
+            <label class="form-label">Button Order</label>
+            <select name="buttonOrder" class="form-select">
+              <option value="cart-then-buy" <%= theme.product.buttonOrder === 'cart-then-buy' ? 'selected' : '' %>>Add to Cart &amp; Buy Now</option>
+              <option value="buy-then-cart" <%= theme.product.buttonOrder === 'buy-then-cart' ? 'selected' : '' %>>Buy Now &amp; Add to Cart</option>
+            </select>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label d-block">Icon Show</label>
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="showAddToCartIcon" id="showAddToCartIcon" <%= theme.product.showAddToCartIcon ? 'checked' : '' %>><label class="form-check-label" for="showAddToCartIcon">Show Add to Cart ICON</label></div>
+            <div class="form-check"><input class="form-check-input" type="checkbox" name="showBuyNowIcon" id="showBuyNowIcon" <%= theme.product.showBuyNowIcon ? 'checked' : '' %>><label class="form-check-label" for="showBuyNowIcon">Show Buy Now ICON</label></div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Button Layout</label>
+            <select name="buttonLayout" class="form-select">
+              <option value="horizontal" <%= theme.product.buttonLayout === 'horizontal' ? 'selected' : '' %>>Horizontal Layout</option>
+              <option value="vertical" <%= theme.product.buttonLayout === 'vertical' ? 'selected' : '' %>>Vertical Layout</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="secHome">
+        <h6 class="mb-3"><span class="badge rounded-pill bg-dark">7</span> Home Section</h6>
+        <div class="row g-3 mb-3">
+          <div class="col-md-3">
+            <label class="form-label">Products on Desktop</label>
+            <select name="productsDesktop" class="form-select">
+              <% [2, 3, 4, 5, 6].forEach(function (n) { %><option value="<%= n %>" <%= theme.home.productsDesktop === n ? 'selected' : '' %>><%= n %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Products on Tablet</label>
+            <select name="productsTablet" class="form-select">
+              <% [2, 3, 4].forEach(function (n) { %><option value="<%= n %>" <%= theme.home.productsTablet === n ? 'selected' : '' %>><%= n %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Products on Mobile</label>
+            <select name="productsMobile" class="form-select">
+              <% [1, 2, 3].forEach(function (n) { %><option value="<%= n %>" <%= theme.home.productsMobile === n ? 'selected' : '' %>><%= n %></option><% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Clothing Style</label>
+            <select name="clothingStyle" class="form-select">
+              <option value="1" <%= theme.home.clothingStyle ? 'selected' : '' %>>On</option>
+              <option value="" <%= !theme.home.clothingStyle ? 'selected' : '' %>>Off</option>
+            </select>
+          </div>
+          <div class="text-danger small">1150×600(px) — Keep 5 or fewer per row for a better experience.</div>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-8">
+            <label class="form-label">Select Home Page Categories</label>
+            <div class="border rounded p-2" style="max-height:160px;overflow-y:auto;">
+              <% categories.forEach(function (c) { %>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="selectedCategories" value="<%= c._id %>" id="homeCat<%= c._id %>" <%= selectedCatIds.indexOf(String(c._id)) !== -1 ? 'checked' : '' %>>
+                  <label class="form-check-label" for="homeCat<%= c._id %>"><%= c.name %></label>
+                </div>
+              <% }); %>
+              <% if (!categories.length) { %><div class="text-muted small">No categories yet.</div><% } %>
+            </div>
+            <div class="form-text">Saved for reference — the homepage still shows its existing category list; wiring this in is a follow-up.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Show All Products Category</label>
+            <select name="showAllProductsCategory" class="form-select">
+              <option value="1" <%= theme.home.showAllProductsCategory ? 'selected' : '' %>>On</option>
+              <option value="" <%= !theme.home.showAllProductsCategory ? 'selected' : '' %>>Off</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-card mb-3" id="secFooter">
+        <h6 class="mb-3"><span class="badge rounded-pill bg-dark">8</span> Footer</h6>
+        <div class="row g-3">
+          <div class="col-md-4"><label class="form-label">Footer Background color</label><input type="color" name="footerBackgroundColor" class="form-control form-control-color w-100" value="<%= theme.footer.backgroundColor %>"></div>
+          <div class="col-md-4"><label class="form-label">Footer Text Color</label><input type="color" name="footerTextColor" class="form-control form-control-color w-100" value="<%= theme.footer.textColor %>"></div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-end sticky-bottom bg-white py-2">
+        <button type="submit" class="btn btn-brand btn-lg"><i class="bi bi-check2"></i> Save Changes</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<%- include('partials/admin-footer') %>
