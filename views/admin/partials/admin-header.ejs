@@ -41,15 +41,17 @@
         <a href="/admin/orders/store-analytics" class="<%= currentSubPath === '/orders/store-analytics' ? 'active' : '' %>">Store Analytics</a>
       </div>
 
-      <button class="admin-nav-toggle <%= currentPage === 'products' || currentPage === 'categories' ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navProduct" aria-expanded="<%= currentPage === 'products' || currentPage === 'categories' ? 'true' : 'false' %>">
-        <i class="bi bi-box-seam"></i> Manage Product <i class="bi bi-chevron-down chevron"></i>
+      <button class="admin-nav-toggle <%= ['products', 'categories', 'inventory'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navProduct" aria-expanded="<%= ['products', 'categories', 'inventory'].includes(currentPage) ? 'true' : 'false' %>">
+        <i class="bi bi-box-seam"></i> Products <i class="bi bi-chevron-down chevron"></i>
       </button>
-      <div class="collapse admin-submenu <%= currentPage === 'products' || currentPage === 'categories' ? 'show' : '' %>" id="navProduct">
+      <div class="collapse admin-submenu <%= ['products', 'categories', 'inventory'].includes(currentPage) ? 'show' : '' %>" id="navProduct">
         <a href="/admin/products" class="<%= currentSubPath === '/products' ? 'active' : '' %>">Products</a>
         <a href="/admin/categories" class="<%= currentSubPath === '/categories' ? 'active' : '' %>">Category</a>
         <a href="/admin/products/variant" class="<%= currentSubPath === '/products/variant' ? 'active' : '' %>">Variant</a>
         <a href="/admin/products/brands" class="<%= currentSubPath === '/products/brands' ? 'active' : '' %>">Brands</a>
         <a href="/admin/products/supplier" class="<%= currentSubPath === '/products/supplier' ? 'active' : '' %>">Supplier</a>
+        <a href="/admin/inventory/purchase" class="<%= currentSubPath === '/inventory/purchase' ? 'active' : '' %>">Purchase</a>
+        <a href="/admin/inventory" class="<%= currentSubPath === '/inventory' ? 'active' : '' %>">Inventory</a>
       </div>
 
       <button class="admin-nav-toggle <%= currentPage === 'delivery' ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navDelivery" aria-expanded="<%= currentPage === 'delivery' ? 'true' : 'false' %>">
@@ -66,14 +68,22 @@
         <a href="/admin/delivery/commission-request" class="<%= currentSubPath === '/delivery/commission-request' ? 'active' : '' %>">Commission Request</a>
       </div>
 
-      <button class="admin-nav-toggle <%= ['marketing', 'analytics', 'reports', 'referral-program'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navMarketing" aria-expanded="<%= ['marketing', 'analytics', 'reports', 'referral-program'].includes(currentPage) ? 'true' : 'false' %>">
-        <i class="bi bi-megaphone"></i> Marketing & Reports <i class="bi bi-chevron-down chevron"></i>
+      <button class="admin-nav-toggle <%= ['marketing', 'analytics', 'reports', 'referral-program', 'offer'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navMarketing" aria-expanded="<%= ['marketing', 'analytics', 'reports', 'referral-program', 'offer'].includes(currentPage) ? 'true' : 'false' %>">
+        <i class="bi bi-megaphone"></i> Marketing & Offers <i class="bi bi-chevron-down chevron"></i>
       </button>
-      <div class="collapse admin-submenu <%= ['marketing', 'analytics', 'reports', 'referral-program'].includes(currentPage) ? 'show' : '' %>" id="navMarketing">
+      <div class="collapse admin-submenu <%= ['marketing', 'analytics', 'reports', 'referral-program', 'offer'].includes(currentPage) ? 'show' : '' %>" id="navMarketing">
         <a href="/admin/marketing" class="<%= currentPage === 'marketing' ? 'active' : '' %>">Marketing</a>
         <a href="/admin/analytics" class="<%= currentPage === 'analytics' ? 'active' : '' %>">Analytics</a>
         <a href="/admin/reports" class="<%= currentPage === 'reports' ? 'active' : '' %>">Sales Report</a>
         <a href="/admin/referral-program" class="<%= currentPage === 'referral-program' ? 'active' : '' %>">Referral Program</a>
+        <a href="/admin/offer/flash-sale" class="<%= currentSubPath === '/offer/flash-sale' ? 'active' : '' %>">Flash Sale</a>
+        <a href="/admin/offer/combo" class="<%= currentSubPath === '/offer/combo' ? 'active' : '' %>">Combo Offer</a>
+        <a href="/admin/offer/best-sale" class="<%= currentSubPath === '/offer/best-sale' ? 'active' : '' %>">Best Sale Products</a>
+        <a href="/admin/offer/popular" class="<%= currentSubPath === '/offer/popular' ? 'active' : '' %>">Popular Products</a>
+        <a href="/admin/offer/hot-deal" class="<%= currentSubPath === '/offer/hot-deal' ? 'active' : '' %>">Hot Deal</a>
+        <a href="/admin/offer/special" class="<%= currentSubPath === '/offer/special' ? 'active' : '' %>">Special Offer</a>
+        <a href="/admin/offer/latest" class="<%= currentSubPath === '/offer/latest' ? 'active' : '' %>">Latest Products</a>
+        <a href="/admin/offer/popup" class="<%= currentSubPath === '/offer/popup' ? 'active' : '' %>">PopUp Offer</a>
       </div>
 
       <button class="admin-nav-toggle <%= ['blog', 'pages', 'landing-page'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navContent" aria-expanded="<%= ['blog', 'pages', 'landing-page'].includes(currentPage) ? 'true' : 'false' %>">
@@ -88,33 +98,22 @@
         <a href="/admin/landing-page/advance" class="<%= currentSubPath === '/landing-page/advance' ? 'active' : '' %>">Advance Landing</a>
       </div>
 
-      <a href="/admin/settings" class="<%= currentPage === 'settings' ? 'active' : '' %>"><i class="bi bi-gear"></i> Setting</a>
-      <a href="/admin/customization" class="<%= currentPage === 'customization' ? 'active' : '' %>"><i class="bi bi-sliders"></i> Customization</a>
-
-      <button class="admin-nav-toggle <%= currentPage === 'inventory' ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navInventory" aria-expanded="<%= currentPage === 'inventory' ? 'true' : 'false' %>">
-        <i class="bi bi-building"></i> Inventory <i class="bi bi-chevron-down chevron"></i>
+      <button class="admin-nav-toggle <%= ['settings', 'customization'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navSettings" aria-expanded="<%= ['settings', 'customization'].includes(currentPage) ? 'true' : 'false' %>">
+        <i class="bi bi-gear"></i> Settings <i class="bi bi-chevron-down chevron"></i>
       </button>
-      <div class="collapse admin-submenu <%= currentPage === 'inventory' ? 'show' : '' %>" id="navInventory">
-        <a href="/admin/inventory/purchase" class="<%= currentSubPath === '/inventory/purchase' ? 'active' : '' %>">Purchase</a>
-        <a href="/admin/inventory" class="<%= currentSubPath === '/inventory' ? 'active' : '' %>">Inventory</a>
+      <div class="collapse admin-submenu <%= ['settings', 'customization'].includes(currentPage) ? 'show' : '' %>" id="navSettings">
+        <a href="/admin/settings" class="<%= currentPage === 'settings' ? 'active' : '' %>">Setting</a>
+        <a href="/admin/customization" class="<%= currentPage === 'customization' ? 'active' : '' %>">Customization</a>
       </div>
 
-      <button class="admin-nav-toggle <%= currentPage === 'offer' ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navOffer" aria-expanded="<%= currentPage === 'offer' ? 'true' : 'false' %>">
-        <i class="bi bi-tag"></i> Offer Setting <i class="bi bi-chevron-down chevron"></i>
+      <button class="admin-nav-toggle <%= ['staff', 'task-management'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navStaffTeam" aria-expanded="<%= ['staff', 'task-management'].includes(currentPage) ? 'true' : 'false' %>">
+        <i class="bi bi-people"></i> Staff & Team <i class="bi bi-chevron-down chevron"></i>
       </button>
-      <div class="collapse admin-submenu <%= currentPage === 'offer' ? 'show' : '' %>" id="navOffer">
-        <a href="/admin/offer/flash-sale" class="<%= currentSubPath === '/offer/flash-sale' ? 'active' : '' %>">Flash Sale</a>
-        <a href="/admin/offer/combo" class="<%= currentSubPath === '/offer/combo' ? 'active' : '' %>">Combo Offer</a>
-        <a href="/admin/offer/best-sale" class="<%= currentSubPath === '/offer/best-sale' ? 'active' : '' %>">Best Sale Products</a>
-        <a href="/admin/offer/popular" class="<%= currentSubPath === '/offer/popular' ? 'active' : '' %>">Popular Products</a>
-        <a href="/admin/offer/hot-deal" class="<%= currentSubPath === '/offer/hot-deal' ? 'active' : '' %>">Hot Deal</a>
-        <a href="/admin/offer/special" class="<%= currentSubPath === '/offer/special' ? 'active' : '' %>">Special Offer</a>
-        <a href="/admin/offer/latest" class="<%= currentSubPath === '/offer/latest' ? 'active' : '' %>">Latest Products</a>
-        <a href="/admin/offer/popup" class="<%= currentSubPath === '/offer/popup' ? 'active' : '' %>">PopUp Offer</a>
+      <div class="collapse admin-submenu <%= ['staff', 'task-management'].includes(currentPage) ? 'show' : '' %>" id="navStaffTeam">
+        <a href="/admin/staff" class="<%= currentPage === 'staff' ? 'active' : '' %>">Staff Setup</a>
+        <a href="/admin/task-management" class="<%= currentPage === 'task-management' ? 'active' : '' %>">Task Management</a>
       </div>
 
-      <a href="/admin/staff" class="<%= currentPage === 'staff' ? 'active' : '' %>"><i class="bi bi-people"></i> Staff</a>
-      <a href="/admin/task-management" class="<%= currentPage === 'task-management' ? 'active' : '' %>"><i class="bi bi-list-task"></i> Task Management</a>
       <a href="/admin/customers" class="<%= currentPage === 'customers' ? 'active' : '' %>"><i class="bi bi-person-lines-fill"></i> Customers</a>
 
       <button class="admin-nav-toggle <%= ['announcements', 'security', 'integrations', 'help-support'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navAdminTools" aria-expanded="<%= ['announcements', 'security', 'integrations', 'help-support'].includes(currentPage) ? 'true' : 'false' %>">

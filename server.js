@@ -11,6 +11,7 @@ const connectDB = require('./config/db');
 const flashMiddleware = require('./middleware/flash');
 const { csrfMiddleware } = require('./middleware/csrf');
 const Product = require('./models/Product');
+const BlogPost = require('./models/BlogPost');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -78,6 +79,20 @@ async function bootstrap() {
   }
   publishDueScheduledProducts();
   setInterval(publishDueScheduledProducts, 60 * 1000);
+
+  // ---- Scheduled blog post publishing (same pattern as products above) ----
+  async function publishDueScheduledBlogPosts() {
+    try {
+      await BlogPost.updateMany(
+        { publishStatus: 'scheduled', publishAt: { $lte: new Date() } },
+        { $set: { publishStatus: 'published', status: true } }
+      );
+    } catch (err) {
+      console.error('[scheduled-publish-blog]', err);
+    }
+  }
+  publishDueScheduledBlogPosts();
+  setInterval(publishDueScheduledBlogPosts, 60 * 1000);
 
   // ---- Routes ----
   app.use('/', require('./routes/store'));

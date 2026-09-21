@@ -1,0 +1,128 @@
+<%
+/* =====================================================================
+   Shared rich-text editor partial — Blog posts, static Pages, Page Builder.
+   Same self-contained contenteditable + document.execCommand technique as
+   the existing Product > Long Description / old Page Builder editors (see
+   public/css/admin.css ".custom-editor" block), just factored out so it's
+   not re-typed on every new form, and extended with:
+     - Full Heading 1-6 support (old copies only had H2/H3) via one Format
+       dropdown instead of one button per level.
+     - An "Insert internal link" dropdown pre-filled with this site's own
+       pages/posts, so linking to another page on the site doesn't require
+       typing/copy-pasting its URL.
+   Locals (all required except internalLinkGroups):
+     idSuffix          - unique string per editor instance on the page
+                          (e.g. 'blog', 'page-about', 'pb') so multiple
+                          editors (e.g. one modal per static page) don't
+                          collide on DOM ids.
+     fieldName         - the <form> field name the HTML should submit as.
+     initialContent    - starting HTML (already-saved content on edit).
+     internalLinkGroups - optional array of { group, items: [{label, url}] }
+                          used to populate the internal-link dropdown.
+   ===================================================================== */
+const _idSuffix = idSuffix;
+const _fieldName = fieldName;
+const _initialContent = initialContent || '';
+const _internalLinkGroups = typeof internalLinkGroups !== 'undefined' ? internalLinkGroups : [];
+%>
+<div class="custom-editor" id="editorWrap-<%= _idSuffix %>">
+  <div class="custom-editor-toolbar" id="editorToolbar-<%= _idSuffix %>">
+    <select class="form-select form-select-sm" style="width:auto;" data-editor-format title="Paragraph / Heading">
+      <option value="P">Paragraph</option>
+      <option value="H1">Heading 1</option>
+      <option value="H2">Heading 2</option>
+      <option value="H3">Heading 3</option>
+      <option value="H4">Heading 4</option>
+      <option value="H5">Heading 5</option>
+      <option value="H6">Heading 6</option>
+      <option value="BLOCKQUOTE">Quote</option>
+    </select>
+    <span class="custom-editor-sep"></span>
+    <button type="button" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+    <button type="button" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+    <button type="button" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
+    <button type="button" data-cmd="strikeThrough" title="Strikethrough"><i class="bi bi-type-strikethrough"></i></button>
+    <span class="custom-editor-sep"></span>
+    <button type="button" data-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+    <button type="button" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
+    <span class="custom-editor-sep"></span>
+    <% if (_internalLinkGroups.length) { %>
+      <select class="form-select form-select-sm" style="width:auto;max-width:220px;" data-editor-internal-link title="Insert a link to a page on this site">
+        <option value="">Insert internal link…</option>
+        <% _internalLinkGroups.forEach(function (g) { %>
+          <% if (g.items && g.items.length) { %>
+            <optgroup label="<%= g.group %>">
+              <% g.items.forEach(function (it) { %>
+                <option value="<%= it.url %>"><%= it.label %></option>
+              <% }); %>
+            </optgroup>
+          <% } %>
+        <% }); %>
+      </select>
+    <% } %>
+    <button type="button" data-editor-external-link title="Insert external link"><i class="bi bi-link-45deg"></i></button>
+    <button type="button" data-cmd="unlink" title="Remove link"><i class="bi bi-link"></i></button>
+    <span class="custom-editor-sep"></span>
+    <button type="button" data-cmd="removeFormat" title="Clear formatting"><i class="bi bi-eraser"></i></button>
+  </div>
+  <div class="custom-editor-body" id="editorBody-<%= _idSuffix %>" contenteditable="true"><%- _initialContent %></div>
+</div>
+<textarea name="<%= _fieldName %>" id="editorField-<%= _idSuffix %>" style="display:none"><%= _initialContent %></textarea>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  (function () {
+    var suffix = <%- JSON.stringify(_idSuffix) %>;
+    var toolbar = document.getElementById('editorToolbar-' + suffix);
+    var editor = document.getElementById('editorBody-' + suffix);
+    var hidden = document.getElementById('editorField-' + suffix);
+    if (!toolbar || !editor || !hidden) return;
+
+    function exec(cmd, value) {
+      editor.focus();
+      var v = (cmd === 'formatBlock' && value) ? '<' + value + '>' : (value || null);
+      document.execCommand(cmd, false, v);
+      sync();
+    }
+    function sync() { hidden.value = editor.innerHTML; }
+
+    toolbar.querySelectorAll('button[data-cmd]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        exec(btn.getAttribute('data-cmd'), btn.getAttribute('data-value'));
+      });
+    });
+
+    var formatSelect = toolbar.querySelector('[data-editor-format]');
+    if (formatSelect) {
+      formatSelect.addEventListener('change', function () {
+        if (formatSelect.value) exec('formatBlock', formatSelect.value);
+        formatSelect.selectedIndex = 0;
+      });
+    }
+
+    var internalLinkSelect = toolbar.querySelector('[data-editor-internal-link]');
+    if (internalLinkSelect) {
+      internalLinkSelect.addEventListener('change', function () {
+        if (internalLinkSelect.value) exec('createLink', internalLinkSelect.value);
+        internalLinkSelect.selectedIndex = 0;
+      });
+    }
+
+    var externalLinkBtn = toolbar.querySelector('[data-editor-external-link]');
+    if (externalLinkBtn) {
+      externalLinkBtn.addEventListener('click', function () {
+        var url = window.prompt('Enter link URL (e.g. https://example.com):');
+        if (url) exec('createLink', url);
+      });
+    }
+
+    // Keep the hidden field (what actually submits) in sync as the admin
+    // types, not just on toolbar clicks / form submit — so nothing typed
+    // is ever lost if something else on the page reads the field early.
+    editor.addEventListener('input', sync);
+    var form = editor.closest('form');
+    if (form) form.addEventListener('submit', sync);
+    sync();
+  })();
+});
+</script>

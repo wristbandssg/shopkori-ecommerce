@@ -14,7 +14,12 @@ const customPageSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     title: { type: String, required: true, trim: true },
     content: { type: String, default: '' },
+    image: { type: String, default: null },
+    imageAlt: { type: String, default: '' },
     status: { type: Boolean, default: true },
+    metaTitle: { type: String, default: '' },
+    metaKeywords: { type: String, default: '' },
+    metaDescription: { type: String, default: '' },
   },
   { timestamps: true }
 );

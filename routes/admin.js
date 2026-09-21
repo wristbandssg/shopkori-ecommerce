@@ -58,6 +58,7 @@ const { sendSms } = require('../lib/sms');
 
 const adminLocals = require('../middleware/adminLocals');
 const { requireAdminLogin } = require('../middleware/auth');
+const { requireModule } = require('../middleware/permissions');
 const { verifyCsrf } = require('../middleware/csrf');
 const upload = require('../middleware/upload');
 const { slugify, ensureUniqueSlug, maskSecret } = require('../middleware/helpers');
@@ -161,6 +162,38 @@ router.get('/logout', (req, res) => {
 
 // Everything below requires admin login
 router.use(requireAdminLogin);
+
+/* =====================================================================
+   STAFF > ROLES ENFORCEMENT (see middleware/permissions.js)
+   ---------------------------------------------------------------------
+   Module -> URL-prefix gates for the subset of PERMISSION_MODULES that
+   map onto a real, unambiguous route group in this app. An account with
+   no role assigned is unrestricted (see permissions.js); an account with
+   a role is blocked (admin/403) from a gated prefix its role doesn't
+   grant. Registration order matters: a MORE SPECIFIC prefix that sits
+   inside a broader one (e.g. /products/variant inside /products,
+   /settings/page-builder and /settings/coupon inside /settings) MUST be
+   registered before the broader one — requireModule() marks a request
+   "handled" on the first gate that clears it, so the broader gate then
+   just passes it through instead of re-checking a second module.
+   Left honestly UNENFORCED (no unambiguous route group exists for them
+   in this actual app, unlike the ones below): storeAnalytics, pos,
+   store, productTax, rating, subscriber, shipping, plans, changeStore,
+   resetPassword.
+   ===================================================================== */
+router.use('/products/variant', requireModule('variants'));
+router.use('/staff/roles', requireModule('role'));
+router.use('/staff/users', requireModule('user'));
+router.use('/settings/page-builder', requireModule('customPage'));
+router.use('/settings/coupon', requireModule('productCoupon'));
+router.use('/pages', requireModule('customPage'));
+router.use('/orders', requireModule('orders'));
+router.use('/products', requireModule('products'));
+router.use('/categories', requireModule('productCategory'));
+router.use('/blog', requireModule('blog'));
+router.use('/customers', requireModule('customers'));
+router.use('/customization', requireModule('themes'));
+router.use('/settings', requireModule('settings'));
 
 /* =====================================================================
    COMING SOON PLACEHOLDERS
@@ -732,7 +765,7 @@ router.get('/orders/after-confirm', async (req, res, next) => {
 /* =====================================================================
    DASHBOARD
    ===================================================================== */
-router.get('/', async (req, res, next) => {
+router.get('/', requireModule('dashboard'), async (req, res, next) => {
   try {
     const [totalSalesAgg, totalOrders, pendingOrders, totalCustomers, totalProducts, lowStock, recentOrders] =
       await Promise.all([
@@ -1232,6 +1265,7 @@ async function saveProduct(req, res, next, existingId) {
       afterConfirmOfferDescription,
       metaTitle, metaKeywords, metaDescription,
       publishStatus, publishAt,
+      imageAlt,
     } = req.body;
 
     const errors = [];
@@ -1356,6 +1390,7 @@ async function saveProduct(req, res, next, existingId) {
           minOrderQty: minOrderQtyNum,
           maxOrderQty: maxOrderQtyNum,
           image: imageName,
+          imageAlt: (imageAlt || '').trim(),
           galleryImage: galleryImageName,
           variantsChartImage: variantsChartImageName,
         },
@@ -1402,6 +1437,7 @@ async function saveProduct(req, res, next, existingId) {
         text: (offerDescriptionText || '').trim(),
       },
       image: imageName || 'product-placeholder.svg',
+      imageAlt: (imageAlt || '').trim(),
       galleryImage: galleryImageName,
       variantsChartImage: variantsChartImageName,
       deliveryType: ['manual', 'free_shipping', 'flat_rate'].includes(deliveryType) ? deliveryType : 'manual',
@@ -4461,7 +4497,8 @@ router.post('/settings/invoice', verifyCsrf, async (req, res, next) => {
 router.get('/settings/page-builder', async (req, res, next) => {
   try {
     const customPages = await CustomPage.find().sort({ createdAt: -1 });
-    res.render('admin/settings-page-builder', { adminPageTitle: 'Page Builder Settings', customPages, editPage: null });
+    const internalLinkGroups = await buildInternalLinkGroups();
+    res.render('admin/settings-page-builder', { adminPageTitle: 'Page Builder Settings', customPages, editPage: null, internalLinkGroups });
   } catch (err) {
     next(err);
   }
@@ -4475,15 +4512,20 @@ router.get('/settings/page-builder/:id/edit', async (req, res, next) => {
       req.flash('danger', 'Page not found.');
       return res.redirect('/admin/settings/page-builder');
     }
-    res.render('admin/settings-page-builder', { adminPageTitle: 'Page Builder Settings', customPages, editPage });
+    const internalLinkGroups = await buildInternalLinkGroups();
+    res.render('admin/settings-page-builder', { adminPageTitle: 'Page Builder Settings', customPages, editPage, internalLinkGroups });
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/settings/page-builder', verifyCsrf, async (req, res, next) => {
+router.post('/settings/page-builder', upload.single('image'), async (req, res, next) => {
   try {
-    const { slug: slugInput, name, title, content } = req.body;
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/settings/page-builder');
+    }
+    const { slug: slugInput, name, title, content, metaTitle, metaKeywords, metaDescription, imageAlt } = req.body;
     if (!name || !name.trim() || !title || !title.trim()) {
       req.flash('danger', 'Page Name and Page Title are required.');
       return res.redirect('/admin/settings/page-builder');
@@ -4495,27 +4537,45 @@ router.post('/settings/page-builder', verifyCsrf, async (req, res, next) => {
       name: name.trim(),
       title: title.trim(),
       content: content || '',
+      image: req.file ? req.file.filename : null,
+      imageAlt: (imageAlt || '').trim(),
       status: true,
+      metaTitle: (metaTitle || '').trim(),
+      metaKeywords: (metaKeywords || '').trim(),
+      metaDescription: (metaDescription || '').trim(),
     });
-    req.flash('success', 'New page saved successfully.');
+    req.flash('success', `New page saved and live at /page/${slug}.`);
     res.redirect('/admin/settings/page-builder');
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/settings/page-builder/:id/edit', verifyCsrf, async (req, res, next) => {
+router.post('/settings/page-builder/:id/edit', upload.single('image'), async (req, res, next) => {
   try {
-    const { slug: slugInput, name, title, content } = req.body;
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect(`/admin/settings/page-builder/${req.params.id}/edit`);
+    }
+    const { slug: slugInput, name, title, content, metaTitle, metaKeywords, metaDescription, imageAlt } = req.body;
     if (!name || !name.trim() || !title || !title.trim()) {
       req.flash('danger', 'Page Name and Page Title are required.');
       return res.redirect(`/admin/settings/page-builder/${req.params.id}/edit`);
     }
     const baseSlug = slugify((slugInput && slugInput.trim()) || name);
     const slug = await ensureUniqueSlug(CustomPage, baseSlug, req.params.id);
+    const existing = await CustomPage.findById(req.params.id);
+    const imageName = req.file ? req.file.filename : (existing ? existing.image : null);
     await CustomPage.updateOne(
       { _id: req.params.id },
-      { slug, name: name.trim(), title: title.trim(), content: content || '', status: !!req.body.status }
+      {
+        slug, name: name.trim(), title: title.trim(), content: content || '', status: !!req.body.status,
+        image: imageName,
+        imageAlt: (imageAlt || '').trim(),
+        metaTitle: (metaTitle || '').trim(),
+        metaKeywords: (metaKeywords || '').trim(),
+        metaDescription: (metaDescription || '').trim(),
+      }
     );
     req.flash('success', 'Page updated successfully.');
     res.redirect('/admin/settings/page-builder');
@@ -5477,6 +5537,40 @@ router.get('/inventory', async (req, res, next) => {
 });
 
 /* =====================================================================
+   Shared "internal link" list for the rich-text editor (views/admin/
+   partials/rich-editor.ejs) used by Pages, Blog and Page Builder below —
+   lets an admin pick another page on this site from a dropdown instead of
+   typing/copy-pasting its URL. Cheap to build (small collections, no
+   products — the catalog can be large, so product links still go through
+   the "Insert external link" box, same as any outside URL).
+   ===================================================================== */
+const STATIC_PAGE_URL = (key) => (key === 'about' ? '/about' : `/policy/${key}`);
+async function buildInternalLinkGroups() {
+  const [categories, staticPages, customPages, posts] = await Promise.all([
+    Category.find({ status: true }).sort({ name: 1 }).select('name slug').lean(),
+    Page.find({}).sort({ key: 1 }).select('key title').lean(),
+    CustomPage.find({}).sort({ name: 1 }).select('slug name').lean(),
+    BlogPost.find({}).sort({ title: 1 }).select('slug title').lean(),
+  ]);
+  return [
+    {
+      group: 'Main',
+      items: [
+        { label: 'Home', url: '/' },
+        { label: 'All Products', url: '/category' },
+        { label: 'Blog (listing)', url: '/blog' },
+        { label: 'Contact', url: '/contact' },
+        { label: 'Track Order', url: '/track-order' },
+      ],
+    },
+    { group: 'Categories', items: categories.map((c) => ({ label: c.name, url: `/category/${c.slug}` })) },
+    { group: 'Static Pages', items: staticPages.map((p) => ({ label: p.title, url: STATIC_PAGE_URL(p.key) })) },
+    { group: 'Custom Pages', items: customPages.map((p) => ({ label: p.name, url: `/page/${p.slug}` })) },
+    { group: 'Blog Posts', items: posts.map((p) => ({ label: p.title, url: `/blog/${p.slug}` })) },
+  ];
+}
+
+/* =====================================================================
    PAGES (About Us, FAQ, How to Order, How to Pay, Terms, Privacy,
    Refund, Shipping) — editable static content, replaces hardcoded text.
    ===================================================================== */
@@ -5501,18 +5595,33 @@ router.get('/pages', async (req, res, next) => {
       await Page.insertMany(missing.map(([key, title]) => ({ key, title, body: '' })));
     }
     const pages = await Page.find({}).sort({ key: 1 });
-    res.render('admin/pages', { adminPageTitle: 'Page Management', pages });
+    const internalLinkGroups = await buildInternalLinkGroups();
+    res.render('admin/pages', { adminPageTitle: 'Page Management', pages, internalLinkGroups });
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/pages/:key', verifyCsrf, async (req, res, next) => {
+router.post('/pages/:key', upload.single('image'), async (req, res, next) => {
   try {
-    const { title, body } = req.body;
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/pages');
+    }
+    const { title, body, metaTitle, metaKeywords, metaDescription, imageAlt } = req.body;
+    const existing = await Page.findOne({ key: req.params.key });
+    const imageName = req.file ? req.file.filename : (existing ? existing.image : null);
     await Page.findOneAndUpdate(
       { key: req.params.key },
-      { title: (title || '').trim(), body: body || '' },
+      {
+        title: (title || '').trim(),
+        body: body || '',
+        image: imageName,
+        imageAlt: (imageAlt || '').trim(),
+        metaTitle: (metaTitle || '').trim(),
+        metaKeywords: (metaKeywords || '').trim(),
+        metaDescription: (metaDescription || '').trim(),
+      },
       { upsert: true }
     );
     req.flash('success', 'Page updated successfully.');
@@ -5528,14 +5637,21 @@ router.post('/pages/:key', verifyCsrf, async (req, res, next) => {
 router.get('/blog', async (req, res, next) => {
   try {
     const posts = await BlogPost.find({}).sort({ createdAt: -1 });
-    res.render('admin/blog', { adminPageTitle: 'Blog Management', posts });
+    const existingCategories = (await BlogPost.distinct('category')).filter(Boolean).sort();
+    res.render('admin/blog', { adminPageTitle: 'Blog Management', posts, existingCategories });
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/blog/new', (req, res) => {
-  res.render('admin/blog-form', { adminPageTitle: 'New Blog Post', post: null, errors: [] });
+router.get('/blog/new', async (req, res, next) => {
+  try {
+    const internalLinkGroups = await buildInternalLinkGroups();
+    const existingCategories = (await BlogPost.distinct('category')).filter(Boolean).sort();
+    res.render('admin/blog-form', { adminPageTitle: 'New Blog Post', post: null, errors: [], internalLinkGroups, existingCategories });
+  } catch (err) {
+    next(err);
+  }
 });
 
 router.get('/blog/:id/edit', async (req, res, next) => {
@@ -5545,7 +5661,9 @@ router.get('/blog/:id/edit', async (req, res, next) => {
       req.flash('danger', 'Blog post not found.');
       return res.redirect('/admin/blog');
     }
-    res.render('admin/blog-form', { adminPageTitle: 'Edit Blog Post', post, errors: [] });
+    const internalLinkGroups = await buildInternalLinkGroups();
+    const existingCategories = (await BlogPost.distinct('category')).filter(Boolean).sort();
+    res.render('admin/blog-form', { adminPageTitle: 'Edit Blog Post', post, errors: [], internalLinkGroups, existingCategories });
   } catch (err) {
     next(err);
   }
@@ -5558,18 +5676,60 @@ async function saveBlogPost(req, res, next, existingId) {
       return res.redirect('/admin/blog');
     }
     const existing = existingId ? await BlogPost.findById(existingId) : null;
-    const { title, excerpt, content } = req.body;
+    const {
+      title, excerpt, content, publishStatus, publishAt,
+      metaTitle, metaKeywords, metaDescription,
+      category, tags: tagsInput, coverImageAlt,
+    } = req.body;
     const errors = [];
+    const tagsList = (tagsInput || '')
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .filter((t, i, arr) => arr.indexOf(t) === i);
     if (!title || !title.trim()) errors.push('Title is required.');
+
+    // Publish / Draft / Schedule — same resolution logic as saveProduct
+    // above: resolves to the single `status` boolean the storefront query
+    // already filters on, and server.js's scheduled-publish job flips a
+    // due 'scheduled' post over to 'published'/status:true on its own.
+    const now = new Date();
+    let publishStatusValue = ['draft', 'published', 'scheduled'].includes(publishStatus) ? publishStatus : 'published';
+    let publishAtValue = null;
+    let statusValue = true;
+    if (publishStatusValue === 'draft') {
+      statusValue = false;
+    } else if (publishStatusValue === 'scheduled') {
+      const parsedPublishAt = publishAt ? new Date(publishAt) : null;
+      if (!parsedPublishAt || Number.isNaN(parsedPublishAt.getTime())) {
+        errors.push('Please choose a date & time to schedule this post.');
+      } else if (parsedPublishAt <= now) {
+        publishStatusValue = 'published';
+        statusValue = true;
+      } else {
+        publishAtValue = parsedPublishAt;
+        statusValue = false;
+      }
+    } else {
+      publishStatusValue = 'published';
+      statusValue = true;
+    }
 
     let imageName = existing ? existing.coverImage : null;
     if (req.file) imageName = req.file.filename;
 
     if (errors.length) {
+      const internalLinkGroups = await buildInternalLinkGroups();
+      const existingCategories = (await BlogPost.distinct('category')).filter(Boolean).sort();
       return res.render('admin/blog-form', {
         adminPageTitle: existing ? 'Edit Blog Post' : 'New Blog Post',
-        post: { ...(existing ? existing.toObject() : {}), ...req.body, coverImage: imageName },
+        post: {
+          ...(existing ? existing.toObject() : {}), ...req.body, coverImage: imageName,
+          publishStatus: publishStatusValue, publishAt: publishAtValue, tags: tagsList,
+        },
         errors,
+        internalLinkGroups,
+        existingCategories,
       });
     }
 
@@ -5582,7 +5742,15 @@ async function saveBlogPost(req, res, next, existingId) {
       excerpt: (excerpt || '').trim(),
       content: content || '',
       coverImage: imageName,
-      status: !!req.body.status,
+      coverImageAlt: (coverImageAlt || '').trim(),
+      category: (category || '').trim(),
+      tags: tagsList,
+      status: statusValue,
+      publishStatus: publishStatusValue,
+      publishAt: publishAtValue,
+      metaTitle: (metaTitle || '').trim(),
+      metaKeywords: (metaKeywords || '').trim(),
+      metaDescription: (metaDescription || '').trim(),
     };
 
     if (existing) {
@@ -5590,7 +5758,7 @@ async function saveBlogPost(req, res, next, existingId) {
       req.flash('success', 'Blog post updated successfully.');
     } else {
       await BlogPost.create(data);
-      req.flash('success', 'New blog post published successfully.');
+      req.flash('success', publishStatusValue === 'draft' ? 'Blog post saved as draft.' : (publishStatusValue === 'scheduled' ? 'Blog post scheduled.' : 'New blog post published successfully.'));
     }
     res.redirect('/admin/blog');
   } catch (err) {

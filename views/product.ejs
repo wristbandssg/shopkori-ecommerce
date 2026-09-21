@@ -82,7 +82,7 @@
   <div class="row g-4">
     <div class="col-md-5">
       <div class="product-gallery">
-        <img id="mainProductImage" src="<%= productImageUrl(product.image) %>" class="img-fluid rounded" alt="<%= product.name %>" onerror="this.src='/images/product-placeholder.svg'">
+        <img id="mainProductImage" src="<%= productImageUrl(product.image) %>" class="img-fluid rounded" alt="<%= product.imageAlt || product.name %>" onerror="this.src='/images/product-placeholder.svg'">
         <% if (product.galleryImage) { %>
           <div class="product-thumbs mt-2 d-flex gap-2">
             <img src="<%= productImageUrl(product.image) %>" class="product-thumb-item active" data-full="<%= productImageUrl(product.image) %>">

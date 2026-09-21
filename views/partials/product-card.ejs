@@ -9,7 +9,7 @@
 %>
 <div class="product-card">
   <a href="/product/<%= p.slug %>" class="product-card-img">
-    <img src="<%= productImageUrl(p.image) %>" alt="<%= p.name %>" loading="lazy" onerror="this.src='/images/product-placeholder.svg'">
+    <img src="<%= productImageUrl(p.image) %>" alt="<%= p.imageAlt || p.name %>" loading="lazy" onerror="this.src='/images/product-placeholder.svg'">
     <% if (!hasVariants && p.hasSale) { %><span class="badge-discount">-<%= p.discountPercent %>%</span><% } %>
     <% if (p.isFlashSale) { %><span class="badge-flash"><i class="bi bi-lightning-fill"></i></span><% } %>
   </a>

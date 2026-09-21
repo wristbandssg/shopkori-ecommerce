@@ -1,5 +1,13 @@
 <%- include('partials/admin-header') %>
 
+<div class="admin-card mb-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+  <div>
+    <strong><i class="bi bi-info-circle"></i> Want to create a brand-new page</strong> (not one of the 8 fixed ones below)?
+    <div class="text-muted small">This screen only edits the site's built-in pages. Use Page Builder to add any new page with its own URL.</div>
+  </div>
+  <a href="/admin/settings/page-builder" class="btn btn-brand text-nowrap"><i class="bi bi-file-earmark-plus"></i> Create New Page</a>
+</div>
+
 <div class="admin-card">
   <h5>Static Page Management</h5>
   <p class="text-muted" style="margin-top:-10px;">Edit the text for "About Us", "FAQ", "How to order", "How to pay" and policy pages here — changes apply to the site immediately.</p>
@@ -19,7 +27,7 @@
           <div class="modal fade" id="editPage<%= p.key %>" tabindex="-1">
             <div class="modal-dialog modal-lg">
               <div class="modal-content">
-                <form method="post" action="/admin/pages/<%= p.key %>">
+                <form method="post" action="/admin/pages/<%= p.key %>" enctype="multipart/form-data">
                   <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
                   <div class="modal-header">
                     <h5 class="modal-title">Edit <%= p.title %></h5>
@@ -32,7 +40,29 @@
                     </div>
                     <div class="mb-3">
                       <label class="form-label">Content</label>
-                      <textarea name="body" class="form-control" rows="8"><%= p.body %></textarea>
+                      <%- include('partials/rich-editor', { idSuffix: 'page-' + p.key, fieldName: 'body', initialContent: p.body || '', internalLinkGroups: internalLinkGroups }) %>
+                    </div>
+                    <div class="mb-3">
+                      <label class="form-label">Image <small class="text-muted">(optional)</small></label>
+                      <input type="file" name="image" class="form-control" accept="image/*">
+                      <% if (p.image) { %><img src="<%= productImageUrl(p.image) %>" class="admin-thumb mt-2"><% } %>
+                      <input type="text" name="imageAlt" class="form-control mt-2" placeholder="Alt text (for SEO & accessibility)" value="<%= p.imageAlt || '' %>">
+                    </div>
+                    <hr>
+                    <h6><i class="bi bi-search"></i> SEO</h6>
+                    <div class="row g-2">
+                      <div class="col-12">
+                        <label class="form-label mb-1">Meta Title</label>
+                        <input type="text" name="metaTitle" class="form-control" value="<%= p.metaTitle || '' %>">
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label mb-1">Meta Keywords</label>
+                        <input type="text" name="metaKeywords" class="form-control" value="<%= p.metaKeywords || '' %>">
+                      </div>
+                      <div class="col-12">
+                        <label class="form-label mb-1">Meta Description</label>
+                        <input type="text" name="metaDescription" class="form-control" value="<%= p.metaDescription || '' %>">
+                      </div>
                     </div>
                   </div>
                   <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>

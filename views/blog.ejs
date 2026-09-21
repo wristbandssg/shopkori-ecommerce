@@ -2,6 +2,24 @@
 <div class="container py-5">
   <h2 class="section-heading mb-4">ব্লগ</h2>
 
+  <% if ((categories && categories.length) || (tags && tags.length)) { %>
+    <div class="mb-4 d-flex flex-wrap gap-2 align-items-center">
+      <% if (categories && categories.length) { %>
+        <a href="/blog" class="badge <%= !activeCategory ? 'bg-primary' : 'bg-light text-dark border' %> text-decoration-none px-3 py-2">সব বিভাগ</a>
+        <% categories.forEach(function (c) { %>
+          <a href="/blog?category=<%= encodeURIComponent(c) %>" class="badge <%= activeCategory === c ? 'bg-primary' : 'bg-light text-dark border' %> text-decoration-none px-3 py-2"><%= c %></a>
+        <% }); %>
+      <% } %>
+    </div>
+    <% if (tags && tags.length) { %>
+      <div class="mb-4 d-flex flex-wrap gap-2 align-items-center">
+        <% tags.forEach(function (t) { %>
+          <a href="/blog?tag=<%= encodeURIComponent(t) %>" class="badge <%= activeTag === t ? 'bg-secondary' : 'bg-light text-dark border' %> text-decoration-none px-3 py-2">#<%= t %></a>
+        <% }); %>
+      </div>
+    <% } %>
+  <% } %>
+
   <% if (!posts.length) { %>
     <div class="static-page mx-auto text-center">
       <i class="bi bi-journal-richtext" style="font-size: 48px; color: var(--brand-gold);"></i>
@@ -15,10 +33,10 @@
           <a href="/blog/<%= post.slug %>" class="text-decoration-none">
             <div class="product-card h-100">
               <div class="product-card-img">
-                <img src="<%= post.coverImage ? productImageUrl(post.coverImage) : '/images/product-placeholder.svg' %>" alt="<%= post.title %>">
+                <img src="<%= post.coverImage ? productImageUrl(post.coverImage) : '/images/product-placeholder.svg' %>" alt="<%= post.coverImageAlt || post.title %>">
               </div>
               <div class="product-card-body">
-                <small class="text-muted"><%= post.createdAt.toLocaleDateString('bn-BD') %></small>
+                <small class="text-muted"><%= post.createdAt.toLocaleDateString('bn-BD') %><% if (post.category) { %> · <%= post.category %><% } %></small>
                 <div class="product-title"><%= post.title %></div>
                 <% if (post.excerpt) { %>
                   <p class="text-muted mb-0" style="font-size:13px;"><%= post.excerpt %></p>

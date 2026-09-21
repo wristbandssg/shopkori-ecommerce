@@ -6,7 +6,7 @@ const { getSettings } = require('../models/Setting');
 const { getMarketingSettings } = require('../models/MarketingSetting');
 const { getThemeCustomizer } = require('../models/ThemeCustomizer');
 const { getOfferSetting } = require('../models/OfferSetting');
-const { currencyFormatter, nl2br } = require('./helpers');
+const { currencyFormatter, nl2br, renderRichText } = require('./helpers');
 const { cartCount } = require('./cart');
 
 /**
@@ -71,6 +71,7 @@ async function storeLocals(req, res, next) {
     res.locals.productImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/product-placeholder.svg');
     res.locals.categoryImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/category-placeholder.svg');
     res.locals.nl2br = nl2br;
+    res.locals.renderRichText = renderRichText;
 
     res.locals.customer = null;
     if (req.session.customerId) {

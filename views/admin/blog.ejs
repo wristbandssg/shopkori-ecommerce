@@ -8,21 +8,31 @@
 
   <div class="table-responsive">
     <table class="table align-middle">
-      <thead><tr><th>Image</th><th>Title</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
+      <thead><tr><th>Image</th><th>Title</th><th>Category / Tags</th><th>Date</th><th>Status</th><th>Action</th></tr></thead>
       <tbody>
         <% posts.forEach(function (p) { %>
           <tr>
-            <td><img src="<%= p.coverImage ? productImageUrl(p.coverImage) : '/images/product-placeholder.svg' %>" class="admin-thumb"></td>
+            <td><img src="<%= p.coverImage ? productImageUrl(p.coverImage) : '/images/product-placeholder.svg' %>" class="admin-thumb" alt="<%= p.coverImageAlt || p.title %>"></td>
             <td><%= p.title %><br><small class="text-muted">/blog/<%= p.slug %></small></td>
+            <td>
+              <% if (p.category) { %><span class="badge bg-info text-dark mb-1"><%= p.category %></span><br><% } %>
+              <% (p.tags || []).forEach(function (t) { %><span class="badge bg-light text-dark border me-1"><%= t %></span><% }); %>
+            </td>
             <td><%= p.createdAt.toLocaleDateString('en-GB') %></td>
-            <td><span class="badge bg-<%= p.status ? 'success' : 'secondary' %>"><%= p.status ? 'Published' : 'Draft' %></span></td>
+            <td>
+              <% if (p.publishStatus === 'scheduled' && p.publishAt) { %>
+                <span class="badge bg-warning text-dark">Scheduled <%= new Date(p.publishAt).toLocaleDateString('en-GB') %></span>
+              <% } else { %>
+                <span class="badge bg-<%= p.status ? 'success' : 'secondary' %>"><%= p.status ? 'Published' : 'Draft' %></span>
+              <% } %>
+            </td>
             <td class="text-nowrap">
               <a href="/admin/blog/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
               <a href="/admin/blog/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this post?')"><i class="bi bi-trash"></i></a>
             </td>
           </tr>
         <% }); %>
-        <% if (!posts.length) { %><tr><td colspan="5" class="text-center text-muted">No blog posts yet.</td></tr><% } %>
+        <% if (!posts.length) { %><tr><td colspan="6" class="text-center text-muted">No blog posts yet.</td></tr><% } %>
       </tbody>
     </table>
   </div>

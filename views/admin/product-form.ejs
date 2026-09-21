@@ -104,6 +104,7 @@
             <label class="form-label">Cover Image <small class="text-muted">(800x800)</small></label>
             <input type="file" name="image" class="form-control" accept="image/*">
             <% if (d.image) { %><img src="<%= productImageUrl(d.image) %>" class="admin-thumb mt-2"><% } %>
+            <input type="text" name="imageAlt" class="form-control mt-2" placeholder="Alt text (for SEO & accessibility)" value="<%= d.imageAlt || '' %>">
           </div>
           <div class="col-md-6">
             <label class="form-label">Product Image <small class="text-muted">(600x600)</small></label>

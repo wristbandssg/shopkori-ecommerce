@@ -2,49 +2,165 @@
   const d = post || {};
   const isEdit = !!(post && post._id);
   const formAction = isEdit ? `/admin/blog/${post._id}/edit` : '/admin/blog/new';
+
+  function toDatetimeLocal(dt) {
+    if (!dt) return '';
+    dt = new Date(dt);
+    if (Number.isNaN(dt.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  }
+  const publishStatusValue = ['draft', 'published', 'scheduled'].includes(d.publishStatus) ? d.publishStatus : 'published';
+  const publishAtLocalValue = toDatetimeLocal(d.publishAt);
+  const tagsValue = Array.isArray(d.tags) ? d.tags.join(', ') : (d.tags || '');
+  const categoriesList = typeof existingCategories !== 'undefined' ? existingCategories : [];
 %>
 <%- include('partials/admin-header') %>
 
-<div class="admin-card">
-  <% if (errors.length) { %>
-    <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
-  <% } %>
+<% if (errors.length) { %>
+  <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+<% } %>
 
-  <form method="post" action="<%= formAction %>" enctype="multipart/form-data">
-    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
-    <div class="row g-3">
-      <div class="col-12">
-        <label class="form-label">Title *</label>
-        <input type="text" name="title" class="form-control" required value="<%= d.title || '' %>">
+<form method="post" action="<%= formAction %>" enctype="multipart/form-data" id="blogForm">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+  <div class="row g-3">
+    <div class="col-lg-8">
+      <div class="admin-card">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Title *</label>
+            <input type="text" name="title" class="form-control" required value="<%= d.title || '' %>">
+          </div>
+
+          <div class="col-md-6">
+            <label class="form-label">Cover Image</label>
+            <input type="file" name="coverImage" class="form-control" accept="image/*">
+            <% if (d.coverImage) { %><img src="<%= productImageUrl(d.coverImage) %>" class="admin-thumb mt-2"><% } %>
+            <input type="text" name="coverImageAlt" class="form-control mt-2" placeholder="Alt text (for SEO & accessibility)" value="<%= d.coverImageAlt || '' %>">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Category</label>
+            <input type="text" name="category" class="form-control" list="blogCategoryList" placeholder="e.g. Recipes" value="<%= d.category || '' %>">
+            <datalist id="blogCategoryList">
+              <% categoriesList.forEach(function (c) { %><option value="<%= c %>"><% }); %>
+            </datalist>
+          </div>
+
+          <div class="col-12">
+            <label class="form-label">Tags <small class="text-muted">(comma separated)</small></label>
+            <input type="text" name="tags" class="form-control" placeholder="e.g. tips, guide, news" value="<%= tagsValue %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Short Excerpt (shown in listing)</label>
+            <input type="text" name="excerpt" class="form-control" value="<%= d.excerpt || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Post Content</label>
+            <%- include('partials/rich-editor', { idSuffix: 'blog', fieldName: 'content', initialContent: d.content || '', internalLinkGroups: internalLinkGroups }) %>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <!-- ---------- Publish ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-toggle2-on"></i> Publish</h5>
+        <div class="btn-group flex-wrap mb-2" role="group">
+          <input type="radio" class="btn-check" name="publishStatus" id="psDraft" value="draft" autocomplete="off" <%= publishStatusValue === 'draft' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="psDraft">Draft</label>
+          <input type="radio" class="btn-check" name="publishStatus" id="psPublished" value="published" autocomplete="off" <%= publishStatusValue === 'published' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="psPublished">Publish</label>
+          <input type="radio" class="btn-check" name="publishStatus" id="psScheduled" value="scheduled" autocomplete="off" <%= publishStatusValue === 'scheduled' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="psScheduled">Schedule</label>
+        </div>
+        <div id="publishAtWrap" class="mb-1" style="<%= publishStatusValue === 'scheduled' ? '' : 'display:none' %>">
+          <label class="form-label">Publish Date &amp; Time</label>
+          <input type="datetime-local" name="publishAt" class="form-control" value="<%= publishAtLocalValue %>">
+        </div>
+        <div class="form-text mb-0">Draft = only visible here in the admin panel. Publish = live on the site now. Schedule = goes live on its own at the date/time you pick (checked every minute).</div>
       </div>
 
-      <div class="col-md-6">
-        <label class="form-label">Cover Image</label>
-        <input type="file" name="coverImage" class="form-control" accept="image/*">
-        <% if (d.coverImage) { %><img src="<%= productImageUrl(d.coverImage) %>" class="admin-thumb mt-2"><% } %>
-      </div>
-      <div class="col-md-6">
-        <div class="form-check mt-4">
-          <input class="form-check-input" type="checkbox" name="status" id="isPublished" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
-          <label class="form-check-label" for="isPublished">Published (show on site)</label>
+      <!-- ---------- SEO ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-search"></i> SEO</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label mb-1">Google Search Preview <small class="text-muted">(updates as you type)</small></label>
+            <div class="serp-preview" id="serpPreview">
+              <div class="serp-url" id="serpUrl"></div>
+              <div class="serp-title" id="serpTitle"></div>
+              <div class="serp-desc" id="serpDesc"></div>
+            </div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Meta Title</label>
+            <input type="text" name="metaTitle" class="form-control" value="<%= d.metaTitle || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Meta Keywords</label>
+            <input type="text" name="metaKeywords" class="form-control" value="<%= d.metaKeywords || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Meta Description</label>
+            <input type="text" name="metaDescription" class="form-control" value="<%= d.metaDescription || '' %>">
+          </div>
+          <div class="col-12">
+            <div class="form-text mb-0"><i class="bi bi-check-circle text-success"></i> Structured data (schema.org <code>Article</code> + <code>BreadcrumbList</code>) is generated automatically from this post's title, image and date — nothing else to fill in for that.</div>
+          </div>
         </div>
       </div>
 
-      <div class="col-12">
-        <label class="form-label">Short Excerpt (shown in listing)</label>
-        <input type="text" name="excerpt" class="form-control" value="<%= d.excerpt || '' %>">
-      </div>
-      <div class="col-12">
-        <label class="form-label">Post Content</label>
-        <textarea name="content" class="form-control" rows="10"><%= d.content || '' %></textarea>
+      <div class="d-grid">
+        <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+        <a href="/admin/blog" class="btn btn-outline-secondary mt-2">Cancel</a>
       </div>
     </div>
+  </div>
+</form>
 
-    <div class="mt-4">
-      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
-      <a href="/admin/blog" class="btn btn-outline-secondary">Cancel</a>
-    </div>
-  </form>
-</div>
+<script>
+  // ---- Publish status: show the Schedule date/time picker only when relevant ----
+  (function () {
+    var publishAtWrap = document.getElementById('publishAtWrap');
+    document.querySelectorAll('input[name="publishStatus"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        publishAtWrap.style.display = document.getElementById('psScheduled').checked ? '' : 'none';
+      });
+    });
+  })();
+
+  // ---- Live Google search-result preview ----
+  (function () {
+    var titleInput = document.querySelector('input[name="title"]');
+    var excerptInput = document.querySelector('input[name="excerpt"]');
+    var metaTitleInput = document.querySelector('input[name="metaTitle"]');
+    var metaDescInput = document.querySelector('input[name="metaDescription"]');
+    var siteName = <%- JSON.stringify(settings.site_name) %>;
+    var titleEl = document.getElementById('serpTitle');
+    var descEl = document.getElementById('serpDesc');
+    var urlEl = document.getElementById('serpUrl');
+
+    function slugPreview(text) {
+      return (text || '').toString().toLowerCase().trim()
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-') || 'your-post';
+    }
+
+    function updatePreview() {
+      var title = metaTitleInput.value.trim() || titleInput.value.trim() || 'Post Title';
+      var desc = metaDescInput.value.trim() || excerptInput.value.trim() || 'Add a Short Excerpt or Meta Description so this shows up nicely in Google.';
+      titleEl.textContent = title + ' | ' + siteName;
+      descEl.textContent = desc.length > 160 ? desc.slice(0, 157) + '…' : desc;
+      urlEl.textContent = siteName + ' › blog › ' + slugPreview(titleInput.value);
+    }
+
+    [titleInput, excerptInput, metaTitleInput, metaDescInput].forEach(function (el) {
+      el.addEventListener('input', updatePreview);
+    });
+    updatePreview();
+  })();
+</script>
 
 <%- include('partials/admin-footer') %>

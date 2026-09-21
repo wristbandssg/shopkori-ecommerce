@@ -42,6 +42,7 @@ const productSchema = new mongoose.Schema(
     videoEmbed: { type: String, default: '' },
     videoPosition: { type: String, enum: ['', 'top', 'bottom'], default: '' },
     image: { type: String, default: null }, // cover image (800x800)
+    imageAlt: { type: String, default: '' }, // alt text for the cover image (SEO + accessibility)
     galleryImage: { type: String, default: null }, // secondary product image (600x600)
     variantsChartImage: { type: String, default: null }, // e.g. a size chart
 

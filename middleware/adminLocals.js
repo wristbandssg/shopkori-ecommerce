@@ -1,4 +1,5 @@
 const Admin = require('../models/Admin');
+const { RoleModel: Role } = require('../models/Role');
 const Order = require('../models/Order');
 const Announcement = require('../models/Announcement');
 const { getSettings } = require('../models/Setting');
@@ -20,6 +21,11 @@ async function adminLocals(req, res, next) {
     res.locals.storeAssetUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : null);
     res.locals.flashes = res.locals.flashes || [];
     res.locals.currentAdmin = null;
+    // The logged-in account's Staff > Roles document (or null — see
+    // middleware/permissions.js for what null means for enforcement).
+    // Loaded here, once per request, so requireModule() and any view can
+    // both read req.adminRole without a second DB round-trip.
+    req.adminRole = null;
     // Made available on every admin page so views never need to remember
     // to pass these through render() individually.
     res.locals.ORDER_STATUSES = ORDER_STATUSES;
@@ -50,6 +56,10 @@ async function adminLocals(req, res, next) {
     res.locals.adminAnnouncements = [];
     if (req.session.adminId) {
       res.locals.currentAdmin = await Admin.findById(req.session.adminId).lean();
+      if (res.locals.currentAdmin && res.locals.currentAdmin.roleId) {
+        req.adminRole = await Role.findById(res.locals.currentAdmin.roleId).lean();
+      }
+      res.locals.adminRole = req.adminRole;
       res.locals.adminAnnouncements = await Announcement.find({
         audience: 'admin_staff',
         active: true,

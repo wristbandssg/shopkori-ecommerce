@@ -10,6 +10,7 @@ const Customer = require('../models/Customer');
 const Order = require('../models/Order');
 const SearchLog = require('../models/SearchLog');
 const Page = require('../models/Page');
+const CustomPage = require('../models/CustomPage');
 const BlogPost = require('../models/BlogPost');
 const { getSettings, setSetting: setSiteSetting } = require('../models/Setting');
 const { getOrderSettings } = require('../models/OrderSetting');
@@ -163,6 +164,83 @@ router.get('/feed/facebook-catalog.xml', async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+/* =====================================================================
+   SITEMAP.XML
+   ---------------------------------------------------------------------
+   A live XML sitemap, built fresh from the current published catalog +
+   content every time it's requested (same "always current" approach as
+   the Facebook catalog feed above) — no separate generate/regenerate
+   step for the admin to remember. Includes: home, static pages (About +
+   policy pages), Page Builder pages, category & brand listing pages,
+   published products, and the blog (listing + published posts).
+   ===================================================================== */
+router.get('/sitemap.xml', async (req, res, next) => {
+  try {
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const urlEntry = (loc, opts) => {
+      opts = opts || {};
+      return (
+        '<url>' +
+        `<loc>${xmlEscape(loc)}</loc>` +
+        (opts.lastmod ? `<lastmod>${new Date(opts.lastmod).toISOString()}</lastmod>` : '') +
+        (opts.changefreq ? `<changefreq>${opts.changefreq}</changefreq>` : '') +
+        (opts.priority ? `<priority>${opts.priority}</priority>` : '') +
+        '</url>'
+      );
+    };
+
+    const [categories, brands, products, blogPosts, staticPages, customPages] = await Promise.all([
+      Category.find({ status: true }),
+      Brand.find({ status: true }),
+      Product.find({ status: true }).select('slug updatedAt'),
+      BlogPost.find({ status: true }).select('slug updatedAt'),
+      Page.find({}),
+      CustomPage.find({ status: true }).select('slug updatedAt'),
+    ]);
+
+    const entries = [];
+    entries.push(urlEntry(`${baseUrl}/`, { changefreq: 'daily', priority: '1.0' }));
+    entries.push(urlEntry(`${baseUrl}/blog`, { changefreq: 'daily', priority: '0.6' }));
+
+    staticPages.forEach((p) => {
+      const loc = p.key === 'about' ? `${baseUrl}/about` : `${baseUrl}/policy/${p.key}`;
+      entries.push(urlEntry(loc, { lastmod: p.updatedAt, changefreq: 'monthly', priority: '0.4' }));
+    });
+    customPages.forEach((p) => {
+      entries.push(urlEntry(`${baseUrl}/page/${p.slug}`, { lastmod: p.updatedAt, changefreq: 'monthly', priority: '0.4' }));
+    });
+    categories.forEach((c) => {
+      entries.push(urlEntry(`${baseUrl}/category/${c.slug}`, { changefreq: 'daily', priority: '0.7' }));
+    });
+    brands.forEach((b) => {
+      entries.push(urlEntry(`${baseUrl}/brand/${b.slug}`, { changefreq: 'daily', priority: '0.6' }));
+    });
+    products.forEach((p) => {
+      entries.push(urlEntry(`${baseUrl}/product/${p.slug}`, { lastmod: p.updatedAt, changefreq: 'weekly', priority: '0.8' }));
+    });
+    blogPosts.forEach((p) => {
+      entries.push(urlEntry(`${baseUrl}/blog/${p.slug}`, { lastmod: p.updatedAt, changefreq: 'monthly', priority: '0.5' }));
+    });
+
+    const xml =
+      '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+      entries.join('') +
+      '</urlset>';
+
+    res.set('Content-Type', 'application/xml; charset=utf-8');
+    res.send(xml);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/robots.txt', (req, res) => {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  res.set('Content-Type', 'text/plain; charset=utf-8');
+  res.send(`User-agent: *\nDisallow: /admin\nSitemap: ${baseUrl}/sitemap.xml\n`);
 });
 
 /* =====================================================================
@@ -874,7 +952,14 @@ router.get('/about', async (req, res, next) => {
     const page = await Page.findOne({ key: 'about' });
     const title = page && page.title ? page.title : 'আমাদের সম্পর্কে';
     const body = page && page.body ? page.body : 'এই পেজের লেখা এখনো যোগ করা হয়নি। অ্যাডমিন প্যানেল থেকে "পেজ ম্যানেজমেন্ট" এ গিয়ে যোগ করুন।';
-    res.render('policy', { pageTitle: title, title, body });
+    res.render('policy', {
+      pageTitle: title, title, body,
+      image: page ? page.image : null,
+      imageAlt: page ? page.imageAlt : '',
+      metaTitle: page ? page.metaTitle : '',
+      metaKeywords: page ? page.metaKeywords : '',
+      metaDescription: page ? page.metaDescription : '',
+    });
   } catch (err) {
     next(err);
   }
@@ -903,7 +988,14 @@ router.get('/policy/:type?', async (req, res, next) => {
     const page = await Page.findOne({ key: type });
     const title = page && page.title ? page.title : POLICY_FALLBACK_TITLES[type];
     const body = page && page.body ? page.body : 'এই পেজের লেখা এখনো যোগ করা হয়নি। অ্যাডমিন প্যানেল থেকে "পেজ ম্যানেজমেন্ট" এ গিয়ে যোগ করুন।';
-    res.render('policy', { pageTitle: title, title, body });
+    res.render('policy', {
+      pageTitle: title, title, body,
+      image: page ? page.image : null,
+      imageAlt: page ? page.imageAlt : '',
+      metaTitle: page ? page.metaTitle : '',
+      metaKeywords: page ? page.metaKeywords : '',
+      metaDescription: page ? page.metaDescription : '',
+    });
   } catch (err) {
     next(err);
   }
@@ -915,12 +1007,47 @@ router.get('/how-to-pay', (req, res) => res.redirect('/policy/how-to-pay'));
 router.get('/faq', (req, res) => res.redirect('/policy/faq'));
 
 /* =====================================================================
+   PAGE BUILDER PAGES (Admin > Settings > Page Builder) — arbitrary pages
+   an admin creates at any slug. Previously these could be created and
+   edited in the admin panel but had NO storefront route at all, so a
+   newly-created page never actually appeared anywhere on the live site —
+   this route is what makes "create a new page" actually work end to end.
+   ===================================================================== */
+router.get('/page/:slug', async (req, res, next) => {
+  try {
+    const page = await CustomPage.findOne({ slug: req.params.slug, status: true });
+    if (!page) {
+      return res.status(404).render('404', { pageTitle: 'পেজ পাওয়া যায়নি' });
+    }
+    res.render('page', {
+      pageTitle: page.title,
+      page,
+      metaTitle: page.metaTitle,
+      metaKeywords: page.metaKeywords,
+      metaDescription: page.metaDescription,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
    BLOG (posts are written/edited from Admin > ব্লগ)
    ===================================================================== */
 router.get('/blog', async (req, res, next) => {
   try {
-    const posts = await BlogPost.find({ status: true }).sort({ createdAt: -1 });
-    res.render('blog', { pageTitle: 'ব্লগ', posts });
+    const { category, tag } = req.query;
+    const filter = { status: true };
+    if (category) filter.category = category;
+    if (tag) filter.tags = tag;
+    const posts = await BlogPost.find(filter).sort({ createdAt: -1 });
+    const categories = (await BlogPost.distinct('category', { status: true })).filter(Boolean).sort();
+    const tagsRaw = await BlogPost.distinct('tags', { status: true });
+    const tags = tagsRaw.filter(Boolean).sort();
+    res.render('blog', {
+      pageTitle: 'ব্লগ', posts, categories, tags,
+      activeCategory: category || '', activeTag: tag || '',
+    });
   } catch (err) {
     next(err);
   }
@@ -933,7 +1060,19 @@ router.get('/blog/:slug', async (req, res, next) => {
       req.flash('danger', 'ব্লগ পোস্টটি খুঁজে পাওয়া যায়নি।');
       return res.redirect('/blog');
     }
-    res.render('blog-post', { pageTitle: post.title, post });
+    const orConditions = [
+      ...(post.category ? [{ category: post.category }] : []),
+      ...(post.tags && post.tags.length ? [{ tags: { $in: post.tags } }] : []),
+    ];
+    const relatedPosts = orConditions.length
+      ? await BlogPost.find({ status: true, _id: { $ne: post._id }, $or: orConditions }).limit(3)
+      : [];
+    res.render('blog-post', {
+      pageTitle: post.title, post, relatedPosts,
+      metaTitle: post.metaTitle,
+      metaKeywords: post.metaKeywords,
+      metaDescription: post.metaDescription,
+    });
   } catch (err) {
     next(err);
   }

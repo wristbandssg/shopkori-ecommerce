@@ -55,6 +55,22 @@ function nl2br(str) {
   return escapeHtml(str).replace(/\n/g, '<br>');
 }
 
+// Blog posts, static Pages and Page Builder pages all used to be a plain
+// <textarea> (content = plain text, line breaks only), and are now written
+// with the rich-text editor (views/admin/partials/rich-editor.ejs), whose
+// content is real HTML. Rendering old plain-text content as raw HTML would
+// just print literal "<" characters if anyone had typed them, and would
+// lose their line breaks entirely (HTML collapses bare \n); rendering new
+// HTML content through nl2br/escapeHtml would show the tags as visible
+// text instead of formatting it. So: HTML-looking content renders as-is
+// (this is admin-authored CMS content — the same trust level as the rest
+// of the admin panel, e.g. the theme customizer's raw CSS/JS), anything
+// else still goes through escaping + nl2br so nothing old breaks.
+function renderRichText(str) {
+  if (!str) return '';
+  return /<[a-z][\s\S]*>/i.test(str) ? str : nl2br(str);
+}
+
 // Admin > API & Integration Management — "Sensitive API secrets should not
 // be shown in full in the UI" (e.g. sk_live_****************8921). Display
 // only; never touches the stored value itself.
@@ -68,4 +84,4 @@ function maskSecret(value) {
   return `${start}${middle}${end}`;
 }
 
-module.exports = { slugify, generateOrderNumber, currencyFormatter, ensureUniqueSlug, escapeHtml, nl2br, maskSecret };
+module.exports = { slugify, generateOrderNumber, currencyFormatter, ensureUniqueSlug, escapeHtml, nl2br, renderRichText, maskSecret };

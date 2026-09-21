@@ -10,6 +10,11 @@ const pageSchema = new mongoose.Schema(
     key: { type: String, required: true, unique: true },
     title: { type: String, required: true },
     body: { type: String, default: '' },
+    image: { type: String, default: null },
+    imageAlt: { type: String, default: '' },
+    metaTitle: { type: String, default: '' },
+    metaKeywords: { type: String, default: '' },
+    metaDescription: { type: String, default: '' },
   },
   { timestamps: true }
 );

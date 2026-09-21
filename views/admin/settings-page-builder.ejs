@@ -10,7 +10,12 @@
 
 <div class="admin-card mb-3">
   <h5 class="mb-3"><i class="bi bi-file-earmark-plus"></i> <%= editPage ? 'Edit Page' : 'Add New Page' %></h5>
-  <form method="post" id="pageBuilderForm" action="<%= editPage ? ('/admin/settings/page-builder/' + editPage._id + '/edit') : '/admin/settings/page-builder' %>">
+  <% if (editPage) { %>
+    <div class="alert alert-light border small mb-3">
+      <i class="bi bi-globe"></i> Live at <a href="/page/<%= editPage.slug %>" target="_blank">/page/<%= editPage.slug %></a><% if (!editPage.status) { %> — currently <strong>inactive</strong>, so this link 404s until you check "Active" below.<% } %>
+    </div>
+  <% } %>
+  <form method="post" id="pageBuilderForm" action="<%= editPage ? ('/admin/settings/page-builder/' + editPage._id + '/edit') : '/admin/settings/page-builder' %>" enctype="multipart/form-data">
     <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
 
     <div class="row g-3 mb-3">
@@ -30,29 +35,31 @@
 
     <div class="mb-3">
       <label class="form-label">Page Content</label>
-      <div class="custom-editor" id="pbEditorWrap">
-        <div class="custom-editor-toolbar" id="pbToolbar">
-          <button type="button" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
-          <button type="button" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
-          <button type="button" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
-          <button type="button" data-cmd="strikeThrough" title="Strikethrough"><i class="bi bi-type-strikethrough"></i></button>
-          <span class="custom-editor-sep"></span>
-          <button type="button" data-cmd="formatBlock" data-value="H2" title="Heading"><i class="bi bi-type-h2"></i></button>
-          <button type="button" data-cmd="formatBlock" data-value="H3" title="Subheading"><i class="bi bi-type-h3"></i></button>
-          <button type="button" data-cmd="formatBlock" data-value="P" title="Paragraph">¶</button>
-          <span class="custom-editor-sep"></span>
-          <button type="button" data-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
-          <button type="button" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
-          <button type="button" data-cmd="formatBlock" data-value="BLOCKQUOTE" title="Quote"><i class="bi bi-quote"></i></button>
-          <span class="custom-editor-sep"></span>
-          <button type="button" id="pbLinkBtn" title="Insert link"><i class="bi bi-link-45deg"></i></button>
-          <button type="button" data-cmd="unlink" title="Remove link"><i class="bi bi-link"></i></button>
-          <span class="custom-editor-sep"></span>
-          <button type="button" data-cmd="removeFormat" title="Clear formatting"><i class="bi bi-eraser"></i></button>
-        </div>
-        <div class="custom-editor-body" id="pbEditor" contenteditable="true"><%- editPage ? (editPage.content || '') : '' %></div>
+      <%- include('partials/rich-editor', { idSuffix: 'pb', fieldName: 'content', initialContent: editPage ? (editPage.content || '') : '', internalLinkGroups: internalLinkGroups }) %>
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">Image <small class="text-muted">(optional)</small></label>
+      <input type="file" name="image" class="form-control" accept="image/*">
+      <% if (editPage && editPage.image) { %><img src="<%= productImageUrl(editPage.image) %>" class="admin-thumb mt-2"><% } %>
+      <input type="text" name="imageAlt" class="form-control mt-2" placeholder="Alt text (for SEO & accessibility)" value="<%= editPage ? (editPage.imageAlt || '') : '' %>">
+    </div>
+
+    <hr>
+    <h6><i class="bi bi-search"></i> SEO</h6>
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <label class="form-label">Meta Title</label>
+        <input type="text" name="metaTitle" class="form-control" value="<%= editPage ? (editPage.metaTitle || '') : '' %>">
       </div>
-      <textarea name="content" id="pbContent" style="display:none"><%= editPage ? (editPage.content || '') : '' %></textarea>
+      <div class="col-md-4">
+        <label class="form-label">Meta Keywords</label>
+        <input type="text" name="metaKeywords" class="form-control" value="<%= editPage ? (editPage.metaKeywords || '') : '' %>">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Meta Description</label>
+        <input type="text" name="metaDescription" class="form-control" value="<%= editPage ? (editPage.metaDescription || '') : '' %>">
+      </div>
     </div>
 
     <% if (editPage) { %>
@@ -71,55 +78,24 @@
   <h5 class="mb-3"><i class="bi bi-files"></i> Page List</h5>
   <div class="table-responsive">
     <table class="table align-middle">
-      <thead><tr><th>Slug</th><th>Page Name</th><th>Title</th><th>Action</th></tr></thead>
+      <thead><tr><th>Slug</th><th>Page Name</th><th>Title</th><th>Status</th><th>Action</th></tr></thead>
       <tbody>
         <% customPages.forEach(function (p) { %>
           <tr>
-            <td><code><%= p.slug %></code></td>
+            <td><a href="/page/<%= p.slug %>" target="_blank"><code><%= p.slug %></code></a></td>
             <td><%= p.name %></td>
             <td><%= p.title %></td>
+            <td><span class="badge bg-<%= p.status ? 'success' : 'secondary' %>"><%= p.status ? 'Active' : 'Inactive' %></span></td>
             <td class="text-nowrap">
               <a href="/admin/settings/page-builder/<%= p._id %>/edit" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
               <a href="/admin/settings/page-builder/delete/<%= p._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this page?" title="Delete"><i class="bi bi-trash"></i></a>
             </td>
           </tr>
         <% }); %>
-        <% if (!customPages.length) { %><tr><td colspan="4" class="text-center text-muted py-4">No pages found. Create one above!</td></tr><% } %>
+        <% if (!customPages.length) { %><tr><td colspan="5" class="text-center text-muted py-4">No pages found. Create one above!</td></tr><% } %>
       </tbody>
     </table>
   </div>
 </div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  (function () {
-    var toolbar = document.getElementById('pbToolbar');
-    var editor = document.getElementById('pbEditor');
-    var hidden = document.getElementById('pbContent');
-    var linkBtn = document.getElementById('pbLinkBtn');
-
-    function exec(cmd, value) {
-      editor.focus();
-      var v = (cmd === 'formatBlock' && value) ? '<' + value + '>' : (value || null);
-      document.execCommand(cmd, false, v);
-    }
-
-    toolbar.querySelectorAll('button[data-cmd]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        exec(btn.getAttribute('data-cmd'), btn.getAttribute('data-value'));
-      });
-    });
-
-    linkBtn.addEventListener('click', function () {
-      var url = window.prompt('Enter link URL (e.g. https://example.com):');
-      if (url) exec('createLink', url);
-    });
-
-    document.getElementById('pageBuilderForm').addEventListener('submit', function () {
-      hidden.value = editor.innerHTML;
-    });
-  })();
-});
-</script>
 
 <%- include('partials/admin-footer') %>
