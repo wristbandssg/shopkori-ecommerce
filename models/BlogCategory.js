@@ -15,8 +15,18 @@ const blogCategorySchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, index: true },
     image: { type: String, default: null },
+    imageAlt: { type: String, default: '' }, // alt text for the image (SEO + accessibility)
     sortOrder: { type: Number, default: 0 },
+
+    // `status` stays the single boolean the storefront query already filters
+    // on ("is this category visible right now"). `publishStatus` + `publishAt`
+    // are the admin-facing Draft/Publish/Schedule controls — same pattern as
+    // models/Product.js and models/BlogPost.js — and server.js's
+    // publishDueScheduledBlogCategories job flips status:true itself once a
+    // due 'scheduled' category's publishAt time arrives.
     status: { type: Boolean, default: true },
+    publishStatus: { type: String, enum: ['draft', 'published', 'scheduled'], default: 'published' },
+    publishAt: { type: Date, default: null },
 
     // -- SEO content blocks for the storefront /blog/category/:slug page --
     // Same shape as models/Category.js: pageTitle is the big on-page

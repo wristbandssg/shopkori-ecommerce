@@ -31,6 +31,10 @@
             <label class="form-label">Title *</label>
             <input type="text" name="title" class="form-control" required value="<%= d.title || '' %>">
           </div>
+          <div class="col-12">
+            <label class="form-label">Slug <small class="text-muted">(auto if blank)</small></label>
+            <input type="text" name="slug" class="form-control" value="<%= d.slug || '' %>">
+          </div>
 
           <div class="col-md-6">
             <label class="form-label">Cover Image</label>

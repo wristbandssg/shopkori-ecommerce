@@ -2,6 +2,16 @@
   const d = blogCategory || {};
   const isEdit = !!(blogCategory && blogCategory._id);
   const formAction = isEdit ? `/admin/blog/categories/${blogCategory._id}/edit` : '/admin/blog/categories/new';
+
+  function toDatetimeLocal(dt) {
+    if (!dt) return '';
+    dt = new Date(dt);
+    if (Number.isNaN(dt.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  }
+  const publishStatusValue = ['draft', 'published', 'scheduled'].includes(d.publishStatus) ? d.publishStatus : 'published';
+  const publishAtLocalValue = toDatetimeLocal(d.publishAt);
 %>
 <%- include('partials/admin-header') %>
 
@@ -28,12 +38,10 @@
 
       <!-- ---------- Basic Information ---------- -->
       <div class="admin-card mb-3">
-        <h5><i class="bi bi-card-text"></i> Basic Information</h5>
         <div class="row g-3">
           <div class="col-12">
             <label class="form-label">Category Name *</label>
             <input type="text" name="name" class="form-control" required value="<%= d.name || '' %>">
-            <div class="form-text">Used in the menu, breadcrumb and URL (/blog/category/&lt;slug&gt;).</div>
           </div>
         </div>
       </div>
@@ -43,15 +51,15 @@
         <h5><i class="bi bi-file-earmark-richtext"></i> Category Page Content</h5>
         <div class="row g-3">
           <div class="col-12">
-            <label class="form-label">Page Title <small class="text-muted">(big heading shown on the category page — leave blank to just use the name above)</small></label>
+            <label class="form-label">Page Title</label>
             <input type="text" name="pageTitle" class="form-control" placeholder="e.g. Recipe Ideas &amp; Cooking Tips | <%= settings.site_name %> Blog" value="<%= d.pageTitle || '' %>">
           </div>
           <div class="col-12">
-            <label class="form-label">Short Intro <small class="text-muted">(shown right under the page title, above the post list)</small></label>
+            <label class="form-label">Short Intro</label>
             <textarea name="shortDescription" class="form-control" rows="3" placeholder="e.g. Recipes, kitchen tips and gifting ideas from the ShopKori team..."><%= d.shortDescription || '' %></textarea>
           </div>
           <div class="col-12">
-            <label class="form-label">Content Below Posts <small class="text-muted">(longer SEO write-up, shown after the post list)</small></label>
+            <label class="form-label">Content Below Posts</label>
             <%- include('partials/rich-editor', { idSuffix: 'blogcat', fieldName: 'description', initialContent: d.description || '' }) %>
           </div>
         </div>
@@ -86,15 +94,21 @@
       <!-- ---------- Status ---------- -->
       <div class="admin-card mb-3">
         <h5><i class="bi bi-toggle2-on"></i> Status</h5>
-        <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" name="status" id="blogCatStatus" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
-          <label class="form-check-label" for="blogCatStatus">Active (Show on Site)</label>
+        <div class="btn-group flex-wrap mb-2" role="group">
+          <input type="radio" class="btn-check" name="publishStatus" id="bcPsDraft" value="draft" autocomplete="off" <%= publishStatusValue === 'draft' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="bcPsDraft">Draft</label>
+          <input type="radio" class="btn-check" name="publishStatus" id="bcPsPublished" value="published" autocomplete="off" <%= publishStatusValue === 'published' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="bcPsPublished">Publish</label>
+          <input type="radio" class="btn-check" name="publishStatus" id="bcPsScheduled" value="scheduled" autocomplete="off" <%= publishStatusValue === 'scheduled' ? 'checked' : '' %>>
+          <label class="btn btn-outline-primary btn-sm" for="bcPsScheduled">Schedule</label>
+        </div>
+        <div id="bcPublishAtWrap" class="mb-1" style="<%= publishStatusValue === 'scheduled' ? '' : 'display:none' %>">
+          <label class="form-label">Publish Date &amp; Time</label>
+          <input type="datetime-local" name="publishAt" class="form-control" value="<%= publishAtLocalValue %>">
         </div>
       </div>
 
-      <!-- ---------- Organization ---------- -->
       <div class="admin-card mb-3">
-        <h5><i class="bi bi-sort-numeric-down"></i> Organization</h5>
         <div class="row g-3">
           <div class="col-12">
             <label class="form-label">Sort Order</label>
@@ -106,9 +120,9 @@
       <!-- ---------- Image ---------- -->
       <div class="admin-card mb-3">
         <h5><i class="bi bi-images"></i> Image</h5>
-        <label class="form-label">Shown wherever this category is listed</label>
         <input type="file" name="image" class="form-control" accept="image/*">
         <% if (d.image) { %><img src="<%= categoryImageUrl(d.image) %>" class="admin-thumb mt-2"><% } %>
+        <input type="text" name="imageAlt" class="form-control mt-2" placeholder="Alt text (for SEO & accessibility)" value="<%= d.imageAlt || '' %>">
       </div>
 
     </div>
@@ -119,5 +133,17 @@
     <a href="/admin/blog/categories" class="btn btn-outline-secondary">Cancel</a>
   </div>
 </form>
+
+<script>
+  // ---- Publish status: show the Schedule date/time picker only when relevant ----
+  (function () {
+    var publishAtWrap = document.getElementById('bcPublishAtWrap');
+    document.querySelectorAll('input[name="publishStatus"]').forEach(function (r) {
+      r.addEventListener('change', function () {
+        publishAtWrap.style.display = document.getElementById('bcPsScheduled').checked ? '' : 'none';
+      });
+    });
+  })();
+</script>
 
 <%- include('partials/admin-footer') %>

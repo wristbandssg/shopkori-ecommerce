@@ -18,7 +18,13 @@
             <td><%= c.name %></td>
             <td><code><%= c.slug %></code></td>
             <td><%= c.sortOrder %></td>
-            <td><span class="badge bg-<%= c.status ? 'success' : 'secondary' %>"><%= c.status ? 'Active' : 'Hidden' %></span></td>
+            <td>
+              <% if (c.publishStatus === 'scheduled' && c.publishAt) { %>
+                <span class="badge bg-warning text-dark">Scheduled <%= new Date(c.publishAt).toLocaleDateString('en-GB') %></span>
+              <% } else { %>
+                <span class="badge bg-<%= c.status ? 'success' : 'secondary' %>"><%= c.status ? 'Active' : 'Draft' %></span>
+              <% } %>
+            </td>
             <td class="text-nowrap">
               <a href="/blog/category/<%= c.slug %>" target="_blank" class="btn btn-sm btn-outline-secondary" title="View on site"><i class="bi bi-box-arrow-up-right"></i></a>
               <a href="/admin/blog/categories/<%= c._id %>/edit" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>

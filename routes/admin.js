@@ -5679,7 +5679,7 @@ async function saveBlogPost(req, res, next, existingId) {
     }
     const existing = existingId ? await BlogPost.findById(existingId) : null;
     const {
-      title, excerpt, content, publishStatus, publishAt,
+      title, slug: slugInput, excerpt, content, publishStatus, publishAt,
       metaTitle, metaKeywords, metaDescription,
       categoryId, tags: tagsInput, coverImageAlt,
     } = req.body;
@@ -5736,7 +5736,7 @@ async function saveBlogPost(req, res, next, existingId) {
       });
     }
 
-    const baseSlug = slugify(title);
+    const baseSlug = slugify((slugInput && slugInput.trim()) || title);
     const slug = await ensureUniqueSlug(BlogPost, baseSlug, existingId || null);
 
     const data = {
@@ -5832,13 +5832,41 @@ async function saveBlogCategory(req, res, next, existingId) {
       return res.redirect('/admin/blog/categories');
     }
     const {
-      name, sortOrder,
+      name, sortOrder, imageAlt,
       pageTitle, shortDescription, description,
       metaTitle, metaKeywords, metaDescription,
+      publishStatus, publishAt,
     } = req.body;
 
     const errors = [];
     if (!name || !name.trim()) errors.push('Category name is required.');
+
+    // Publish / Draft / Schedule — same resolution logic as saveProduct /
+    // saveBlogPost: resolves to the single `status` boolean the storefront
+    // query already filters on, and server.js's
+    // publishDueScheduledBlogCategories job flips a due 'scheduled' category
+    // over to 'published'/status:true on its own.
+    const now = new Date();
+    let publishStatusValue = ['draft', 'published', 'scheduled'].includes(publishStatus) ? publishStatus : 'published';
+    let publishAtValue = null;
+    let statusValue = true;
+    if (publishStatusValue === 'draft') {
+      statusValue = false;
+    } else if (publishStatusValue === 'scheduled') {
+      const parsedPublishAt = publishAt ? new Date(publishAt) : null;
+      if (!parsedPublishAt || Number.isNaN(parsedPublishAt.getTime())) {
+        errors.push('Please choose a date & time to schedule this category.');
+      } else if (parsedPublishAt <= now) {
+        publishStatusValue = 'published';
+        statusValue = true;
+      } else {
+        publishAtValue = parsedPublishAt;
+        statusValue = false;
+      }
+    } else {
+      publishStatusValue = 'published';
+      statusValue = true;
+    }
 
     const existing = existingId ? await BlogCategory.findById(existingId) : null;
     let imageName = existing ? existing.image : null;
@@ -5847,7 +5875,11 @@ async function saveBlogCategory(req, res, next, existingId) {
     if (errors.length) {
       return res.render('admin/blog-category-form', {
         adminPageTitle: existing ? 'Edit Blog Category' : 'Add New Blog Category',
-        blogCategory: { ...(existing ? existing.toObject() : {}), ...req.body, image: imageName },
+        blogCategory: {
+          ...(existing ? existing.toObject() : {}), ...req.body, image: imageName,
+          imageAlt: (imageAlt || '').trim(),
+          publishStatus: publishStatusValue, publishAt: publishAtValue,
+        },
         errors,
       });
     }
@@ -5855,8 +5887,11 @@ async function saveBlogCategory(req, res, next, existingId) {
     const data = {
       name: name.trim(),
       sortOrder: parseInt(sortOrder, 10) || 0,
-      status: !!req.body.status,
+      status: statusValue,
+      publishStatus: publishStatusValue,
+      publishAt: publishAtValue,
       image: imageName,
+      imageAlt: (imageAlt || '').trim(),
       pageTitle: (pageTitle || '').trim(),
       shortDescription: (shortDescription || '').trim(),
       description: description || '',
