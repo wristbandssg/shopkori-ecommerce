@@ -2,12 +2,12 @@
 <div class="container py-5">
   <h2 class="section-heading mb-4">ব্লগ</h2>
 
-  <% if ((categories && categories.length) || (tags && tags.length)) { %>
+  <% if ((blogCategories && blogCategories.length) || (tags && tags.length)) { %>
     <div class="mb-4 d-flex flex-wrap gap-2 align-items-center">
-      <% if (categories && categories.length) { %>
-        <a href="/blog" class="badge <%= !activeCategory ? 'bg-primary' : 'bg-light text-dark border' %> text-decoration-none px-3 py-2">সব বিভাগ</a>
-        <% categories.forEach(function (c) { %>
-          <a href="/blog?category=<%= encodeURIComponent(c) %>" class="badge <%= activeCategory === c ? 'bg-primary' : 'bg-light text-dark border' %> text-decoration-none px-3 py-2"><%= c %></a>
+      <% if (blogCategories && blogCategories.length) { %>
+        <a href="/blog" class="badge bg-primary text-decoration-none px-3 py-2">সব বিভাগ</a>
+        <% blogCategories.forEach(function (c) { %>
+          <a href="/blog/category/<%= c.slug %>" class="badge bg-light text-dark border text-decoration-none px-3 py-2"><%= c.name %></a>
         <% }); %>
       <% } %>
     </div>
@@ -36,7 +36,7 @@
                 <img src="<%= post.coverImage ? productImageUrl(post.coverImage) : '/images/product-placeholder.svg' %>" alt="<%= post.coverImageAlt || post.title %>">
               </div>
               <div class="product-card-body">
-                <small class="text-muted"><%= post.createdAt.toLocaleDateString('bn-BD') %><% if (post.category) { %> · <%= post.category %><% } %></small>
+                <small class="text-muted"><%= post.createdAt.toLocaleDateString('bn-BD') %><% if (post.category) { %> · <%= post.category.name %><% } %></small>
                 <div class="product-title"><%= post.title %></div>
                 <% if (post.excerpt) { %>
                   <p class="text-muted mb-0" style="font-size:13px;"><%= post.excerpt %></p>

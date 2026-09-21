@@ -1,0 +1,107 @@
+<%
+  const ogImage = (category && category.image) ? baseUrl + categoryImageUrl(category.image) : '';
+%>
+<%- include('partials/header', { ogImage }) %>
+
+<%
+  // ---- schema.org structured data ----
+  // Same pattern as views/category.ejs: BreadcrumbList so Google can show
+  // Home > Blog > Category in the search result path, plus an ItemList of
+  // this page's posts so the category page reads as a real collection,
+  // not just plain text + links.
+  const breadcrumbItems = [
+    { '@type': 'ListItem', position: 1, name: 'হোম', item: baseUrl + '/' },
+    { '@type': 'ListItem', position: 2, name: 'ব্লগ', item: baseUrl + '/blog' },
+    { '@type': 'ListItem', position: 3, name: category.name, item: baseUrl + '/blog/category/' + category.slug },
+  ];
+  const categoryBreadcrumbSchema = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: breadcrumbItems };
+  const categoryItemListSchema = posts.length ? {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    itemListElement: posts.map(function (p, i) {
+      return { '@type': 'ListItem', position: (page - 1) * perPage + i + 1, url: baseUrl + '/blog/' + p.slug };
+    }),
+  } : null;
+%>
+<script type="application/ld+json"><%- JSON.stringify(categoryBreadcrumbSchema) %></script>
+<% if (categoryItemListSchema) { %><script type="application/ld+json"><%- JSON.stringify(categoryItemListSchema) %></script><% } %>
+
+<div class="container py-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">হোম</a></li>
+      <li class="breadcrumb-item"><a href="/blog">ব্লগ</a></li>
+      <li class="breadcrumb-item active"><%= category.name %></li>
+    </ol>
+  </nav>
+
+  <% if (category.pageTitle || category.shortDescription) { %>
+    <div class="category-intro mb-3">
+      <% if (category.pageTitle) { %><h1 class="category-intro-title"><%= category.pageTitle %></h1><% } %>
+      <% if (category.shortDescription) { %><p class="category-intro-text text-muted"><%- nl2br(category.shortDescription) %></p><% } %>
+    </div>
+  <% } %>
+
+  <div class="row">
+    <div class="col-lg-3 mb-4">
+      <div class="filter-box">
+        <h6>বিভাগসমূহ</h6>
+        <ul class="filter-cat-list">
+          <li><a href="/blog">সব পোস্ট</a></li>
+          <% allBlogCategories.forEach(function (c) { %>
+            <li><a href="/blog/category/<%= c.slug %>" class="<%= String(category._id) === String(c._id) ? 'active' : '' %>"><%= c.name %></a></li>
+          <% }); %>
+        </ul>
+      </div>
+    </div>
+
+    <div class="col-lg-9">
+      <h4 class="mb-3"><%= category.pageTitle ? category.name : pageTitle %> <small class="text-muted">(<%= total %> টি পোস্ট)</small></h4>
+
+      <% if (!posts.length) { %>
+        <div class="alert alert-info">এই বিভাগে এখনো কোনো পোস্ট নেই।</div>
+      <% } else { %>
+        <div class="row g-4">
+          <% posts.forEach(function (post) { %>
+            <div class="col-6 col-md-4">
+              <a href="/blog/<%= post.slug %>" class="text-decoration-none">
+                <div class="product-card h-100">
+                  <div class="product-card-img">
+                    <img src="<%= post.coverImage ? productImageUrl(post.coverImage) : '/images/product-placeholder.svg' %>" alt="<%= post.coverImageAlt || post.title %>">
+                  </div>
+                  <div class="product-card-body">
+                    <small class="text-muted"><%= post.createdAt.toLocaleDateString('bn-BD') %></small>
+                    <div class="product-title"><%= post.title %></div>
+                    <% if (post.excerpt) { %>
+                      <p class="text-muted mb-0" style="font-size:13px;"><%= post.excerpt %></p>
+                    <% } %>
+                  </div>
+                </div>
+              </a>
+            </div>
+          <% }); %>
+        </div>
+
+        <% if (totalPages > 1) { %>
+          <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+              <% for (let i = 1; i <= totalPages; i++) { %>
+                <li class="page-item <%= i === page ? 'active' : '' %>">
+                  <a class="page-link" href="/blog/category/<%= category.slug %>?page=<%= i %>"><%= i %></a>
+                </li>
+              <% } %>
+            </ul>
+          </nav>
+        <% } %>
+      <% } %>
+    </div>
+  </div>
+
+  <% if (category.description) { %>
+    <div class="category-seo-content mt-4 pt-4 border-top">
+      <%- renderRichText(category.description) %>
+    </div>
+  <% } %>
+</div>
+
+<%- include('partials/footer') %>

@@ -34,6 +34,7 @@ const { getEmailSetting, updateEmailSetting } = require('../models/EmailSetting'
 const { generateSecret, verifyTotp } = require('../lib/totp');
 const Page = require('../models/Page');
 const BlogPost = require('../models/BlogPost');
+const BlogCategory = require('../models/BlogCategory');
 const LandingPage = require('../models/LandingPage');
 const ShortLandingPage = require('../models/ShortLandingPage');
 const LandingCheckout = require('../models/LandingCheckout');
@@ -5546,11 +5547,12 @@ router.get('/inventory', async (req, res, next) => {
    ===================================================================== */
 const STATIC_PAGE_URL = (key) => (key === 'about' ? '/about' : `/policy/${key}`);
 async function buildInternalLinkGroups() {
-  const [categories, staticPages, customPages, posts] = await Promise.all([
+  const [categories, staticPages, customPages, posts, blogCategories] = await Promise.all([
     Category.find({ status: true }).sort({ name: 1 }).select('name slug').lean(),
     Page.find({}).sort({ key: 1 }).select('key title').lean(),
     CustomPage.find({}).sort({ name: 1 }).select('slug name').lean(),
     BlogPost.find({}).sort({ title: 1 }).select('slug title').lean(),
+    BlogCategory.find({ status: true }).sort({ name: 1 }).select('name slug').lean(),
   ]);
   return [
     {
@@ -5566,6 +5568,7 @@ async function buildInternalLinkGroups() {
     { group: 'Categories', items: categories.map((c) => ({ label: c.name, url: `/category/${c.slug}` })) },
     { group: 'Static Pages', items: staticPages.map((p) => ({ label: p.title, url: STATIC_PAGE_URL(p.key) })) },
     { group: 'Custom Pages', items: customPages.map((p) => ({ label: p.name, url: `/page/${p.slug}` })) },
+    { group: 'Blog Categories', items: blogCategories.map((c) => ({ label: c.name, url: `/blog/category/${c.slug}` })) },
     { group: 'Blog Posts', items: posts.map((p) => ({ label: p.title, url: `/blog/${p.slug}` })) },
   ];
 }
@@ -5636,9 +5639,8 @@ router.post('/pages/:key', upload.single('image'), async (req, res, next) => {
    ===================================================================== */
 router.get('/blog', async (req, res, next) => {
   try {
-    const posts = await BlogPost.find({}).sort({ createdAt: -1 });
-    const existingCategories = (await BlogPost.distinct('category')).filter(Boolean).sort();
-    res.render('admin/blog', { adminPageTitle: 'Blog Management', posts, existingCategories });
+    const posts = await BlogPost.find({}).populate('category').sort({ createdAt: -1 });
+    res.render('admin/blog', { adminPageTitle: 'Blog Management', posts });
   } catch (err) {
     next(err);
   }
@@ -5647,8 +5649,8 @@ router.get('/blog', async (req, res, next) => {
 router.get('/blog/new', async (req, res, next) => {
   try {
     const internalLinkGroups = await buildInternalLinkGroups();
-    const existingCategories = (await BlogPost.distinct('category')).filter(Boolean).sort();
-    res.render('admin/blog-form', { adminPageTitle: 'New Blog Post', post: null, errors: [], internalLinkGroups, existingCategories });
+    const blogCategories = await BlogCategory.find().sort({ sortOrder: 1, name: 1 });
+    res.render('admin/blog-form', { adminPageTitle: 'New Blog Post', post: null, errors: [], internalLinkGroups, blogCategories });
   } catch (err) {
     next(err);
   }
@@ -5662,8 +5664,8 @@ router.get('/blog/:id/edit', async (req, res, next) => {
       return res.redirect('/admin/blog');
     }
     const internalLinkGroups = await buildInternalLinkGroups();
-    const existingCategories = (await BlogPost.distinct('category')).filter(Boolean).sort();
-    res.render('admin/blog-form', { adminPageTitle: 'Edit Blog Post', post, errors: [], internalLinkGroups, existingCategories });
+    const blogCategories = await BlogCategory.find().sort({ sortOrder: 1, name: 1 });
+    res.render('admin/blog-form', { adminPageTitle: 'Edit Blog Post', post, errors: [], internalLinkGroups, blogCategories });
   } catch (err) {
     next(err);
   }
@@ -5679,7 +5681,7 @@ async function saveBlogPost(req, res, next, existingId) {
     const {
       title, excerpt, content, publishStatus, publishAt,
       metaTitle, metaKeywords, metaDescription,
-      category, tags: tagsInput, coverImageAlt,
+      categoryId, tags: tagsInput, coverImageAlt,
     } = req.body;
     const errors = [];
     const tagsList = (tagsInput || '')
@@ -5720,16 +5722,17 @@ async function saveBlogPost(req, res, next, existingId) {
 
     if (errors.length) {
       const internalLinkGroups = await buildInternalLinkGroups();
-      const existingCategories = (await BlogPost.distinct('category')).filter(Boolean).sort();
+      const blogCategories = await BlogCategory.find().sort({ sortOrder: 1, name: 1 });
       return res.render('admin/blog-form', {
         adminPageTitle: existing ? 'Edit Blog Post' : 'New Blog Post',
         post: {
           ...(existing ? existing.toObject() : {}), ...req.body, coverImage: imageName,
           publishStatus: publishStatusValue, publishAt: publishAtValue, tags: tagsList,
+          category: categoryId || null,
         },
         errors,
         internalLinkGroups,
-        existingCategories,
+        blogCategories,
       });
     }
 
@@ -5743,7 +5746,7 @@ async function saveBlogPost(req, res, next, existingId) {
       content: content || '',
       coverImage: imageName,
       coverImageAlt: (coverImageAlt || '').trim(),
-      category: (category || '').trim(),
+      category: categoryId || null,
       tags: tagsList,
       status: statusValue,
       publishStatus: publishStatusValue,
@@ -5778,6 +5781,123 @@ router.get('/blog/delete/:id', async (req, res, next) => {
     await BlogPost.deleteOne({ _id: req.params.id });
     req.flash('success', 'Blog post deleted successfully.');
     res.redirect('/admin/blog');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   BLOG CATEGORIES
+   ---------------------------------------------------------------------
+   Same create/edit/SEO shape as Product Category (models/Category.js +
+   saveCategory above) — its own admin screen, its own storefront page
+   (/blog/category/:slug in routes/store.js) with the same pageTitle/
+   shortDescription/description/metaTitle/metaKeywords/metaDescription
+   fields a category page needs to be genuinely SEO-able.
+   ===================================================================== */
+router.get('/blog/categories', async (req, res, next) => {
+  try {
+    const blogCategories = await BlogCategory.find().sort({ sortOrder: 1, name: 1 });
+    res.render('admin/blog-categories', { adminPageTitle: 'Blog Categories', blogCategories });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/blog/categories/new', (req, res) => {
+  res.render('admin/blog-category-form', { adminPageTitle: 'Add New Blog Category', blogCategory: {}, errors: [] });
+});
+
+router.get('/blog/categories/:id/edit', async (req, res, next) => {
+  try {
+    const blogCategory = await BlogCategory.findById(req.params.id);
+    if (!blogCategory) {
+      req.flash('danger', 'Blog category not found.');
+      return res.redirect('/admin/blog/categories');
+    }
+    res.render('admin/blog-category-form', { adminPageTitle: 'Edit Blog Category', blogCategory, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// CSRF is checked manually below (not via the verifyCsrf middleware) because
+// multer's upload.single('image') is what parses multipart/form-data —
+// req.body (and so req.body.csrfToken) isn't populated until after it runs.
+// Same pattern as saveCategory/saveBlogPost above.
+async function saveBlogCategory(req, res, next, existingId) {
+  try {
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      req.flash('danger', 'Form has expired.');
+      return res.redirect('/admin/blog/categories');
+    }
+    const {
+      name, sortOrder,
+      pageTitle, shortDescription, description,
+      metaTitle, metaKeywords, metaDescription,
+    } = req.body;
+
+    const errors = [];
+    if (!name || !name.trim()) errors.push('Category name is required.');
+
+    const existing = existingId ? await BlogCategory.findById(existingId) : null;
+    let imageName = existing ? existing.image : null;
+    if (req.file) imageName = req.file.filename;
+
+    if (errors.length) {
+      return res.render('admin/blog-category-form', {
+        adminPageTitle: existing ? 'Edit Blog Category' : 'Add New Blog Category',
+        blogCategory: { ...(existing ? existing.toObject() : {}), ...req.body, image: imageName },
+        errors,
+      });
+    }
+
+    const data = {
+      name: name.trim(),
+      sortOrder: parseInt(sortOrder, 10) || 0,
+      status: !!req.body.status,
+      image: imageName,
+      pageTitle: (pageTitle || '').trim(),
+      shortDescription: (shortDescription || '').trim(),
+      description: description || '',
+      metaTitle: (metaTitle || '').trim(),
+      metaKeywords: (metaKeywords || '').trim(),
+      metaDescription: (metaDescription || '').trim(),
+    };
+
+    if (existing) {
+      data.slug = await ensureUniqueSlug(BlogCategory, slugify(name), existingId);
+      await BlogCategory.updateOne({ _id: existingId }, data);
+      req.flash('success', 'Blog category updated successfully.');
+    } else {
+      data.slug = await ensureUniqueSlug(BlogCategory, slugify(name), null);
+      await BlogCategory.create(data);
+      req.flash('success', 'New blog category added successfully.');
+    }
+    res.redirect('/admin/blog/categories');
+  } catch (err) {
+    next(err);
+  }
+}
+
+router.post('/blog/categories/new', upload.single('image'), (req, res, next) => saveBlogCategory(req, res, next, null));
+router.post('/blog/categories/:id/edit', upload.single('image'), (req, res, next) => saveBlogCategory(req, res, next, req.params.id));
+
+router.get('/blog/categories/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/blog/categories');
+    }
+    // Posts in a deleted category aren't deleted themselves — just left
+    // with no category (same "don't cascade-delete content" choice as
+    // everywhere else in this app), same as unassigning a Product's
+    // category would need a manual re-pick, except here we do it for the
+    // admin automatically so no post silently keeps a dangling reference.
+    await BlogPost.updateMany({ category: req.params.id }, { $set: { category: null } });
+    await BlogCategory.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Blog category deleted successfully.');
+    res.redirect('/admin/blog/categories');
   } catch (err) {
     next(err);
   }

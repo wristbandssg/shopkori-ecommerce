@@ -12,8 +12,8 @@
   }
   const publishStatusValue = ['draft', 'published', 'scheduled'].includes(d.publishStatus) ? d.publishStatus : 'published';
   const publishAtLocalValue = toDatetimeLocal(d.publishAt);
-  const tagsValue = Array.isArray(d.tags) ? d.tags.join(', ') : (d.tags || '');
-  const categoriesList = typeof existingCategories !== 'undefined' ? existingCategories : [];
+  const blogCategoriesList = typeof blogCategories !== 'undefined' ? blogCategories : [];
+  const selectedBlogCategoryId = d.category ? String(d.category._id || d.category) : '';
 %>
 <%- include('partials/admin-header') %>
 
@@ -39,17 +39,15 @@
             <input type="text" name="coverImageAlt" class="form-control mt-2" placeholder="Alt text (for SEO & accessibility)" value="<%= d.coverImageAlt || '' %>">
           </div>
           <div class="col-md-6">
-            <label class="form-label">Category</label>
-            <input type="text" name="category" class="form-control" list="blogCategoryList" placeholder="e.g. Recipes" value="<%= d.category || '' %>">
-            <datalist id="blogCategoryList">
-              <% categoriesList.forEach(function (c) { %><option value="<%= c %>"><% }); %>
-            </datalist>
+            <label class="form-label">Category <small class="text-muted">(<a href="/admin/blog/categories/new" target="_blank">+ New Category</a>)</small></label>
+            <select name="categoryId" class="form-select">
+              <option value="">-- No Category --</option>
+              <% blogCategoriesList.forEach(function (c) { %>
+                <option value="<%= c._id %>" <%= selectedBlogCategoryId === String(c._id) ? 'selected' : '' %>><%= c.name %></option>
+              <% }); %>
+            </select>
           </div>
 
-          <div class="col-12">
-            <label class="form-label">Tags <small class="text-muted">(comma separated)</small></label>
-            <input type="text" name="tags" class="form-control" placeholder="e.g. tips, guide, news" value="<%= tagsValue %>">
-          </div>
           <div class="col-12">
             <label class="form-label">Short Excerpt (shown in listing)</label>
             <input type="text" name="excerpt" class="form-control" value="<%= d.excerpt || '' %>">
@@ -78,21 +76,12 @@
           <label class="form-label">Publish Date &amp; Time</label>
           <input type="datetime-local" name="publishAt" class="form-control" value="<%= publishAtLocalValue %>">
         </div>
-        <div class="form-text mb-0">Draft = only visible here in the admin panel. Publish = live on the site now. Schedule = goes live on its own at the date/time you pick (checked every minute).</div>
       </div>
 
       <!-- ---------- SEO ---------- -->
       <div class="admin-card mb-3">
         <h5><i class="bi bi-search"></i> SEO</h5>
         <div class="row g-3">
-          <div class="col-12">
-            <label class="form-label mb-1">Google Search Preview <small class="text-muted">(updates as you type)</small></label>
-            <div class="serp-preview" id="serpPreview">
-              <div class="serp-url" id="serpUrl"></div>
-              <div class="serp-title" id="serpTitle"></div>
-              <div class="serp-desc" id="serpDesc"></div>
-            </div>
-          </div>
           <div class="col-12">
             <label class="form-label">Meta Title</label>
             <input type="text" name="metaTitle" class="form-control" value="<%= d.metaTitle || '' %>">
@@ -104,9 +93,6 @@
           <div class="col-12">
             <label class="form-label">Meta Description</label>
             <input type="text" name="metaDescription" class="form-control" value="<%= d.metaDescription || '' %>">
-          </div>
-          <div class="col-12">
-            <div class="form-text mb-0"><i class="bi bi-check-circle text-success"></i> Structured data (schema.org <code>Article</code> + <code>BreadcrumbList</code>) is generated automatically from this post's title, image and date — nothing else to fill in for that.</div>
           </div>
         </div>
       </div>
@@ -130,37 +116,6 @@
     });
   })();
 
-  // ---- Live Google search-result preview ----
-  (function () {
-    var titleInput = document.querySelector('input[name="title"]');
-    var excerptInput = document.querySelector('input[name="excerpt"]');
-    var metaTitleInput = document.querySelector('input[name="metaTitle"]');
-    var metaDescInput = document.querySelector('input[name="metaDescription"]');
-    var siteName = <%- JSON.stringify(settings.site_name) %>;
-    var titleEl = document.getElementById('serpTitle');
-    var descEl = document.getElementById('serpDesc');
-    var urlEl = document.getElementById('serpUrl');
-
-    function slugPreview(text) {
-      return (text || '').toString().toLowerCase().trim()
-        .replace(/[^a-z0-9\s-]/g, '')
-        .replace(/\s+/g, '-')
-        .replace(/-+/g, '-') || 'your-post';
-    }
-
-    function updatePreview() {
-      var title = metaTitleInput.value.trim() || titleInput.value.trim() || 'Post Title';
-      var desc = metaDescInput.value.trim() || excerptInput.value.trim() || 'Add a Short Excerpt or Meta Description so this shows up nicely in Google.';
-      titleEl.textContent = title + ' | ' + siteName;
-      descEl.textContent = desc.length > 160 ? desc.slice(0, 157) + '…' : desc;
-      urlEl.textContent = siteName + ' › blog › ' + slugPreview(titleInput.value);
-    }
-
-    [titleInput, excerptInput, metaTitleInput, metaDescInput].forEach(function (el) {
-      el.addEventListener('input', updatePreview);
-    });
-    updatePreview();
-  })();
 </script>
 
 <%- include('partials/admin-footer') %>

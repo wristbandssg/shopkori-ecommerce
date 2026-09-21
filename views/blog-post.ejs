@@ -22,7 +22,7 @@
     dateModified: post.updatedAt || post.createdAt,
     publisher: { '@type': 'Organization', name: settings.site_name },
     mainEntityOfPage: postUrl,
-    articleSection: post.category || undefined,
+    articleSection: post.category ? post.category.name : undefined,
     keywords: (post.tags && post.tags.length) ? post.tags.join(', ') : undefined,
   };
   const breadcrumbSchema = {
@@ -43,7 +43,7 @@
     <% if (post.coverImage) { %>
       <img src="<%= productImageUrl(post.coverImage) %>" alt="<%= post.coverImageAlt || post.title %>" class="img-fluid rounded mb-4" style="width:100%; max-height:420px; object-fit:cover;">
     <% } %>
-    <small class="text-muted"><%= post.createdAt.toLocaleDateString('bn-BD') %><% if (post.category) { %> · <a href="/blog?category=<%= encodeURIComponent(post.category) %>" class="text-decoration-none"><%= post.category %></a><% } %></small>
+    <small class="text-muted"><%= post.createdAt.toLocaleDateString('bn-BD') %><% if (post.category) { %> · <a href="/blog/category/<%= post.category.slug %>" class="text-decoration-none"><%= post.category.name %></a><% } %></small>
     <h2 class="mt-1"><%= post.title %></h2>
     <% if (post.tags && post.tags.length) { %>
       <div class="mb-3 d-flex flex-wrap gap-2">

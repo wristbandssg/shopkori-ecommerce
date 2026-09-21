@@ -1,0 +1,123 @@
+<%
+  const d = blogCategory || {};
+  const isEdit = !!(blogCategory && blogCategory._id);
+  const formAction = isEdit ? `/admin/blog/categories/${blogCategory._id}/edit` : '/admin/blog/categories/new';
+%>
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+<% } %>
+
+<form method="post" action="<%= formAction %>" enctype="multipart/form-data" id="blogCategoryForm">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill text-brand"></i> <%= isEdit ? 'Edit Blog Category' : 'Add New Blog Category' %></h4>
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+      <a href="/admin/blog/categories" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <!-- =====================================================
+         MAIN COLUMN — the category page's content + SEO
+         ===================================================== -->
+    <div class="col-lg-8">
+
+      <!-- ---------- Basic Information ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-card-text"></i> Basic Information</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Category Name *</label>
+            <input type="text" name="name" class="form-control" required value="<%= d.name || '' %>">
+            <div class="form-text">Used in the menu, breadcrumb and URL (/blog/category/&lt;slug&gt;).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Category Page Content (SEO) — same fields as Product Category ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-file-earmark-richtext"></i> Category Page Content</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Page Title <small class="text-muted">(big heading shown on the category page — leave blank to just use the name above)</small></label>
+            <input type="text" name="pageTitle" class="form-control" placeholder="e.g. Recipe Ideas &amp; Cooking Tips | <%= settings.site_name %> Blog" value="<%= d.pageTitle || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Short Intro <small class="text-muted">(shown right under the page title, above the post list)</small></label>
+            <textarea name="shortDescription" class="form-control" rows="3" placeholder="e.g. Recipes, kitchen tips and gifting ideas from the ShopKori team..."><%= d.shortDescription || '' %></textarea>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Content Below Posts <small class="text-muted">(longer SEO write-up, shown after the post list)</small></label>
+            <%- include('partials/rich-editor', { idSuffix: 'blogcat', fieldName: 'description', initialContent: d.description || '' }) %>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- SEO ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-search"></i> SEO</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Meta Title</label>
+            <input type="text" name="metaTitle" class="form-control" value="<%= d.metaTitle || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Meta Keywords</label>
+            <input type="text" name="metaKeywords" class="form-control" value="<%= d.metaKeywords || '' %>">
+          </div>
+          <div class="col-12">
+            <label class="form-label">Meta Description</label>
+            <input type="text" name="metaDescription" class="form-control" value="<%= d.metaDescription || '' %>">
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- =====================================================
+         SIDEBAR — status, order, image
+         ===================================================== -->
+    <div class="col-lg-4">
+
+      <!-- ---------- Status ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-toggle2-on"></i> Status</h5>
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" name="status" id="blogCatStatus" <%= (d.status === undefined || d.status) ? 'checked' : '' %>>
+          <label class="form-check-label" for="blogCatStatus">Active (Show on Site)</label>
+        </div>
+      </div>
+
+      <!-- ---------- Organization ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-sort-numeric-down"></i> Organization</h5>
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="form-label">Sort Order</label>
+            <input type="number" name="sortOrder" class="form-control" value="<%= d.sortOrder !== undefined ? d.sortOrder : 0 %>">
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------- Image ---------- -->
+      <div class="admin-card mb-3">
+        <h5><i class="bi bi-images"></i> Image</h5>
+        <label class="form-label">Shown wherever this category is listed</label>
+        <input type="file" name="image" class="form-control" accept="image/*">
+        <% if (d.image) { %><img src="<%= categoryImageUrl(d.image) %>" class="admin-thumb mt-2"><% } %>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="mb-4">
+    <button type="submit" class="btn btn-brand"><i class="bi bi-check2"></i> Save</button>
+    <a href="/admin/blog/categories" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+
+<%- include('partials/admin-footer') %>

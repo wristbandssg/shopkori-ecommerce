@@ -8,7 +8,10 @@ const blogPostSchema = new mongoose.Schema(
     content: { type: String, default: '' },
     coverImage: { type: String, default: null },
     coverImageAlt: { type: String, default: '' }, // alt text for the cover image (SEO + accessibility)
-    category: { type: String, default: '', trim: true },
+    // A real Blog Category (see models/BlogCategory.js), created/edited the
+    // same way a Product Category is — not free text anymore. null = this
+    // post has no category assigned.
+    category: { type: mongoose.Schema.Types.ObjectId, ref: 'BlogCategory', default: null },
     tags: [{ type: String, trim: true }],
     status: { type: Boolean, default: true }, // true = published, false = draft
     // `status` stays the single boolean the storefront query already filters

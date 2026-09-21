@@ -12,6 +12,7 @@ const SearchLog = require('../models/SearchLog');
 const Page = require('../models/Page');
 const CustomPage = require('../models/CustomPage');
 const BlogPost = require('../models/BlogPost');
+const BlogCategory = require('../models/BlogCategory');
 const { getSettings, setSetting: setSiteSetting } = require('../models/Setting');
 const { getOrderSettings } = require('../models/OrderSetting');
 
@@ -191,13 +192,14 @@ router.get('/sitemap.xml', async (req, res, next) => {
       );
     };
 
-    const [categories, brands, products, blogPosts, staticPages, customPages] = await Promise.all([
+    const [categories, brands, products, blogPosts, staticPages, customPages, blogCategories] = await Promise.all([
       Category.find({ status: true }),
       Brand.find({ status: true }),
       Product.find({ status: true }).select('slug updatedAt'),
       BlogPost.find({ status: true }).select('slug updatedAt'),
       Page.find({}),
       CustomPage.find({ status: true }).select('slug updatedAt'),
+      BlogCategory.find({ status: true }).select('slug updatedAt'),
     ]);
 
     const entries = [];
@@ -219,6 +221,9 @@ router.get('/sitemap.xml', async (req, res, next) => {
     });
     products.forEach((p) => {
       entries.push(urlEntry(`${baseUrl}/product/${p.slug}`, { lastmod: p.updatedAt, changefreq: 'weekly', priority: '0.8' }));
+    });
+    blogCategories.forEach((c) => {
+      entries.push(urlEntry(`${baseUrl}/blog/category/${c.slug}`, { lastmod: c.updatedAt, changefreq: 'weekly', priority: '0.5' }));
     });
     blogPosts.forEach((p) => {
       entries.push(urlEntry(`${baseUrl}/blog/${p.slug}`, { lastmod: p.updatedAt, changefreq: 'monthly', priority: '0.5' }));
@@ -1033,20 +1038,51 @@ router.get('/page/:slug', async (req, res, next) => {
 
 /* =====================================================================
    BLOG (posts are written/edited from Admin > ব্লগ)
+   ---------------------------------------------------------------------
+   Categories are a real collection now (models/BlogCategory.js, managed
+   from Admin > Blog > Categories) — same shape as Product Category — so
+   /blog/category/:slug is registered BEFORE /blog/:slug below (otherwise
+   the :slug wildcard would swallow it and try to look up a blog post
+   literally named "category").
    ===================================================================== */
 router.get('/blog', async (req, res, next) => {
   try {
-    const { category, tag } = req.query;
+    const { tag } = req.query;
     const filter = { status: true };
-    if (category) filter.category = category;
     if (tag) filter.tags = tag;
-    const posts = await BlogPost.find(filter).sort({ createdAt: -1 });
-    const categories = (await BlogPost.distinct('category', { status: true })).filter(Boolean).sort();
+    const posts = await BlogPost.find(filter).populate('category').sort({ createdAt: -1 });
+    const blogCategories = await BlogCategory.find({ status: true }).sort({ sortOrder: 1, name: 1 });
     const tagsRaw = await BlogPost.distinct('tags', { status: true });
     const tags = tagsRaw.filter(Boolean).sort();
     res.render('blog', {
-      pageTitle: 'ব্লগ', posts, categories, tags,
-      activeCategory: category || '', activeTag: tag || '',
+      pageTitle: 'ব্লগ', posts, blogCategories, tags, activeTag: tag || '',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/blog/category/:slug', async (req, res, next) => {
+  try {
+    const category = await BlogCategory.findOne({ slug: req.params.slug, status: true });
+    if (!category) return res.status(404).render('404', { pageTitle: 'ক্যাটাগরি পাওয়া যায়নি' });
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const perPage = 9;
+    const filter = { status: true, category: category._id };
+    const [total, posts, allBlogCategories] = await Promise.all([
+      BlogPost.countDocuments(filter),
+      BlogPost.find(filter).sort({ createdAt: -1 }).skip((page - 1) * perPage).limit(perPage),
+      BlogCategory.find({ status: true }).sort({ sortOrder: 1, name: 1 }),
+    ]);
+
+    res.render('blog-category', {
+      pageTitle: category.pageTitle || category.name,
+      category, posts, allBlogCategories, total, page, perPage,
+      totalPages: Math.max(1, Math.ceil(total / perPage)),
+      metaTitle: category.metaTitle,
+      metaKeywords: category.metaKeywords,
+      metaDescription: category.metaDescription,
     });
   } catch (err) {
     next(err);
@@ -1055,13 +1091,13 @@ router.get('/blog', async (req, res, next) => {
 
 router.get('/blog/:slug', async (req, res, next) => {
   try {
-    const post = await BlogPost.findOne({ slug: req.params.slug, status: true });
+    const post = await BlogPost.findOne({ slug: req.params.slug, status: true }).populate('category');
     if (!post) {
       req.flash('danger', 'ব্লগ পোস্টটি খুঁজে পাওয়া যায়নি।');
       return res.redirect('/blog');
     }
     const orConditions = [
-      ...(post.category ? [{ category: post.category }] : []),
+      ...(post.category ? [{ category: post.category._id }] : []),
       ...(post.tags && post.tags.length ? [{ tags: { $in: post.tags } }] : []),
     ];
     const relatedPosts = orConditions.length

@@ -90,7 +90,8 @@
         <i class="bi bi-file-earmark-richtext"></i> Content <i class="bi bi-chevron-down chevron"></i>
       </button>
       <div class="collapse admin-submenu <%= ['blog', 'pages', 'landing-page'].includes(currentPage) ? 'show' : '' %>" id="navContent">
-        <a href="/admin/blog" class="<%= currentPage === 'blog' ? 'active' : '' %>">Blog</a>
+        <a href="/admin/blog" class="<%= currentPage === 'blog' && currentSubPath !== '/blog/categories' ? 'active' : '' %>">Blog</a>
+        <a href="/admin/blog/categories" class="<%= currentSubPath === '/blog/categories' ? 'active' : '' %>">Blog Categories</a>
         <a href="/admin/pages" class="<%= currentPage === 'pages' ? 'active' : '' %>">Pages</a>
         <a href="/admin/landing-page/main" class="<%= currentSubPath === '/landing-page/main' ? 'active' : '' %>">Main Landing</a>
         <a href="/admin/landing-page/short" class="<%= currentSubPath === '/landing-page/short' ? 'active' : '' %>">Short Landing</a>

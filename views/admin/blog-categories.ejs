@@ -1,0 +1,35 @@
+<%- include('partials/admin-header') %>
+
+<div class="admin-card mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-journal-bookmark-fill text-brand"></i> Blog Categories</h4>
+    <a href="/admin/blog/categories/new" class="btn btn-brand"><i class="bi bi-plus-circle"></i> New Category</a>
+  </div>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Image</th><th>Name</th><th>Slug</th><th>Order</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        <% blogCategories.forEach(function (c) { %>
+          <tr>
+            <td><img src="<%= categoryImageUrl(c.image) %>" class="admin-thumb"></td>
+            <td><%= c.name %></td>
+            <td><code><%= c.slug %></code></td>
+            <td><%= c.sortOrder %></td>
+            <td><span class="badge bg-<%= c.status ? 'success' : 'secondary' %>"><%= c.status ? 'Active' : 'Hidden' %></span></td>
+            <td class="text-nowrap">
+              <a href="/blog/category/<%= c.slug %>" target="_blank" class="btn btn-sm btn-outline-secondary" title="View on site"><i class="bi bi-box-arrow-up-right"></i></a>
+              <a href="/admin/blog/categories/<%= c._id %>/edit" class="btn btn-sm btn-outline-primary" title="Edit"><i class="bi bi-pencil"></i></a>
+              <a href="/admin/blog/categories/delete/<%= c._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger js-confirm" data-confirm="Delete this category? Posts in it will be kept, just unassigned." title="Delete"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!blogCategories.length) { %><tr><td colspan="6" class="text-center text-muted">No blog categories yet.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>
