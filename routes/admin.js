@@ -1,5 +1,6 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 
 const router = express.Router();
 
@@ -11,9 +12,20 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
 const Admin = require('../models/Admin');
+const { RoleModel: Role, PERMISSION_MODULES } = require('../models/Role');
+const StaffCommissionSetup = require('../models/StaffCommissionSetup');
+const {
+  TaskModel: Task, TASK_PRIORITIES, TASK_STATUSES, TASK_TYPES,
+  priorityLabel, priorityBadge, taskStatusLabel, taskStatusBadge, typeLabel,
+} = require('../models/Task');
+const { getReferralSetting } = require('../models/ReferralSetting');
+const ReferralPayoutRequest = require('../models/ReferralPayoutRequest');
+const { getHelpSupportSetting } = require('../models/HelpSupportSetting');
+const SupportTicket = require('../models/SupportTicket');
 const DeliveryCommissionSetup = require('../models/DeliveryCommissionSetup');
 const DeliveryRequest = require('../models/DeliveryRequest');
 const PageView = require('../models/PageView');
+const SearchLog = require('../models/SearchLog');
 const Page = require('../models/Page');
 const BlogPost = require('../models/BlogPost');
 const LandingPage = require('../models/LandingPage');
@@ -67,6 +79,10 @@ router.post('/login', async (req, res, next) => {
     const { username, password } = req.body;
     const admin = await Admin.findOne({ $or: [{ username }, { email: (username || '').toLowerCase() }] });
     if (admin && (await bcrypt.compare(password, admin.password))) {
+      // Staff > User > "Login is enable" — genuinely enforced here.
+      if (admin.loginEnabled === false) {
+        return res.render('admin/login', { errors: ['This account has been disabled. Contact an administrator.'], formData: req.body });
+      }
       req.session.adminId = admin._id;
       return res.redirect('/admin');
     }
@@ -108,6 +124,11 @@ const COMING_SOON_PAGES = {
   // '/offer/*' sub-pages are now real (see the OFFER SETTING section
   // below) — removed from here.
 
+  // Staff Settings grid cards with no design shown anywhere (see the
+  // STAFF SETTINGS section below for the 4 real cards).
+  '/staff/product-assign': 'Product Assign List',
+  '/staff/commission-request': 'Staff Commission Request',
+
   '/accounting/income': 'Income',
   '/accounting/expenses': 'Expenses',
   '/accounting/expense-list': 'Expense List',
@@ -117,7 +138,8 @@ const COMING_SOON_PAGES = {
   '/accounting/balance-transfer': 'Balance Transfer',
   '/accounting/balance-overview': 'Balance Overview',
 
-  '/task-management': 'Task Management',
+  // '/task-management' is now real (see the TASK MANAGEMENT section below).
+
   '/pos': 'POS',
 
   // Still coming soon — no distinct UI/spec provided for these yet.
@@ -127,9 +149,10 @@ const COMING_SOON_PAGES = {
   '/orders/blocked': 'Order Block',
   '/orders/store-analytics': 'Store Analytics',
 
-  '/referral-program': 'Referral Program',
+  // '/referral-program' is now real (see the REFERRAL PROGRAM section below).
+
   '/our-service': 'Our Service',
-  '/help-support': 'Help & Support',
+  // '/help-support' is now real (see the HELP & SUPPORT section below).
 };
 
 Object.keys(COMING_SOON_PAGES).forEach((subPath) => {
@@ -2184,79 +2207,470 @@ router.post('/orders/:id/delivery', verifyCsrf, async (req, res, next) => {
 });
 
 /* =====================================================================
-   STAFF
-   ---------------------------------------------------------------------
+   STAFF SETTINGS — grid hub (Roles / User / Staff Commission Setup /
+   Staff Report / Product Assign List / Staff Commission Request).
+
    Every "Employee" used across Order Management / Manage Delivery
    (Order.assignedEmployee, Order.delivery.deliveryMan) is one of these
-   Admin accounts — this is where they actually get created, so those
-   dropdowns have someone in them. `role` is a free-text label only
-   (e.g. "Delivery Man", "Manager") — there's no access control tied to
-   it anywhere in this app.
+   Admin accounts (see Staff > User below) — this is where they actually
+   get created, so those dropdowns have someone in them.
+
+   Product Assign List and Staff Commission Request had no design shown
+   anywhere in the screenshots (just the two grid card names), so — same
+   as Manage Sliders / Product View Setting under Customization — they
+   stay honest coming-soon stubs (registered in COMING_SOON_PAGES) rather
+   than a guessed-at feature. "Staff Commission Request" is NOT the same
+   thing as the existing Manage Delivery > Commission Request page — that
+   one pays out models/DeliveryCommissionSetup.js's volume-tier commission
+   for individual delivery-man accounts; this would be a payout request
+   flow for models/StaffCommissionSetup.js's flat-rate, per-Role commission
+   below, which is a different scheme with no request/approve UI shown.
    ===================================================================== */
-router.get('/staff', async (req, res, next) => {
+const STAFF_CARDS = ['roles', 'user', 'commissionSetup', 'report', 'productAssign', 'commissionRequest'];
+const STAFF_CARD_META = {
+  roles: { title: 'Roles', path: '/admin/staff/roles', icon: 'bi-shield-lock-fill', color: '#337ab7' },
+  user: { title: 'User', path: '/admin/staff/users', icon: 'bi-person-fill', color: '#f0ad4e' },
+  commissionSetup: { title: 'Staff Commission Setup', path: '/admin/staff/commission-setup', icon: 'bi-percent', color: '#28a745' },
+  report: { title: 'Staff Report', path: '/admin/staff/report', icon: 'bi-bar-chart-fill', color: '#d6336c' },
+  productAssign: { title: 'Product Assign List', path: '/admin/staff/product-assign', icon: 'bi-list-check', color: '#e05d3f' },
+  commissionRequest: { title: 'Staff Commission Request', path: '/admin/staff/commission-request', icon: 'bi-chat-dots-fill', color: '#212529' },
+};
+
+router.get('/staff', (req, res) => {
+  res.render('admin/staff', { adminPageTitle: 'Staff Settings', STAFF_CARDS, STAFF_CARD_META });
+});
+
+/* ---------------------------------------------------------------------
+   ROLES — a name + permission matrix (see models/Role.js for what's
+   genuinely saved vs. actually enforced).
+   --------------------------------------------------------------------- */
+router.get('/staff/roles', async (req, res, next) => {
   try {
-    const staff = await Admin.find().sort({ createdAt: -1 });
-    res.render('admin/staff', { adminPageTitle: 'Staff', staff, errors: [] });
+    const roles = await Role.find().sort({ createdAt: -1 });
+    res.render('admin/staff-roles', { adminPageTitle: 'Roles', roles, PERMISSION_MODULES });
   } catch (err) {
     next(err);
   }
 });
 
-router.post('/staff', verifyCsrf, async (req, res, next) => {
+function parsePermissionsFromBody(body) {
+  const permissions = {};
+  PERMISSION_MODULES.forEach((mod) => {
+    const raw = body[`perm_${mod.key}`];
+    if (!raw) return;
+    const checked = (Array.isArray(raw) ? raw : [raw]).filter((a) => mod.actions.includes(a));
+    if (checked.length) permissions[mod.key] = checked;
+  });
+  return permissions;
+}
+
+router.get('/staff/roles/new', (req, res) => {
+  res.render('admin/staff-role-form', { adminPageTitle: 'Add Role', role: null, PERMISSION_MODULES, errors: [] });
+});
+
+router.post('/staff/roles/new', verifyCsrf, async (req, res, next) => {
   try {
-    const { id, username, email, fullName, role, password } = req.body;
+    const name = (req.body.name || '').trim();
     const errors = [];
-    if (!username || !username.trim()) errors.push('Username is required.');
+    if (!name) errors.push('Role name is required.');
+    if (!errors.length && (await Role.findOne({ name }))) errors.push('A role with that name already exists.');
+
+    if (errors.length) {
+      return res.render('admin/staff-role-form', { adminPageTitle: 'Add Role', role: { name, permissions: parsePermissionsFromBody(req.body) }, PERMISSION_MODULES, errors });
+    }
+
+    await Role.create({ name, permissions: parsePermissionsFromBody(req.body) });
+    req.flash('success', 'Role created successfully.');
+    res.redirect('/admin/staff/roles');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/staff/roles/:id/edit', async (req, res, next) => {
+  try {
+    const role = await Role.findById(req.params.id);
+    if (!role) {
+      req.flash('danger', 'Role not found.');
+      return res.redirect('/admin/staff/roles');
+    }
+    res.render('admin/staff-role-form', { adminPageTitle: 'Edit Role', role, PERMISSION_MODULES, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/staff/roles/:id/edit', verifyCsrf, async (req, res, next) => {
+  try {
+    const name = (req.body.name || '').trim();
+    const errors = [];
+    if (!name) errors.push('Role name is required.');
+    if (!errors.length && (await Role.findOne({ name, _id: { $ne: req.params.id } }))) errors.push('A role with that name already exists.');
+
+    if (errors.length) {
+      return res.render('admin/staff-role-form', {
+        adminPageTitle: 'Edit Role', role: { _id: req.params.id, name, permissions: parsePermissionsFromBody(req.body) }, PERMISSION_MODULES, errors,
+      });
+    }
+
+    await Role.updateOne({ _id: req.params.id }, { name, permissions: parsePermissionsFromBody(req.body) });
+    req.flash('success', 'Role updated successfully.');
+    res.redirect('/admin/staff/roles');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/staff/roles/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/staff/roles');
+    }
+    if (await Admin.findOne({ roleId: req.params.id })) {
+      req.flash('danger', 'This role is assigned to at least one user — reassign them first.');
+      return res.redirect('/admin/staff/roles');
+    }
+    await Role.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Role deleted successfully.');
+    res.redirect('/admin/staff/roles');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   USER — staff/admin accounts (formerly the standalone Staff page).
+   `role` is a free-text label only. `roleId` is the real Role link the
+   "User Role" dropdown sets. `loginEnabled` really gates sign-in (see
+   POST /login above).
+   --------------------------------------------------------------------- */
+router.get('/staff/users', async (req, res, next) => {
+  try {
+    const [staff, roles] = await Promise.all([
+      Admin.find().sort({ createdAt: -1 }).populate('roleId', 'name'),
+      Role.find().sort({ name: 1 }),
+    ]);
+    res.render('admin/staff-users', { adminPageTitle: 'Users', staff, roles, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/staff/users', verifyCsrf, async (req, res, next) => {
+  try {
+    const { id, name, email, roleId, password } = req.body;
+    const username = (name || '').trim();
+    const errors = [];
+    if (!username) errors.push('Name is required.');
     if (!email || !email.trim()) errors.push('Email is required.');
     if (!id && (!password || password.length < 4)) errors.push('Password must be at least 4 characters.');
 
     if (!errors.length) {
       const dupe = await Admin.findOne({
         _id: { $ne: id || null },
-        $or: [{ username: (username || '').trim() }, { email: (email || '').trim().toLowerCase() }],
+        $or: [{ username }, { email: (email || '').trim().toLowerCase() }],
       });
-      if (dupe) errors.push('That username or email is already in use.');
+      if (dupe) errors.push('That name or email is already in use.');
     }
 
     if (errors.length) {
-      const staff = await Admin.find().sort({ createdAt: -1 });
-      return res.render('admin/staff', { adminPageTitle: 'Staff', staff, errors });
+      const [staff, roles] = await Promise.all([
+        Admin.find().sort({ createdAt: -1 }).populate('roleId', 'name'),
+        Role.find().sort({ name: 1 }),
+      ]);
+      return res.render('admin/staff-users', { adminPageTitle: 'Users', staff, roles, errors });
     }
 
+    const roleDoc = roleId ? await Role.findById(roleId) : null;
     const data = {
-      username: username.trim(),
+      username,
+      fullName: username,
       email: email.trim().toLowerCase(),
-      fullName: (fullName || '').trim(),
-      role: (role || '').trim() || 'admin',
+      roleId: roleDoc ? roleDoc._id : null,
+      role: roleDoc ? roleDoc.name : 'admin',
+      loginEnabled: !!req.body.loginEnabled,
     };
     if (password) data.password = await bcrypt.hash(password, 10);
 
     if (id) {
       await Admin.updateOne({ _id: id }, data);
-      req.flash('success', 'Staff account updated successfully.');
+      req.flash('success', 'User updated successfully.');
     } else {
       await Admin.create(data);
-      req.flash('success', 'New staff account created successfully.');
+      req.flash('success', 'New user created successfully.');
     }
-    res.redirect('/admin/staff');
+    res.redirect('/admin/staff/users');
   } catch (err) {
     next(err);
   }
 });
 
-router.get('/staff/delete/:id', async (req, res, next) => {
+router.get('/staff/users/delete/:id', async (req, res, next) => {
   try {
     if (req.query.csrf !== req.session.csrfToken) {
       req.flash('danger', 'Invalid request.');
-      return res.redirect('/admin/staff');
+      return res.redirect('/admin/staff/users');
     }
     if (String(req.params.id) === String(req.session.adminId)) {
       req.flash('danger', "You can't delete the account you're currently logged in as.");
-      return res.redirect('/admin/staff');
+      return res.redirect('/admin/staff/users');
     }
     await Admin.deleteOne({ _id: req.params.id });
-    req.flash('success', 'Staff account deleted successfully.');
-    res.redirect('/admin/staff');
+    req.flash('success', 'User deleted successfully.');
+    res.redirect('/admin/staff/users');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   STAFF COMMISSION SETUP — flat % rate per Role (see models/StaffCommissionSetup.js
+   for what "After Courier"/"After Delivered" mean — an original, disclosed
+   interpretation since the screenshot's table had no example row).
+   --------------------------------------------------------------------- */
+router.get('/staff/commission-setup', async (req, res, next) => {
+  try {
+    const [setups, roles] = await Promise.all([
+      StaffCommissionSetup.find().sort({ createdAt: -1 }).populate('role', 'name'),
+      Role.find().sort({ name: 1 }),
+    ]);
+    res.render('admin/staff-commission-setup', { adminPageTitle: 'Staff Commission Setup', setups, roles, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/staff/commission-setup', verifyCsrf, async (req, res, next) => {
+  try {
+    const { id, role, commissionRate } = req.body;
+    const errors = [];
+    if (!role) errors.push('Select an employee type (Role).');
+    if (commissionRate === undefined || commissionRate === '' || Number(commissionRate) < 0) errors.push('Enter a valid commission rate.');
+
+    if (errors.length) {
+      const [setups, roles] = await Promise.all([
+        StaffCommissionSetup.find().sort({ createdAt: -1 }).populate('role', 'name'),
+        Role.find().sort({ name: 1 }),
+      ]);
+      return res.render('admin/staff-commission-setup', { adminPageTitle: 'Staff Commission Setup', setups, roles, errors });
+    }
+
+    const data = {
+      role,
+      commissionRate: Number(commissionRate) || 0,
+      afterCourier: !!req.body.afterCourier,
+      afterDelivered: !!req.body.afterDelivered,
+    };
+    if (id) {
+      await StaffCommissionSetup.updateOne({ _id: id }, data);
+      req.flash('success', 'Commission setup updated successfully.');
+    } else {
+      await StaffCommissionSetup.create(data);
+      req.flash('success', 'Commission setup created successfully.');
+    }
+    res.redirect('/admin/staff/commission-setup');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/staff/commission-setup/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/staff/commission-setup');
+    }
+    await StaffCommissionSetup.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Commission setup deleted successfully.');
+    res.redirect('/admin/staff/commission-setup');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------------------------------------------------
+   STAFF REPORT — real per-staff order counts by status (Order.assignedEmployee,
+   grouped over the selected date range) plus a real Commission Amount
+   computed from Staff Commission Setup. "Paid Commission" is always 0 —
+   there's no payout/approval system yet (see Staff Commission Request
+   above), so rather than invent a number, it's honestly left at 0, which
+   makes Total Commission equal Commission Amount for now.
+   --------------------------------------------------------------------- */
+router.get('/staff/report', async (req, res, next) => {
+  try {
+    const range = ['today', 'yesterday', 'this_week', 'this_month'].includes(req.query.range) ? req.query.range : 'today';
+    const now = new Date();
+    let from = new Date(now); from.setHours(0, 0, 0, 0);
+    let to = new Date(now); to.setHours(23, 59, 59, 999);
+    if (range === 'yesterday') {
+      from.setDate(from.getDate() - 1); to.setDate(to.getDate() - 1);
+    } else if (range === 'this_week') {
+      from.setDate(from.getDate() - from.getDay());
+    } else if (range === 'this_month') {
+      from = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const [staff, setups] = await Promise.all([
+      Admin.find().sort({ username: 1 }).populate('roleId', 'name'),
+      StaffCommissionSetup.find(),
+    ]);
+    const setupByRole = {};
+    setups.forEach((s) => { setupByRole[String(s.role)] = s; });
+
+    const orders = await Order.find({ createdAt: { $gte: from, $lte: to }, assignedEmployee: { $ne: null } })
+      .select('assignedEmployee status total').lean();
+
+    const rows = staff.map((s) => {
+      const own = orders.filter((o) => String(o.assignedEmployee) === String(s._id));
+      const countByStatus = { pending: 0, confirmed: 0, courier: 0, cancelled: 0, delivered: 0, returned: 0 };
+      own.forEach((o) => { if (o.status in countByStatus) countByStatus[o.status] += 1; });
+
+      const setup = s.roleId ? setupByRole[String(s.roleId._id)] : null;
+      let commissionAmount = 0;
+      if (setup) {
+        own.forEach((o) => {
+          const eligible = (setup.afterCourier && o.status === 'courier') || (setup.afterDelivered && o.status === 'delivered');
+          if (eligible) commissionAmount += (o.total || 0) * (setup.commissionRate / 100);
+        });
+      }
+
+      return {
+        _id: s._id, name: s.fullName || s.username,
+        newOrders: countByStatus.pending, confirmed: countByStatus.confirmed, courier: countByStatus.courier,
+        cancelled: countByStatus.cancelled, delivered: countByStatus.delivered, returned: countByStatus.returned,
+        commissionAmount, paidCommission: 0, totalCommission: commissionAmount,
+      };
+    }).filter((r) => r.newOrders + r.confirmed + r.courier + r.cancelled + r.delivered + r.returned > 0);
+
+    res.render('admin/staff-report', { adminPageTitle: 'Staff Report', rows, range });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   TASK MANAGEMENT — a general internal to-do/task tracker for admin
+   staff (see models/Task.js for exactly what's a real link vs a
+   manually-typed tag: Employee is a real Admin FK; Order Status and
+   Invoice Number are free-form fields that are NOT wired to any real
+   Order). Filters: Priority, Status, Type, Assigned User (employee),
+   Order Status, plus a text search across Title/Description/Invoice
+   Number.
+   ===================================================================== */
+router.get('/task-management', async (req, res, next) => {
+  try {
+    const {
+      priority = '', status = '', type = '', employee = '', orderStatus = '', q = '',
+    } = req.query;
+
+    const filter = {};
+    if (priority) filter.priority = priority;
+    if (status) filter.status = status;
+    if (type) filter.type = type;
+    if (employee) filter.employee = employee;
+    if (orderStatus) filter.orderStatus = orderStatus;
+    if (q.trim()) {
+      const re = new RegExp(q.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+      filter.$or = [{ title: re }, { description: re }, { invoiceNumber: re }];
+    }
+
+    const [tasks, employees] = await Promise.all([
+      Task.find(filter).sort({ createdAt: -1 }).populate('employee', 'username fullName'),
+      Admin.find().sort({ username: 1 }).select('username fullName'),
+    ]);
+
+    res.render('admin/task-management', {
+      adminPageTitle: 'Task Management',
+      tasks,
+      employees,
+      TASK_PRIORITIES,
+      TASK_STATUSES,
+      TASK_TYPES,
+      ORDER_STATUSES,
+      priorityLabel,
+      priorityBadge,
+      taskStatusLabel,
+      taskStatusBadge,
+      typeLabel,
+      filters: {
+        priority, status, type, employee, orderStatus, q,
+      },
+      errors: [],
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/task-management', verifyCsrf, async (req, res, next) => {
+  try {
+    const {
+      id, title, description, orderStatus, employee, invoiceNumber, priority, status, type, dueDate,
+    } = req.body;
+
+    const errors = [];
+    if (!title || !title.trim()) errors.push('Title is required.');
+
+    if (errors.length) {
+      const [tasks, employees] = await Promise.all([
+        Task.find().sort({ createdAt: -1 }).populate('employee', 'username fullName'),
+        Admin.find().sort({ username: 1 }).select('username fullName'),
+      ]);
+      return res.render('admin/task-management', {
+        adminPageTitle: 'Task Management',
+        tasks,
+        employees,
+        TASK_PRIORITIES,
+        TASK_STATUSES,
+        TASK_TYPES,
+        ORDER_STATUSES,
+        priorityLabel,
+        priorityBadge,
+        taskStatusLabel,
+        taskStatusBadge,
+        typeLabel,
+        filters: {
+          priority: '', status: '', type: '', employee: '', orderStatus: '', q: '',
+        },
+        errors,
+      });
+    }
+
+    const data = {
+      title: title.trim(),
+      description: description || '',
+      orderStatus: ORDER_STATUSES.some((s) => s.value === orderStatus) ? orderStatus : '',
+      employee: employee || null,
+      invoiceNumber: (invoiceNumber || '').trim(),
+      priority: TASK_PRIORITIES.some((p) => p.value === priority) ? priority : 'medium',
+      status: TASK_STATUSES.some((s) => s.value === status) ? status : 'pending',
+      type: TASK_TYPES.some((t) => t.value === type) ? type : 'general',
+      dueDate: dueDate ? new Date(dueDate) : null,
+    };
+
+    if (id) {
+      await Task.updateOne({ _id: id }, data);
+      req.flash('success', 'Task updated successfully.');
+    } else {
+      await Task.create(data);
+      req.flash('success', 'Task created successfully.');
+    }
+    res.redirect('/admin/task-management');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/task-management/delete/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/task-management');
+    }
+    await Task.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Task deleted successfully.');
+    res.redirect('/admin/task-management');
   } catch (err) {
     next(err);
   }
@@ -2735,7 +3149,7 @@ router.post('/marketing/sms/test', verifyCsrf, async (req, res, next) => {
    (see middleware/trackPageView.js, which logs every real storefront
    page load).
    ===================================================================== */
-const ANALYTICS_CARDS = ['productReports', 'productAnalytics', 'lowStock', 'mostSoldItems', 'topCategory', 'storeVisitors', 'storeTopClicks'];
+const ANALYTICS_CARDS = ['productReports', 'productAnalytics', 'lowStock', 'mostSoldItems', 'topCategory', 'storeVisitors', 'storeTopClicks', 'searchAnalytics'];
 const ANALYTICS_CARD_META = {
   productReports: { title: 'Product Reports', path: 'product-reports', icon: 'bi-clipboard-data', color: '#f0ad4e' },
   productAnalytics: { title: 'Product Analytics', path: 'product-analytics', icon: 'bi-bar-chart-fill', color: '#337ab7' },
@@ -2744,6 +3158,7 @@ const ANALYTICS_CARD_META = {
   topCategory: { title: 'Top Category', path: 'top-category', icon: 'bi-tags-fill', color: '#2e9e5b' },
   storeVisitors: { title: 'Store Visitors', path: 'store-visitors', icon: 'bi-people-fill', color: '#16a085' },
   storeTopClicks: { title: 'Store Top Clicks', path: 'store-top-clicks', icon: 'bi-cursor-fill', color: '#d6336c' },
+  searchAnalytics: { title: 'Search Analytics', path: 'search-analytics', icon: 'bi-search', color: '#0ea5a5' },
 };
 
 // Same from/to date-range convention as the existing Sales Report page
@@ -2920,6 +3335,67 @@ router.get('/analytics/store-top-clicks', async (req, res, next) => {
   }
 });
 
+/* ---------------------------------------------------------------------
+   SEARCH ANALYTICS — real storefront search logging (see models/SearchLog.js
+   and GET /search in routes/store.js). Top Searches and No Result Searches
+   are real aggregations over logged queries. "Search Conversion" is a
+   deliberately scoped, disclosed approximation: it's the % of sessions
+   that searched in this window and ALSO placed any order in the same
+   browser session (matching SearchLog.sessionKey against Order.trackToken
+   — both are req.sessionID, see models/SearchLog.js's file comment) — not
+   "this exact search term caused this exact purchase", which would need
+   product-click tracking this app doesn't have.
+   --------------------------------------------------------------------- */
+router.get('/analytics/search-analytics', async (req, res, next) => {
+  try {
+    const { from, to, fromDate, toDate } = resolveDateRange(req);
+    const match = { createdAt: { $gte: fromDate, $lte: toDate } };
+
+    const [recentSearches, topSearches, noResultSearches, totalSearches, searchedSessions] = await Promise.all([
+      SearchLog.find(match).sort({ createdAt: -1 }).limit(20).lean(),
+      SearchLog.aggregate([
+        { $match: match },
+        { $group: { _id: { $toLower: '$query' }, count: { $sum: 1 }, avgResults: { $avg: '$resultCount' } } },
+        { $sort: { count: -1 } },
+        { $limit: 15 },
+      ]),
+      SearchLog.aggregate([
+        { $match: { ...match, resultCount: 0 } },
+        { $group: { _id: { $toLower: '$query' }, count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+        { $limit: 15 },
+      ]),
+      SearchLog.countDocuments(match),
+      SearchLog.distinct('sessionKey', { ...match, sessionKey: { $ne: '' } }),
+    ]);
+
+    let convertedCount = 0;
+    if (searchedSessions.length) {
+      const orderedSessions = await Order.distinct('trackToken', { trackToken: { $in: searchedSessions }, isDeleted: false });
+      convertedCount = orderedSessions.length;
+    }
+    const conversionRate = searchedSessions.length ? (convertedCount / searchedSessions.length) * 100 : 0;
+    const noResultCount = noResultSearches.reduce((s, r) => s + r.count, 0);
+
+    res.render('admin/analytics-search', {
+      adminPageTitle: 'Search Analytics',
+      meta: ANALYTICS_CARD_META.searchAnalytics,
+      from,
+      to,
+      recentSearches,
+      topSearches,
+      noResultSearches,
+      totalSearches,
+      noResultCount,
+      uniqueSearchSessions: searchedSessions.length,
+      convertedCount,
+      conversionRate,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 /* =====================================================================
    CUSTOMERS
    ===================================================================== */
@@ -2945,6 +3421,271 @@ router.get('/customers', async (req, res, next) => {
     });
 
     res.render('admin/customers', { adminPageTitle: 'Customer Management', customers, q });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   REFERRAL PROGRAM — a real Admin > Customer acquisition referral link.
+   ---------------------------------------------------------------------
+   The reference design (ClickDokan) is SaaS-platform-shaped: refer other
+   businesses to buy a ClickDokan "Plan" and earn a cut ("Refer Imran and
+   earn ৳500 per paid signup!"). ShopKori has no such multi-tenant
+   Plan/subscription system at all — no models/Plan.js, and "Plans" /
+   "Ad On" / "Startup Package" from the reference sidebar were never added
+   to admin-header.ejs either — so that literal feature has nothing real
+   to attach to.
+
+   This is built as ShopKori's own, genuinely working equivalent instead:
+   each Admin gets a personal share link. When someone creates a Customer
+   account on the storefront via that link, Customer.referredBy records
+   which Admin gets credit (see middleware/storeLocals.js, which captures
+   ?ref=<code> into the session, and POST /register in routes/store.js,
+   which resolves it onto the new Customer). A "paid signup" is that
+   referred customer's first order reaching paymentStatus 'paid' (online
+   payment) or status 'delivered' (COD collected on delivery) — the two
+   real "money actually changed hands" signals this app already has.
+
+   The Referral Transaction table's columns are relabeled from the
+   reference design's "Plan Name / Plan Price" (no such concept exists
+   here) to the real Customer + Order Amount that earned the commission —
+   same table shape and style, real data instead of a mismatched label.
+   commissionAmount is a fixed ৳500 (models/ReferralSetting.js) — the
+   reference design's Guideline card has no edit form, so there's no UI to
+   change it yet. The Payout tab's "Request Payout" button and its inline
+   Paid/Reject actions are an original, disclosed addition (no payout-
+   request button was visible in the reference screenshot) — without it,
+   Payout History would have no way to ever contain a row, mirroring the
+   already-existing Admin > Manage Delivery > Commission Request pattern.
+   ===================================================================== */
+function generateReferralCode() {
+  return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+async function ensureAdminReferralCode(admin) {
+  if (admin.referralCode) return admin.referralCode;
+  let code;
+  let taken = true;
+  while (taken) {
+    code = generateReferralCode();
+    // eslint-disable-next-line no-await-in-loop
+    taken = !!(await Admin.findOne({ referralCode: code }));
+  }
+  admin.referralCode = code;
+  await admin.save();
+  return code;
+}
+
+// A referred customer's first order to reach either real "paid" signal
+// this app has: online payment success, or COD cash collected on delivery.
+async function qualifyingReferralOrders(adminId) {
+  const referredCustomers = await Customer.find({ referredBy: adminId }).sort({ createdAt: -1 }).lean();
+  const customerIds = referredCustomers.map((c) => c._id);
+  if (!customerIds.length) return { referredCustomers, orders: [] };
+  const orders = await Order.find({
+    customer: { $in: customerIds },
+    isDeleted: false,
+    $or: [{ paymentStatus: 'paid' }, { status: 'delivered' }],
+  }).select('customer orderNumber total createdAt').sort({ createdAt: -1 }).lean();
+  return { referredCustomers, orders };
+}
+
+async function referralBalances(adminId) {
+  const [referralSetting, { orders }, requests] = await Promise.all([
+    getReferralSetting(),
+    qualifyingReferralOrders(adminId),
+    ReferralPayoutRequest.find({ admin: adminId }).sort({ createdAt: -1 }),
+  ]);
+  const totalCommission = orders.reduce((sum, o) => sum + Math.min(referralSetting.commissionAmount, o.total || 0), 0);
+  const paidCommission = requests.filter((r) => r.status === 'paid').reduce((sum, r) => sum + r.amount, 0);
+  const pendingCommission = requests.filter((r) => r.status === 'pending').reduce((sum, r) => sum + r.amount, 0);
+  const available = Math.max(0, totalCommission - paidCommission - pendingCommission);
+  return {
+    totalCommission, paidCommission, pendingCommission, available, requests,
+  };
+}
+
+router.get('/referral-program', async (req, res, next) => {
+  try {
+    const admin = await Admin.findById(req.session.adminId);
+    const code = await ensureAdminReferralCode(admin);
+    const referralLink = `${req.protocol}://${req.get('host')}/register?ref=${code}`;
+    const referralSetting = await getReferralSetting();
+    res.render('admin/referral-guideline', {
+      adminPageTitle: 'Referral Program', referralTab: 'guideline', referralLink, referralSetting,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/referral-program/transactions', async (req, res, next) => {
+  try {
+    const referralSetting = await getReferralSetting();
+    const { referredCustomers, orders } = await qualifyingReferralOrders(req.session.adminId);
+    const customerById = {};
+    referredCustomers.forEach((c) => { customerById[String(c._id)] = c; });
+
+    const rows = orders.map((o) => {
+      const commissionAmount = Math.min(referralSetting.commissionAmount, o.total || 0);
+      const commissionPercent = o.total ? (commissionAmount / o.total) * 100 : 0;
+      return {
+        customer: customerById[String(o.customer)] || null,
+        orderNumber: o.orderNumber,
+        orderTotal: o.total,
+        createdAt: o.createdAt,
+        commissionAmount,
+        commissionPercent,
+      };
+    });
+
+    res.render('admin/referral-transactions', {
+      adminPageTitle: 'Referral Program', referralTab: 'transactions', rows, referralSetting,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/referral-program/payout', async (req, res, next) => {
+  try {
+    const {
+      totalCommission, paidCommission, available, requests,
+    } = await referralBalances(req.session.adminId);
+    res.render('admin/referral-payout', {
+      adminPageTitle: 'Referral Program', referralTab: 'payout', totalCommission, paidCommission, available, requests, errors: [],
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/referral-program/payout', verifyCsrf, async (req, res, next) => {
+  try {
+    const adminId = req.session.adminId;
+    const {
+      totalCommission, paidCommission, available, requests,
+    } = await referralBalances(adminId);
+
+    const amount = Number(req.body.amount);
+    const method = req.body.method;
+    const paymentNumber = (req.body.paymentNumber || '').trim();
+    const errors = [];
+    if (!amount || amount <= 0) errors.push('Enter a valid amount.');
+    else if (amount > available) errors.push(`You can request up to ${available.toFixed(2)} — your current unpaid commission balance.`);
+    if (!['cash', 'bkash', 'nagad', 'bank'].includes(method)) errors.push('Select a payment method.');
+    if (!paymentNumber) errors.push('Enter your payment number / account.');
+
+    if (errors.length) {
+      return res.render('admin/referral-payout', {
+        adminPageTitle: 'Referral Program', referralTab: 'payout', totalCommission, paidCommission, available, requests, errors,
+      });
+    }
+
+    await ReferralPayoutRequest.create({
+      admin: adminId, amount, method, paymentNumber,
+    });
+    req.flash('success', 'Payout request submitted successfully.');
+    res.redirect('/admin/referral-program/payout');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/referral-program/payout/:id/action', verifyCsrf, async (req, res, next) => {
+  try {
+    const action = req.body.action === 'paid' ? 'paid' : (req.body.action === 'reject' ? 'rejected' : null);
+    if (action) {
+      await ReferralPayoutRequest.updateOne({ _id: req.params.id, status: 'pending' }, { status: action });
+      req.flash('success', `Payout request marked ${action}.`);
+    }
+    res.redirect('/admin/referral-program/payout');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/referral-program/users', async (req, res, next) => {
+  try {
+    const referredCustomers = await Customer.find({ referredBy: req.session.adminId }).sort({ createdAt: -1 }).lean();
+    res.render('admin/referral-users', { adminPageTitle: 'Referral Program', referralTab: 'users', referredCustomers });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   HELP & SUPPORT
+   ---------------------------------------------------------------------
+   This page is the store admin reaching ShopKori's own platform support
+   team (the banner says "for decisions or technical problems"), not
+   customers reaching the store — see models/HelpSupportSetting.js for why
+   that's kept separate from models/HomeSetting.js's storefront contact
+   fields. Of the 5 cards: Call Now / Email / Live Chat / Join Community
+   are direct tel:/mailto:/new-tab links built from HelpSupportSetting's
+   (currently fixed, undisclosed-in-the-design) values — genuinely real,
+   just not yet editable from a UI. Create Support Ticket is the one card
+   with an actual data-backed flow: it opens a modal (kept off the main
+   page so the page itself stays exactly like the reference screenshot)
+   with a form plus a short history of tickets already raised, backed by
+   models/SupportTicket.js. There's no live ShopKori support agent in
+   this app, so a ticket is a real, saved, shared record any admin can
+   mark Resolved — not a two-way conversation.
+   ===================================================================== */
+router.get('/help-support', async (req, res, next) => {
+  try {
+    const [helpSupportSetting, tickets] = await Promise.all([
+      getHelpSupportSetting(),
+      SupportTicket.find().sort({ createdAt: -1 }).limit(5).populate('admin', 'username fullName'),
+    ]);
+    res.render('admin/help-support', {
+      adminPageTitle: 'Help & Support', helpSupportSetting, tickets, errors: [],
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/help-support/tickets', verifyCsrf, async (req, res, next) => {
+  try {
+    const { subject, message, priority } = req.body;
+    const errors = [];
+    if (!subject || !subject.trim()) errors.push('Subject is required.');
+    if (!message || !message.trim()) errors.push('Please describe your issue.');
+
+    if (errors.length) {
+      const [helpSupportSetting, tickets] = await Promise.all([
+        getHelpSupportSetting(),
+        SupportTicket.find().sort({ createdAt: -1 }).limit(5).populate('admin', 'username fullName'),
+      ]);
+      return res.render('admin/help-support', {
+        adminPageTitle: 'Help & Support', helpSupportSetting, tickets, errors,
+      });
+    }
+
+    await SupportTicket.create({
+      admin: req.session.adminId,
+      subject: subject.trim(),
+      message: message.trim(),
+      priority: ['low', 'medium', 'high'].includes(priority) ? priority : 'medium',
+    });
+    req.flash('success', 'Support ticket submitted successfully.');
+    res.redirect('/admin/help-support');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/help-support/tickets/:id/resolve', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/help-support');
+    }
+    await SupportTicket.updateOne({ _id: req.params.id }, { status: 'resolved' });
+    req.flash('success', 'Ticket marked resolved.');
+    res.redirect('/admin/help-support');
   } catch (err) {
     next(err);
   }

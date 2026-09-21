@@ -1,0 +1,109 @@
+<%- include('partials/admin-header') %>
+
+<div class="help-banner">
+  <div class="help-banner-dots"><span></span><span></span><span></span><span></span></div>
+  <div class="help-banner-bubble"><i class="bi bi-chat-dots-fill"></i></div>
+  <div class="help-banner-eyebrow">সিদ্ধান্ত নিতে বা টেকনিক্যাল সমস্যা সমাধানে</div>
+  <h3>সাহায্য প্রয়োজন?</h3>
+  <p>আপনার প্রশ্ন যা-ই হোক না কেন, আমরা আপনার পাশে আছি। প্রয়োজন অনুযায়ী নিচের যেকোনো একটি মাধ্যমে যোগাযোগ করুন।</p>
+
+  <div class="help-actions">
+    <button type="button" class="help-action-card" data-bs-toggle="modal" data-bs-target="#supportTicketModal">
+      <span class="help-action-icon"><i class="bi bi-headset"></i></span>
+      <span class="help-action-label">সাপোর্ট টিকেট করুন</span>
+    </button>
+
+    <% if (helpSupportSetting.liveChatUrl) { %>
+      <a class="help-action-card" href="<%= helpSupportSetting.liveChatUrl %>" target="_blank" rel="noopener">
+        <span class="help-action-icon"><i class="bi bi-chat-dots-fill"></i></span>
+        <span class="help-action-label">লাইভ চ্যাটে কথা বলুন</span>
+      </a>
+    <% } %>
+
+    <% if (helpSupportSetting.supportPhone) { %>
+      <a class="help-action-card" href="tel:<%= helpSupportSetting.supportPhone.replace(/[^+\d]/g, '') %>">
+        <span class="help-action-icon"><i class="bi bi-telephone-fill"></i></span>
+        <span class="help-action-label">এখনই কল করুন</span>
+      </a>
+    <% } %>
+
+    <% if (helpSupportSetting.supportEmail) { %>
+      <a class="help-action-card" href="mailto:<%= helpSupportSetting.supportEmail %>">
+        <span class="help-action-icon"><i class="bi bi-envelope-fill"></i></span>
+        <span class="help-action-label">ইমেইল করুন</span>
+      </a>
+    <% } %>
+
+    <% if (helpSupportSetting.communityUrl) { %>
+      <a class="help-action-card" href="<%= helpSupportSetting.communityUrl %>" target="_blank" rel="noopener">
+        <span class="help-action-icon"><i class="bi bi-people-fill"></i></span>
+        <span class="help-action-label">কমিউনিটিতে যোগ দিন</span>
+      </a>
+    <% } %>
+  </div>
+</div>
+
+<!-- Create Support Ticket modal -->
+<div class="modal fade" id="supportTicketModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header"><h5 class="modal-title">Create Support Ticket</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+      <div class="modal-body">
+        <% if (errors && errors.length) { %>
+          <div class="alert alert-danger">
+            <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+          </div>
+        <% } %>
+        <form method="post" action="/admin/help-support/tickets" class="mb-4">
+          <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+          <div class="mb-3"><label class="form-label">Subject*</label><input type="text" name="subject" class="form-control" placeholder="What do you need help with?" required></div>
+          <div class="mb-3"><label class="form-label">Message*</label><textarea name="message" class="form-control" rows="4" placeholder="Describe your issue in detail" required></textarea></div>
+          <div class="mb-3" style="max-width:200px;">
+            <label class="form-label">Priority</label>
+            <select name="priority" class="form-select">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-brand w-100">Submit Ticket</button>
+        </form>
+
+        <h6 class="mb-2">Recent Tickets</h6>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle">
+            <thead><tr><th>Subject</th><th>Raised By</th><th>Priority</th><th>Status</th><th>Date</th><th></th></tr></thead>
+            <tbody>
+              <% tickets.forEach(function (t) { %>
+                <tr>
+                  <td><%= t.subject %></td>
+                  <td><%= t.admin ? (t.admin.fullName || t.admin.username) : '—' %></td>
+                  <td><span class="badge bg-<%= t.priority === 'high' ? 'danger' : (t.priority === 'low' ? 'secondary' : 'warning') %>"><%= t.priority.charAt(0).toUpperCase() + t.priority.slice(1) %></span></td>
+                  <td><span class="badge bg-<%= t.status === 'resolved' ? 'success' : 'info' %>"><%= t.status === 'resolved' ? 'Resolved' : 'Open' %></span></td>
+                  <td><small class="text-muted"><%= new Date(t.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
+                  <td>
+                    <% if (t.status === 'open') { %>
+                      <a href="/admin/help-support/tickets/<%= t._id %>/resolve?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-success">Mark Resolved</a>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+              <% if (!tickets.length) { %><tr><td colspan="6" class="text-center text-muted py-3">No tickets yet.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+        <p class="form-text mb-0">ShopKori doesn't have a live support-agent backend in this app, so tickets are a shared record any admin can see and mark resolved rather than a two-way conversation — for a live answer, use Live Chat, Call Now, or Email instead.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  <% if (errors && errors.length) { %>
+    new bootstrap.Modal(document.getElementById('supportTicketModal')).show();
+  <% } %>
+});
+</script>
+
+<%- include('partials/admin-footer') %>

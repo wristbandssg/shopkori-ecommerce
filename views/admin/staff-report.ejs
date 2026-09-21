@@ -1,0 +1,55 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/staff" class="text-decoration-none">Staff Setup</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Staff Report</span>
+</nav>
+
+<div class="admin-card">
+  <h6 class="mb-3">Staff Order Report</h6>
+
+  <form method="get" class="mb-3">
+    <label class="form-label">Date Range</label>
+    <select name="range" class="form-select" style="max-width:220px" onchange="this.form.submit()">
+      <option value="today" <%= range === 'today' ? 'selected' : '' %>>Today</option>
+      <option value="yesterday" <%= range === 'yesterday' ? 'selected' : '' %>>Yesterday</option>
+      <option value="this_week" <%= range === 'this_week' ? 'selected' : '' %>>This Week</option>
+      <option value="this_month" <%= range === 'this_month' ? 'selected' : '' %>>This Month</option>
+    </select>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>#</th><th>Staff Name</th><th>New Orders</th><th>Confirmed</th><th>Courier</th>
+          <th>Cancelled</th><th>Delivered</th><th>Returned</th><th>Commission Amount</th><th>Paid Commission</th><th>Total Commission</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% rows.forEach(function (r, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><%= r.name %></td>
+            <td><%= r.newOrders %></td>
+            <td><%= r.confirmed %></td>
+            <td><%= r.courier %></td>
+            <td><%= r.cancelled %></td>
+            <td><%= r.delivered %></td>
+            <td><%= r.returned %></td>
+            <td><%= currency(r.commissionAmount) %></td>
+            <td><%= currency(r.paidCommission) %></td>
+            <td><%= currency(r.totalCommission) %></td>
+          </tr>
+        <% }); %>
+        <% if (!rows.length) { %><tr><td colspan="11" class="text-center text-muted py-4">No data found for the selected range.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+  <p class="form-text mb-0">Commission Amount is calculated live from Staff &gt; Commission Setup. "Paid Commission" is always ৳0 — there's no payout/approval workflow built yet (see Staff &gt; Staff Commission Request), so Total Commission currently equals Commission Amount.</p>
+</div>
+
+<%- include('partials/admin-footer') %>

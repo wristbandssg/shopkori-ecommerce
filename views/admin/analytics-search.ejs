@@ -1,0 +1,113 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/analytics" class="text-decoration-none">Analytics Settings</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted"><%= meta.title %></span>
+</nav>
+
+<p class="small text-muted">What customers actually search for on the storefront, logged from every real search.</p>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex gap-2 align-items-end flex-wrap">
+    <div>
+      <label class="form-label">Start Date</label>
+      <input type="date" name="from" class="form-control" value="<%= from %>">
+    </div>
+    <div>
+      <label class="form-label">End Date</label>
+      <input type="date" name="to" class="form-control" value="<%= to %>">
+    </div>
+    <button class="btn btn-brand">Filter</button>
+  </form>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#0ea5a5;"><i class="bi bi-search"></i></div>
+      <div><span class="stat-value"><%= totalSearches %></span><span class="stat-label">Total Searches</span></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#d9534f;"><i class="bi bi-emoji-frown"></i></div>
+      <div><span class="stat-value"><%= noResultCount %></span><span class="stat-label">No Result Searches</span></div>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#2e9e5b;"><i class="bi bi-graph-up-arrow"></i></div>
+      <div><span class="stat-value"><%= conversionRate.toFixed(1) %>%</span><span class="stat-label">Search Conversion</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-6">
+    <div class="admin-card h-100">
+      <div class="card-title-bar">Top Searches</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>#</th><th>Query</th><th>Searches</th><th>Avg. Results</th></tr></thead>
+          <tbody>
+            <% topSearches.forEach(function (r, i) { %>
+              <tr>
+                <td><%= i + 1 %></td>
+                <td>"<%= r._id %>"</td>
+                <td><span class="badge bg-primary"><%= r.count %></span></td>
+                <td><%= r.avgResults.toFixed(1) %></td>
+              </tr>
+            <% }); %>
+            <% if (!topSearches.length) { %><tr><td colspan="4" class="text-center text-muted py-3">No searches recorded in this period.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="admin-card h-100">
+      <div class="card-title-bar">No Result Searches</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>#</th><th>Query</th><th>Times Searched</th></tr></thead>
+          <tbody>
+            <% noResultSearches.forEach(function (r, i) { %>
+              <tr>
+                <td><%= i + 1 %></td>
+                <td>"<%= r._id %>"</td>
+                <td><span class="badge bg-danger"><%= r.count %></span></td>
+              </tr>
+            <% }); %>
+            <% if (!noResultSearches.length) { %><tr><td colspan="3" class="text-center text-muted py-3">No zero-result searches in this period.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-text mb-0">A recurring "no result" search is a real signal to onboard that product.</p>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card">
+  <div class="card-title-bar">Recent Searches</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Query</th><th>Results</th><th>Searched At</th></tr></thead>
+      <tbody>
+        <% recentSearches.forEach(function (s) { %>
+          <tr>
+            <td>"<%= s.query %>"</td>
+            <td><span class="badge bg-<%= s.resultCount ? 'success' : 'danger' %>"><%= s.resultCount %></span></td>
+            <td><small class="text-muted"><%= new Date(s.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) %></small></td>
+          </tr>
+        <% }); %>
+        <% if (!recentSearches.length) { %><tr><td colspan="3" class="text-center text-muted py-3">No searches recorded in this period.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+  <p class="form-text mb-0">Search Conversion = of the <%= uniqueSearchSessions %> browser sessions that searched in this period, how many (<%= convertedCount %>) also placed an order in that same session — not that the order was necessarily for the searched item, since this app doesn't track product clicks from search results yet.</p>
+</div>
+
+<%- include('partials/admin-footer') %>

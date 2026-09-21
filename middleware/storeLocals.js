@@ -1,5 +1,6 @@
 const Category = require('../models/Category');
 const Customer = require('../models/Customer');
+const Admin = require('../models/Admin');
 const { getSettings } = require('../models/Setting');
 const { getMarketingSettings } = require('../models/MarketingSetting');
 const { getThemeCustomizer } = require('../models/ThemeCustomizer');
@@ -65,6 +66,17 @@ async function storeLocals(req, res, next) {
     res.locals.customer = null;
     if (req.session.customerId) {
       res.locals.customer = await Customer.findById(req.session.customerId).lean();
+    }
+
+    // Admin > Referral Program share link (?ref=<code>) — captured here so
+    // it survives however the visitor browses before registering, not just
+    // a direct hit on /register. Only looked up once, on the actual click
+    // (when ?ref is present); resolves to a real Admin _id and is kept in
+    // the session until POST /register (routes/store.js) consumes it, or
+    // gets overwritten by a newer ?ref link.
+    if (req.query.ref && !req.session.customerId) {
+      const referrer = await Admin.findOne({ referralCode: String(req.query.ref).toUpperCase() }).select('_id').lean();
+      if (referrer) req.session.referralAdminId = String(referrer._id);
     }
 
     next();

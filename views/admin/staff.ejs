@@ -1,88 +1,50 @@
 <%- include('partials/admin-header') %>
 
-<% if (errors && errors.length) { %>
-  <div class="alert alert-danger">
-    <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
-  </div>
-<% } %>
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Staff Setup</span>
+</nav>
 
-<div class="row g-4">
-  <div class="col-lg-4">
-    <div class="admin-card">
-      <h5>Add New Staff</h5>
-      <form method="post" action="/admin/staff">
-        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
-        <div class="mb-3">
-          <label class="form-label">Username</label>
-          <input type="text" name="username" class="form-control" required>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Full Name</label>
-          <input type="text" name="fullName" class="form-control">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Email</label>
-          <input type="email" name="email" class="form-control" required>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Role</label>
-          <input type="text" name="role" class="form-control" placeholder="e.g. Delivery Man, Manager">
-        </div>
-        <div class="mb-3">
-          <label class="form-label">Password</label>
-          <input type="password" name="password" class="form-control" required>
-        </div>
-        <button type="submit" class="btn btn-brand w-100">Add Staff</button>
-      </form>
-    </div>
-  </div>
-
-  <div class="col-lg-8">
-    <div class="admin-card">
-      <h5>All Staff</h5>
-      <div class="table-responsive">
-        <table class="table align-middle">
-          <thead><tr><th>Username</th><th>Full Name</th><th>Email</th><th>Role</th><th>Joined</th><th>Action</th></tr></thead>
-          <tbody>
-            <% staff.forEach(function (s) { %>
-              <tr>
-                <td><%= s.username %></td>
-                <td><%= s.fullName || '—' %></td>
-                <td><%= s.email %></td>
-                <td><span class="badge bg-light text-dark border"><%= s.role || 'admin' %></span></td>
-                <td><small class="text-muted"><%= new Date(s.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
-                <td class="text-nowrap">
-                  <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editStaff<%= s._id %>"><i class="bi bi-pencil"></i></button>
-                  <a href="/admin/staff/delete/<%= s._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this staff account?')"><i class="bi bi-trash"></i></a>
-                </td>
-              </tr>
-
-              <div class="modal fade" id="editStaff<%= s._id %>" tabindex="-1">
-                <div class="modal-dialog">
-                  <div class="modal-content">
-                    <form method="post" action="/admin/staff">
-                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
-                      <input type="hidden" name="id" value="<%= s._id %>">
-                      <div class="modal-header"><h5 class="modal-title">Edit Staff</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                      <div class="modal-body">
-                        <div class="mb-3"><label class="form-label">Username</label><input type="text" name="username" class="form-control" value="<%= s.username %>" required></div>
-                        <div class="mb-3"><label class="form-label">Full Name</label><input type="text" name="fullName" class="form-control" value="<%= s.fullName || '' %>"></div>
-                        <div class="mb-3"><label class="form-label">Email</label><input type="email" name="email" class="form-control" value="<%= s.email %>" required></div>
-                        <div class="mb-3"><label class="form-label">Role</label><input type="text" name="role" class="form-control" value="<%= s.role || '' %>"></div>
-                        <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password"></div>
-                      </div>
-                      <div class="modal-footer"><button type="submit" class="btn btn-brand">Save</button></div>
-                    </form>
-                  </div>
-                </div>
-              </div>
-            <% }); %>
-            <% if (!staff.length) { %><tr><td colspan="6" class="text-center text-muted">No staff accounts yet.</td></tr><% } %>
-          </tbody>
-        </table>
-      </div>
-    </div>
+<div class="admin-card mb-3">
+  <div class="d-flex gap-2 flex-wrap">
+    <input type="text" id="staffSearch" class="form-control" style="max-width:260px" placeholder="Search...">
+    <button class="btn btn-outline-secondary" type="button"><i class="bi bi-search"></i></button>
   </div>
 </div>
+
+<div class="row g-3" id="staffGrid">
+  <% STAFF_CARDS.forEach(function (key) { %>
+    <% var m = STAFF_CARD_META[key]; %>
+    <div class="col-md-4 staff-grid-item" data-name="<%= m.title.toLowerCase() %>">
+      <a href="<%= m.path %>" class="text-decoration-none">
+        <div class="admin-card d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center justify-content-center rounded-circle text-white" style="width:44px;height:44px;background:<%= m.color %>;font-size:1.1rem;flex-shrink:0;">
+              <i class="bi <%= m.icon %>"></i>
+            </div>
+            <div>
+              <div class="fw-semibold text-dark"><%= m.title %></div>
+              <span class="small text-primary">Manage <i class="bi bi-arrow-right"></i></span>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+  <% }); %>
+</div>
+
+<script>
+  (function () {
+    var input = document.getElementById('staffSearch');
+    if (!input) return;
+    input.addEventListener('input', function () {
+      var q = input.value.trim().toLowerCase();
+      document.querySelectorAll('#staffGrid .staff-grid-item').forEach(function (item) {
+        item.style.display = !q || item.getAttribute('data-name').indexOf(q) !== -1 ? '' : 'none';
+      });
+    });
+  })();
+</script>
 
 <%- include('partials/admin-footer') %>

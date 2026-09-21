@@ -1,0 +1,36 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Referral Program</span>
+</nav>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <%- include('partials/referral-tabs') %>
+  </div>
+  <div class="col-md-9">
+    <div class="admin-card">
+      <div class="card-title-bar">Guideline</div>
+      <div class="row g-3 align-items-center">
+        <div class="col-md-6">
+          <div class="fw-semibold"><%= referralSetting.guidelineTitle %></div>
+          <div class="text-muted small"><%= referralSetting.guidelineSubtitle %></div>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label small text-muted mb-1">Share Your Link</label>
+          <div class="input-group">
+            <input type="text" class="form-control" value="<%= referralLink %>" readonly id="referralLinkInput">
+            <button class="btn btn-brand" type="button" onclick="document.getElementById('referralLinkInput').select(); document.execCommand('copy');"><i class="bi bi-clipboard"></i></button>
+          </div>
+        </div>
+      </div>
+      <p class="form-text mb-0 mt-3">
+        This is your own personal share link. When someone signs up for a customer account on the storefront through it, and their first order gets paid (online payment) or delivered (Cash on Delivery), you earn <%= currency(referralSetting.commissionAmount) %> commission — see Referral Transaction. ShopKori doesn't have a subscription "Plan" system like the reference design's "per paid signup" wording implies, so here a "paid signup" means a referred customer's first real, paid order.
+      </p>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

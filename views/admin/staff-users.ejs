@@ -1,0 +1,121 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/staff" class="text-decoration-none">Staff Setup</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Users</span>
+</nav>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger">
+    <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+  </div>
+<% } %>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h6 class="mb-0">Users</h6>
+  <button type="button" class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#addUserModal"><i class="bi bi-plus-lg"></i></button>
+</div>
+
+<% if (!staff.length) { %>
+  <div class="admin-card text-center py-5" style="cursor:pointer;" data-bs-toggle="modal" data-bs-target="#addUserModal">
+    <div class="d-flex align-items-center justify-content-center rounded-circle text-white mx-auto mb-2" style="width:40px;height:40px;background:var(--bs-brand,#EC0E8C);">
+      <i class="bi bi-plus-lg"></i>
+    </div>
+    <div class="fw-semibold">New User</div>
+    <div class="text-muted small">Click here to add new User</div>
+  </div>
+<% } else { %>
+  <div class="admin-card">
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Login</th><th>Joined</th><th>Action</th></tr></thead>
+        <tbody>
+          <% staff.forEach(function (s) { %>
+            <tr>
+              <td><%= s.fullName || s.username %></td>
+              <td><%= s.email %></td>
+              <td><span class="badge bg-light text-dark border"><%= s.roleId ? s.roleId.name : (s.role || '—') %></span></td>
+              <td><span class="badge bg-<%= s.loginEnabled === false ? 'secondary' : 'success' %>"><%= s.loginEnabled === false ? 'Disabled' : 'Enabled' %></span></td>
+              <td><small class="text-muted"><%= new Date(s.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
+              <td class="text-nowrap">
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editUser<%= s._id %>"><i class="bi bi-pencil"></i></button>
+                <a href="/admin/staff/users/delete/<%= s._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this user?')"><i class="bi bi-trash"></i></a>
+              </td>
+            </tr>
+
+            <div class="modal fade" id="editUser<%= s._id %>" tabindex="-1">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  <form method="post" action="/admin/staff/users">
+                    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                    <input type="hidden" name="id" value="<%= s._id %>">
+                    <div class="modal-header"><h5 class="modal-title">Edit User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                    <div class="modal-body">
+                      <div class="mb-3"><label class="form-label">Name*</label><input type="text" name="name" class="form-control" value="<%= s.fullName || s.username %>" placeholder="Enter Name" required></div>
+                      <div class="mb-3"><label class="form-label">Email*</label><input type="email" name="email" class="form-control" value="<%= s.email %>" placeholder="Enter Email" required></div>
+                      <div class="mb-3">
+                        <label class="form-label">User Role*</label>
+                        <select name="roleId" class="form-select">
+                          <option value="">— Select Role —</option>
+                          <% roles.forEach(function (r) { %>
+                            <option value="<%= r._id %>" <%= s.roleId && String(s.roleId._id) === String(r._id) ? 'selected' : '' %>><%= r.name %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password"></div>
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" name="loginEnabled" value="1" id="loginEnabled<%= s._id %>" <%= s.loginEnabled !== false ? 'checked' : '' %>>
+                        <label class="form-check-label" for="loginEnabled<%= s._id %>">Login is enable</label>
+                      </div>
+                    </div>
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                      <button type="submit" class="btn btn-brand">Save</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+<% } %>
+
+<!-- Add User modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/admin/staff/users">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="modal-header"><h5 class="modal-title">Add User</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label">Name*</label><input type="text" name="name" class="form-control" placeholder="Enter Name" required></div>
+          <div class="mb-3"><label class="form-label">Email*</label><input type="email" name="email" class="form-control" placeholder="Enter Email" required></div>
+          <div class="mb-3">
+            <label class="form-label">User Role*</label>
+            <select name="roleId" class="form-select">
+              <option value="">— Select Role —</option>
+              <% roles.forEach(function (r) { %><option value="<%= r._id %>"><%= r.name %></option><% }); %>
+            </select>
+          </div>
+          <div class="mb-3"><label class="form-label">Password*</label><input type="password" name="password" class="form-control" placeholder="Enter Password" required></div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" name="loginEnabled" value="1" id="loginEnabledNew" checked>
+            <label class="form-check-label" for="loginEnabledNew">Login is enable</label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

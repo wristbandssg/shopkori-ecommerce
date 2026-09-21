@@ -1,0 +1,43 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Referral Program</span>
+</nav>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <%- include('partials/referral-tabs') %>
+  </div>
+  <div class="col-md-9">
+    <div class="admin-card">
+      <div class="card-title-bar">Referral Transaction</div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr><th>#</th><th>Customer</th><th>Order Amount</th><th>Commission (%)</th><th>Commission Amount</th></tr>
+          </thead>
+          <tbody>
+            <% rows.forEach(function (r, i) { %>
+              <tr>
+                <td><%= i + 1 %></td>
+                <td>
+                  <div class="fw-semibold"><%= r.customer ? r.customer.name : '—' %></div>
+                  <small class="text-muted">Order <%= r.orderNumber %> · <%= new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small>
+                </td>
+                <td><%= currency(r.orderTotal) %></td>
+                <td><%= r.commissionPercent.toFixed(1) %>%</td>
+                <td><%= currency(r.commissionAmount) %></td>
+              </tr>
+            <% }); %>
+            <% if (!rows.length) { %><tr><td colspan="5" class="text-center text-muted py-4">No referral transactions yet.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-text mb-0">The reference design's columns here were "Plan Name / Plan Price" — a ClickDokan subscription-plan concept ShopKori doesn't have. Relabeled to what's real: the referred Customer and the Order Amount that earned the commission. Commission (%) is computed per row (commission amount ÷ order amount), since the underlying rate is actually a fixed ৳<%= referralSetting ? referralSetting.commissionAmount : '' %> rather than a percentage.</p>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

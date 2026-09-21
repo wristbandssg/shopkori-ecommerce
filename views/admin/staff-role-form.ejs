@@ -1,0 +1,106 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/staff" class="text-decoration-none">Staff Setup</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/staff/roles" class="text-decoration-none">Roles</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted"><%= adminPageTitle %></span>
+</nav>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger">
+    <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+  </div>
+<% } %>
+
+<% var ACTION_LABELS = { manage: 'Manage', create: 'Create', edit: 'Edit', delete: 'Delete', show: 'Show', resetPassword: 'Reset Password' }; %>
+<% var perms = (role && role.permissions) || {}; %>
+
+<form method="post" action="<%= role && role._id ? ('/admin/staff/roles/' + role._id + '/edit') : '/admin/staff/roles/new' %>">
+  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+  <div class="admin-card">
+    <label class="form-label">Name *</label>
+    <input type="text" name="name" class="form-control mb-1" style="max-width:400px" placeholder="Enter Role Name" value="<%= (role && role.name) || '' %>" required>
+    <p class="form-text mb-3">Type a name for this role (e.g. "Manager", "Delivery Man").</p>
+
+    <label class="form-label d-block">Assign Permission to Roles</label>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm align-middle" id="permissionsTable">
+        <thead>
+          <tr>
+            <th style="width:36px;"><input type="checkbox" id="permMasterCheckbox"></th>
+            <th>Module</th>
+            <th>Permissions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% PERMISSION_MODULES.forEach(function (mod) { %>
+            <% var modChecked = perms[mod.key] || []; %>
+            <tr class="perm-row" data-module="<%= mod.key %>">
+              <td><input type="checkbox" class="perm-row-checkbox" <%= modChecked.length === mod.actions.length ? 'checked' : '' %>></td>
+              <td><%= mod.label %></td>
+              <td>
+                <div class="d-flex flex-wrap gap-3">
+                  <% mod.actions.forEach(function (action) { %>
+                    <div class="form-check">
+                      <input type="checkbox" class="form-check-input perm-action-checkbox" name="perm_<%= mod.key %>" value="<%= action %>" id="perm_<%= mod.key %>_<%= action %>" <%= modChecked.indexOf(action) !== -1 ? 'checked' : '' %>>
+                      <label class="form-check-label" for="perm_<%= mod.key %>_<%= action %>"><%= ACTION_LABELS[action] || action %></label>
+                    </div>
+                  <% }); %>
+                </div>
+              </td>
+            </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2">
+      <a href="/admin/staff/roles" class="btn btn-outline-secondary">Cancel</a>
+      <button type="submit" class="btn btn-brand"><%= role && role._id ? 'Save' : 'Create' %></button>
+    </div>
+  </div>
+</form>
+
+<script>
+(function () {
+  var table = document.getElementById('permissionsTable');
+  var master = document.getElementById('permMasterCheckbox');
+
+  function rowCheckboxes(row) { return row.querySelectorAll('.perm-action-checkbox'); }
+  function syncRowFromActions(row) {
+    var boxes = rowCheckboxes(row);
+    var rowCb = row.querySelector('.perm-row-checkbox');
+    var allChecked = boxes.length > 0 && Array.prototype.every.call(boxes, function (b) { return b.checked; });
+    rowCb.checked = allChecked;
+  }
+  function syncMaster() {
+    var rowCbs = table.querySelectorAll('.perm-row-checkbox');
+    master.checked = rowCbs.length > 0 && Array.prototype.every.call(rowCbs, function (b) { return b.checked; });
+  }
+
+  table.querySelectorAll('.perm-row').forEach(function (row) {
+    row.querySelector('.perm-row-checkbox').addEventListener('change', function () {
+      var checked = this.checked;
+      rowCheckboxes(row).forEach(function (b) { b.checked = checked; });
+      syncMaster();
+    });
+    rowCheckboxes(row).forEach(function (b) {
+      b.addEventListener('change', function () { syncRowFromActions(row); syncMaster(); });
+    });
+    syncRowFromActions(row);
+  });
+  syncMaster();
+
+  master.addEventListener('change', function () {
+    var checked = this.checked;
+    table.querySelectorAll('.perm-row-checkbox').forEach(function (rowCb) { rowCb.checked = checked; });
+    table.querySelectorAll('.perm-action-checkbox').forEach(function (b) { b.checked = checked; });
+  });
+})();
+</script>
+
+<%- include('partials/admin-footer') %>

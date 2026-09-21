@@ -1,0 +1,47 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/staff" class="text-decoration-none">Staff Setup</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Roles</span>
+</nav>
+
+<div class="admin-card">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h6 class="mb-0">Roles</h6>
+    <a href="/admin/staff/roles/new" class="btn btn-brand btn-sm"><i class="bi bi-plus-lg"></i></a>
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Role</th><th>Permissions</th><th style="width:110px;">Action</th></tr></thead>
+      <tbody>
+        <% roles.forEach(function (r) { %>
+          <% var modKeys = Object.keys(r.permissions || {}); %>
+          <tr>
+            <td class="fw-semibold"><%= r.name %></td>
+            <td>
+              <% if (!modKeys.length) { %>
+                <span class="text-muted small">No permissions set</span>
+              <% } else { %>
+                <% modKeys.slice(0, 4).forEach(function (key) { %>
+                  <% var mod = PERMISSION_MODULES.find(function (m) { return m.key === key; }); %>
+                  <span class="badge bg-light text-dark border me-1 mb-1"><%= mod ? mod.label : key %></span>
+                <% }); %>
+                <% if (modKeys.length > 4) { %><span class="badge bg-light text-dark border">+<%= modKeys.length - 4 %> more</span><% } %>
+              <% } %>
+            </td>
+            <td class="text-nowrap">
+              <a href="/admin/staff/roles/<%= r._id %>/edit" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+              <a href="/admin/staff/roles/delete/<%= r._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this role?')"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!roles.length) { %><tr><td colspan="3" class="text-center text-muted py-4">No roles found.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

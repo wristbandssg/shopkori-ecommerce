@@ -1,0 +1,39 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Referral Program</span>
+</nav>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <%- include('partials/referral-tabs') %>
+  </div>
+  <div class="col-md-9">
+    <div class="admin-card">
+      <div class="card-title-bar">Users</div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead><tr><th>#</th><th>User Name</th><th>Join At</th></tr></thead>
+          <tbody>
+            <% referredCustomers.forEach(function (c, i) { %>
+              <tr>
+                <td><%= i + 1 %></td>
+                <td>
+                  <div class="fw-semibold"><%= c.name %></div>
+                  <small class="text-muted"><%= c.email %></small>
+                </td>
+                <td><small class="text-muted"><%= new Date(c.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
+              </tr>
+            <% }); %>
+            <% if (!referredCustomers.length) { %><tr><td colspan="3" class="text-center text-muted py-4">No one has signed up through your referral link yet.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-text mb-0">Everyone here created their customer account on the storefront through your Share Your Link (Guideline tab) — this list doesn't require a paid order, unlike Referral Transaction.</p>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

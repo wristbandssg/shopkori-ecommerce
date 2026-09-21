@@ -309,3 +309,61 @@ body { font-family: 'Poppins', sans-serif; background: var(--admin-bg); margin: 
 .serp-preview-title { font-size: 18px; color: #1a0dab; line-height: 1.3; margin: 3px 0 4px; cursor: pointer; }
 .serp-preview-title:hover { text-decoration: underline; }
 .serp-preview-desc { font-size: 13px; color: #4d5156; line-height: 1.5; }
+
+/* ---------- Referral Program: vertical side-tab nav + small card title bar ---------- */
+.side-tabs { display: flex; flex-direction: column; gap: 8px; }
+.side-tab {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 16px; border-radius: 8px;
+  background: #fff; color: var(--admin-text); text-decoration: none;
+  font-size: 14px; font-weight: 500;
+  border: 1px solid #e9eaee;
+}
+.side-tab:hover { color: var(--admin-pink); border-color: var(--admin-pink-soft); }
+.side-tab.active { background: var(--admin-pink); color: #fff; border-color: var(--admin-pink); }
+.card-title-bar {
+  border-left: 3px solid var(--admin-pink);
+  padding-left: 10px;
+  font-weight: 700;
+  color: var(--admin-navy);
+  margin-bottom: 16px;
+}
+
+/* ---------- Help & Support ---------- */
+.help-banner {
+  background: linear-gradient(135deg, #fdeaf4 0%, #fbd6ea 100%);
+  border-radius: 14px;
+  padding: 34px 28px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+.help-banner-eyebrow { color: var(--admin-text); font-size: 15px; }
+.help-banner h3 { color: var(--admin-pink); font-weight: 800; margin: 4px 0 10px; }
+.help-banner p { color: #8a8a95; font-size: 13px; max-width: 560px; margin: 0 auto; }
+.help-banner-bubble {
+  position: absolute; top: 22px; right: 60px;
+  width: 34px; height: 34px; border-radius: 50%;
+  background: rgba(236,14,140,0.15); color: var(--admin-pink);
+  display: flex; align-items: center; justify-content: center;
+}
+.help-banner-dots {
+  position: absolute; top: 24px; right: 24px;
+  display: grid; grid-template-columns: repeat(4, 5px); gap: 4px;
+}
+.help-banner-dots span { width: 5px; height: 5px; border-radius: 50%; background: rgba(236,14,140,0.35); }
+.help-actions { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-top: 26px; }
+.help-action-card {
+  background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  padding: 20px 18px; width: 170px; text-align: center;
+  text-decoration: none; color: var(--admin-text);
+  border: none; cursor: pointer;
+}
+.help-action-card:hover { color: var(--admin-pink); box-shadow: 0 4px 12px rgba(236,14,140,0.15); }
+.help-action-icon {
+  width: 46px; height: 46px; border-radius: 50%;
+  background: var(--admin-pink); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 19px; margin: 0 auto 12px;
+}
+.help-action-label { font-size: 13px; font-weight: 500; }

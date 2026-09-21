@@ -8,6 +8,7 @@ const Brand = require('../models/Brand');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const Order = require('../models/Order');
+const SearchLog = require('../models/SearchLog');
 const Page = require('../models/Page');
 const BlogPost = require('../models/BlogPost');
 const { getSettings, setSetting: setSiteSetting } = require('../models/Setting');
@@ -769,7 +770,13 @@ router.post('/register', async (req, res, next) => {
         errors.push('এই ইমেইল দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট আছে।');
       } else {
         const hashed = await bcrypt.hash(password, 10);
-        const customer = await Customer.create({ name, email: email.toLowerCase(), phone, password: hashed });
+        // Admin > Referral Program: credit whichever admin's share link
+        // brought this visitor here (captured in middleware/storeLocals.js).
+        const customer = await Customer.create({
+          name, email: email.toLowerCase(), phone, password: hashed,
+          referredBy: req.session.referralAdminId || null,
+        });
+        delete req.session.referralAdminId;
         req.session.customerId = customer._id;
         req.flash('success', 'অ্যাকাউন্ট তৈরি হয়েছে। স্বাগতম!');
         return res.redirect('/account');
@@ -843,6 +850,15 @@ router.get('/search', async (req, res, next) => {
       })
         .sort({ createdAt: -1 })
         .limit(40);
+      // Admin > Analytics > Search Analytics — fire-and-forget, same
+      // pattern as middleware/trackPageView.js, so a slow/failed write
+      // here never delays real search results.
+      SearchLog.create({
+        query: q,
+        resultCount: products.length,
+        sessionKey: (req.session && req.session.id) || '',
+        customer: req.session.customerId || null,
+      }).catch(() => {});
     }
     res.render('search', { pageTitle: 'সার্চ ফলাফল', q, products });
   } catch (err) {

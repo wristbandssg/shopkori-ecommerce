@@ -1,0 +1,246 @@
+<%- include('partials/admin-header') %>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger">
+    <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+  </div>
+<% } %>
+
+<div class="admin-card mb-3">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+    <select name="priority" class="form-select" style="max-width:160px" onchange="this.form.submit()">
+      <option value="">Priority (all)</option>
+      <% TASK_PRIORITIES.forEach(function (p) { %>
+        <option value="<%= p.value %>" <%= filters.priority === p.value ? 'selected' : '' %>><%= p.label %></option>
+      <% }); %>
+    </select>
+    <select name="status" class="form-select" style="max-width:160px" onchange="this.form.submit()">
+      <option value="">Status (all)</option>
+      <% TASK_STATUSES.forEach(function (s) { %>
+        <option value="<%= s.value %>" <%= filters.status === s.value ? 'selected' : '' %>><%= s.label %></option>
+      <% }); %>
+    </select>
+    <select name="type" class="form-select" style="max-width:160px" onchange="this.form.submit()">
+      <option value="">Type (all)</option>
+      <% TASK_TYPES.forEach(function (t) { %>
+        <option value="<%= t.value %>" <%= filters.type === t.value ? 'selected' : '' %>><%= t.label %></option>
+      <% }); %>
+    </select>
+    <select name="employee" class="form-select" style="max-width:180px" onchange="this.form.submit()">
+      <option value="">Assigned User (all)</option>
+      <% employees.forEach(function (e) { %>
+        <option value="<%= e._id %>" <%= filters.employee === String(e._id) ? 'selected' : '' %>><%= e.fullName || e.username %></option>
+      <% }); %>
+    </select>
+    <select name="orderStatus" class="form-select" style="max-width:180px" onchange="this.form.submit()">
+      <option value="">Order Status (all)</option>
+      <% ORDER_STATUSES.forEach(function (s) { %>
+        <option value="<%= s.value %>" <%= filters.orderStatus === s.value ? 'selected' : '' %>><%= s.label %></option>
+      <% }); %>
+    </select>
+    <input type="text" name="q" class="form-control" style="max-width:200px" placeholder="Search title, description..." value="<%= filters.q %>">
+    <button class="btn btn-outline-secondary"><i class="bi bi-search"></i> Search</button>
+    <a href="/admin/task-management" class="btn btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Clear All</a>
+
+    <button type="button" class="btn btn-brand ms-auto" data-bs-toggle="modal" data-bs-target="#addTaskModal"><i class="bi bi-plus-lg"></i> Add Task</button>
+  </form>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Title</th>
+          <th>Description</th>
+          <th>Priority</th>
+          <th>Status</th>
+          <th>Type</th>
+          <th>Invoice Number</th>
+          <th>Order Status</th>
+          <th>User Name</th>
+          <th>Due Date</th>
+          <th></th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% tasks.forEach(function (t, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td class="fw-semibold"><%= t.title %></td>
+            <td class="text-muted small" style="max-width:220px;white-space:normal;"><%= (t.description || '').slice(0, 80) %><%= (t.description || '').length > 80 ? '…' : '' %></td>
+            <td><span class="badge bg-<%= priorityBadge(t.priority) %>"><%= priorityLabel(t.priority) %></span></td>
+            <td><span class="badge bg-<%= taskStatusBadge(t.status) %>"><%= taskStatusLabel(t.status) %></span></td>
+            <td><%= typeLabel(t.type) %></td>
+            <td><%= t.invoiceNumber || '—' %></td>
+            <td><%= t.orderStatus ? statusLabel(t.orderStatus) : '—' %></td>
+            <td><%= t.employee ? (t.employee.fullName || t.employee.username) : '—' %></td>
+            <td><small class="text-muted"><%= t.dueDate ? new Date(t.dueDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—' %></small></td>
+            <td>
+              <% if (t.employee) { %>
+                <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-light border" style="width:28px;height:28px;" title="<%= t.employee.fullName || t.employee.username %>">
+                  <i class="bi bi-person-fill text-muted"></i>
+                </span>
+              <% } %>
+            </td>
+            <td class="text-nowrap">
+              <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#editTask<%= t._id %>"><i class="bi bi-pencil"></i></button>
+              <a href="/admin/task-management/delete/<%= t._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this task?')"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+
+          <div class="modal fade" id="editTask<%= t._id %>" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                <form method="post" action="/admin/task-management">
+                  <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                  <input type="hidden" name="id" value="<%= t._id %>">
+                  <div class="modal-header"><h5 class="modal-title">Edit Task</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                  <div class="modal-body">
+                    <div class="mb-3"><label class="form-label">Title*</label><input type="text" name="title" class="form-control" value="<%= t.title %>" placeholder="Enter Title" required></div>
+                    <div class="row g-3 mb-3">
+                      <div class="col-md-6">
+                        <label class="form-label">Order Status</label>
+                        <select name="orderStatus" class="form-select">
+                          <option value="">— None —</option>
+                          <% ORDER_STATUSES.forEach(function (s) { %>
+                            <option value="<%= s.value %>" <%= t.orderStatus === s.value ? 'selected' : '' %>><%= s.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">Employee Name</label>
+                        <select name="employee" class="form-select">
+                          <option value="">— Unassigned —</option>
+                          <% employees.forEach(function (e) { %>
+                            <option value="<%= e._id %>" <%= t.employee && String(t.employee._id) === String(e._id) ? 'selected' : '' %>><%= e.fullName || e.username %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="mb-3"><label class="form-label">Invoice Number</label><input type="text" name="invoiceNumber" class="form-control" value="<%= t.invoiceNumber %>" placeholder="e.g. INV-00123"></div>
+                    <div class="mb-3"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="3" placeholder="Enter Description"><%= t.description %></textarea></div>
+                    <div class="row g-3 mb-3">
+                      <div class="col-md-6">
+                        <label class="form-label">Priority</label>
+                        <select name="priority" class="form-select">
+                          <% TASK_PRIORITIES.forEach(function (p) { %>
+                            <option value="<%= p.value %>" <%= t.priority === p.value ? 'selected' : '' %>><%= p.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">Status</label>
+                        <select name="status" class="form-select">
+                          <% TASK_STATUSES.forEach(function (s) { %>
+                            <option value="<%= s.value %>" <%= t.status === s.value ? 'selected' : '' %>><%= s.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                    </div>
+                    <div class="row g-3">
+                      <div class="col-md-6">
+                        <label class="form-label">Type</label>
+                        <select name="type" class="form-select">
+                          <% TASK_TYPES.forEach(function (ty) { %>
+                            <option value="<%= ty.value %>" <%= t.type === ty.value ? 'selected' : '' %>><%= ty.label %></option>
+                          <% }); %>
+                        </select>
+                      </div>
+                      <div class="col-md-6">
+                        <label class="form-label">Due Date &amp; Time</label>
+                        <input type="datetime-local" name="dueDate" class="form-control" value="<%= t.dueDate ? new Date(t.dueDate.getTime() - t.dueDate.getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '' %>">
+                      </div>
+                    </div>
+                  </div>
+                  <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-brand">Save</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        <% }); %>
+        <% if (!tasks.length) { %><tr><td colspan="12" class="text-center text-muted py-4">No tasks found.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+  <p class="form-text mb-0">Order Status and Invoice Number are manually set tags for your own reference — they are not linked to a real order and don't update automatically. The small person icon shows the assigned user at a glance; full name is in the "User Name" column.</p>
+</div>
+
+<!-- Add Task modal -->
+<div class="modal fade" id="addTaskModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="/admin/task-management">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="modal-header"><h5 class="modal-title">Add Task</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3"><label class="form-label">Title*</label><input type="text" name="title" class="form-control" placeholder="Enter Title" required></div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Order Status</label>
+              <select name="orderStatus" class="form-select">
+                <option value="">— None —</option>
+                <% ORDER_STATUSES.forEach(function (s) { %>
+                  <option value="<%= s.value %>"><%= s.label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Employee Name</label>
+              <select name="employee" class="form-select">
+                <option value="">— Unassigned —</option>
+                <% employees.forEach(function (e) { %>
+                  <option value="<%= e._id %>"><%= e.fullName || e.username %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+          <div class="mb-3"><label class="form-label">Invoice Number</label><input type="text" name="invoiceNumber" class="form-control" placeholder="e.g. INV-00123"></div>
+          <div class="mb-3"><label class="form-label">Description</label><textarea name="description" class="form-control" rows="3" placeholder="Enter Description"></textarea></div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Priority</label>
+              <select name="priority" class="form-select">
+                <% TASK_PRIORITIES.forEach(function (p) { %>
+                  <option value="<%= p.value %>" <%= p.value === 'medium' ? 'selected' : '' %>><%= p.label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Status</label>
+              <select name="status" class="form-select">
+                <% TASK_STATUSES.forEach(function (s) { %>
+                  <option value="<%= s.value %>" <%= s.value === 'pending' ? 'selected' : '' %>><%= s.label %></option>
+                <% }); %>
+              </select>
+            </div>
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Type</label>
+              <select name="type" class="form-select">
+                <% TASK_TYPES.forEach(function (ty) { %>
+                  <option value="<%= ty.value %>" <%= ty.value === 'general' ? 'selected' : '' %>><%= ty.label %></option>
+                <% }); %>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Due Date &amp; Time</label>
+              <input type="datetime-local" name="dueDate" class="form-control">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-brand w-100">Create Task</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

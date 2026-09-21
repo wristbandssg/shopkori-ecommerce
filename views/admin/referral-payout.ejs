@@ -1,0 +1,133 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Referral Program</span>
+</nav>
+
+<% if (errors && errors.length) { %>
+  <div class="alert alert-danger">
+    <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+  </div>
+<% } %>
+
+<div class="row g-3">
+  <div class="col-md-3">
+    <%- include('partials/referral-tabs') %>
+  </div>
+  <div class="col-md-9">
+    <div class="admin-card mb-3">
+      <div class="card-title-bar">Payout</div>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <div class="d-flex align-items-center gap-3 p-3 rounded" style="background:var(--admin-pink-soft);">
+            <span class="d-inline-flex align-items-center justify-content-center rounded-circle text-white" style="width:42px;height:42px;background:var(--admin-pink);"><i class="bi bi-wallet2"></i></span>
+            <div>
+              <div class="small text-muted">Total Commission Amount</div>
+              <div class="fw-bold fs-5"><%= currency(totalCommission) %></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="d-flex align-items-center gap-3 p-3 rounded" style="background:var(--admin-pink-soft);">
+            <span class="d-inline-flex align-items-center justify-content-center rounded-circle text-white" style="width:42px;height:42px;background:var(--admin-pink);"><i class="bi bi-wallet2"></i></span>
+            <div>
+              <div class="small text-muted">Paid Commission Amount</div>
+              <div class="fw-bold fs-5"><%= currency(paidCommission) %></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div class="text-muted small">Available to request: <span class="fw-semibold text-dark"><%= currency(available) %></span></div>
+        <button type="button" class="btn btn-brand btn-sm" data-bs-toggle="modal" data-bs-target="#requestPayoutModal" <%= available > 0 ? '' : 'disabled' %>><i class="bi bi-plus-lg"></i> Request Payout</button>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <div class="card-title-bar">Payout History</div>
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr><th>#</th><th>Requested Date</th><th>Payment Method</th><th>Payment Number</th><th>Status</th><th>Requested Amount</th><th>Action</th></tr>
+          </thead>
+          <tbody>
+            <% requests.forEach(function (r, i) { %>
+              <tr>
+                <td><%= i + 1 %></td>
+                <td><small class="text-muted"><%= new Date(r.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
+                <td><%= r.method ? r.method.charAt(0).toUpperCase() + r.method.slice(1) : '—' %></td>
+                <td><%= r.paymentNumber || '—' %></td>
+                <td>
+                  <% if (r.status === 'pending') { %>
+                    <span class="badge bg-warning text-dark">Pending</span>
+                  <% } else { %>
+                    <span class="badge bg-<%= r.status === 'paid' ? 'success' : 'danger' %>"><%= r.status.charAt(0).toUpperCase() + r.status.slice(1) %></span>
+                  <% } %>
+                </td>
+                <td><%= currency(r.amount) %></td>
+                <td class="text-nowrap">
+                  <% if (r.status === 'pending') { %>
+                    <form method="post" action="/admin/referral-program/payout/<%= r._id %>/action" class="d-inline">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="action" value="paid">
+                      <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-check-lg"></i></button>
+                    </form>
+                    <form method="post" action="/admin/referral-program/payout/<%= r._id %>/action" class="d-inline">
+                      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                      <input type="hidden" name="action" value="reject">
+                      <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-x-lg"></i></button>
+                    </form>
+                  <% } else { %>
+                    —
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+            <% if (!requests.length) { %><tr><td colspan="7" class="text-center text-muted py-4">No payout requests yet.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-text mb-0">"Request Payout" and the Paid/Reject actions weren't shown in the reference screenshot — added so this table can actually have rows. Without a request button, Payout History could never contain anything.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Request Payout modal -->
+<div class="modal fade" id="requestPayoutModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="/admin/referral-program/payout">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="modal-header"><h5 class="modal-title">Request Payout</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Amount*</label>
+            <input type="number" name="amount" class="form-control" min="1" step="0.01" max="<%= available %>" placeholder="Up to <%= currency(available) %>" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Payment Method*</label>
+            <select name="method" class="form-select" required>
+              <option value="">-- Select Method --</option>
+              <option value="bkash">bKash</option>
+              <option value="nagad">Nagad</option>
+              <option value="bank">Bank</option>
+              <option value="cash">Cash</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Payment Number*</label>
+            <input type="text" name="paymentNumber" class="form-control" placeholder="bKash/Nagad number or bank account" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-brand">Submit Request</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>
