@@ -152,6 +152,25 @@
 </div>
 <% } %>
 
+<!-- Admin > Announcement System (audience: Customers). Dismissed
+     per-browser via localStorage, same pattern as the admin panel's
+     version (views/admin/partials/admin-header.ejs). -->
+<% (typeof storeAnnouncements !== 'undefined' ? storeAnnouncements : []).forEach(function (a) { %>
+  <div class="store-announcement" data-announcement-id="<%= a._id %>" style="background:#fff3cd;color:#664d03;padding:10px 16px;text-align:center;font-size:13px;position:relative;">
+    <strong><i class="bi bi-megaphone-fill"></i> <%= a.title %>:</strong> <%= a.message %>
+    <button type="button" aria-label="বন্ধ করুন" onclick="this.parentElement.remove(); try { var seen = JSON.parse(localStorage.getItem('shopkori_dismissed_announcements') || '[]'); seen.push('<%= a._id %>'); localStorage.setItem('shopkori_dismissed_announcements', JSON.stringify(seen)); } catch (e) {}" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:16px;line-height:1;cursor:pointer;color:#664d03;">&times;</button>
+  </div>
+<% }); %>
+<script>
+  // Hide any storefront announcement this browser already dismissed.
+  try {
+    var dismissedStoreAnnouncements = JSON.parse(localStorage.getItem('shopkori_dismissed_announcements') || '[]');
+    document.querySelectorAll('.store-announcement').forEach(function (el) {
+      if (dismissedStoreAnnouncements.indexOf(el.getAttribute('data-announcement-id')) !== -1) el.remove();
+    });
+  } catch (e) {}
+</script>
+
 <!-- Admin > Offer Setting > PopUp Offer — shown once per browser session
      (sessionStorage, so it doesn't reappear on every page nav) when a
      popup has been saved with an image. -->

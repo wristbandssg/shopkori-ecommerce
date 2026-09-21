@@ -1,0 +1,67 @@
+<%- include('partials/admin-header') %>
+
+<p class="small text-muted">Real, live banners — Customers publishes to the storefront (see the top of every store page), Admin Staff publishes to this panel (see the top of this page for anyone else logged in). ClickDokan's reference design also offers "All Vendors / Specific Vendors" — ShopKori has no Vendor concept (single-tenant), so that option isn't shown here.</p>
+
+<div class="admin-card mb-3">
+  <div class="card-title-bar">New Announcement</div>
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger">
+      <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+    </div>
+  <% } %>
+  <form method="post" action="/admin/announcements" class="row g-3">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+    <div class="col-md-6">
+      <label class="form-label">Title*</label>
+      <input type="text" name="title" class="form-control" placeholder="e.g. System maintenance tonight" value="<%= formData.title || '' %>" required>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Audience*</label>
+      <select name="audience" class="form-select" required>
+        <option value="">Choose...</option>
+        <option value="customers" <%= formData.audience === 'customers' ? 'selected' : '' %>>Customers (storefront)</option>
+        <option value="admin_staff" <%= formData.audience === 'admin_staff' ? 'selected' : '' %>>Admin Staff (this panel)</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label">Expires <span class="text-muted small">(optional)</span></label>
+      <input type="date" name="expiresAt" class="form-control" value="<%= formData.expiresAt || '' %>">
+    </div>
+    <div class="col-12">
+      <label class="form-label">Message*</label>
+      <textarea name="message" class="form-control" rows="2" placeholder="e.g. Eid Campaign registration closes tomorrow." required><%= formData.message || '' %></textarea>
+    </div>
+    <div class="col-12">
+      <button type="submit" class="btn btn-brand"><i class="bi bi-megaphone-fill"></i> Publish Announcement</button>
+    </div>
+  </form>
+</div>
+
+<div class="admin-card">
+  <div class="card-title-bar">All Announcements</div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead><tr><th>Title</th><th>Message</th><th>Audience</th><th>Status</th><th>Expires</th><th>Created By</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        <% list.forEach(function (a) { %>
+          <tr>
+            <td><strong><%= a.title %></strong></td>
+            <td class="small" style="max-width:280px;"><%= a.message %></td>
+            <td><span class="badge bg-<%= a.audience === 'customers' ? 'info' : 'dark' %>"><%= a.audience === 'customers' ? 'Customers' : 'Admin Staff' %></span></td>
+            <td><span class="badge bg-<%= a.active ? 'success' : 'secondary' %>"><%= a.active ? 'Active' : 'Inactive' %></span></td>
+            <td><small class="text-muted"><%= a.expiresAt ? new Date(a.expiresAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Never' %></small></td>
+            <td><small class="text-muted"><%= a.createdBy ? (a.createdBy.fullName || a.createdBy.username) : '—' %></small></td>
+            <td><small class="text-muted"><%= new Date(a.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) %></small></td>
+            <td class="text-nowrap">
+              <a href="/admin/announcements/<%= a._id %>/toggle?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-secondary"><%= a.active ? 'Deactivate' : 'Activate' %></a>
+              <a href="/admin/announcements/<%= a._id %>/delete?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Delete this announcement?');"><i class="bi bi-trash"></i></a>
+            </td>
+          </tr>
+        <% }); %>
+        <% if (!list.length) { %><tr><td colspan="8" class="text-center text-muted py-3">No announcements yet.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

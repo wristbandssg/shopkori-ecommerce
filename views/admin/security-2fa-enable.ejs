@@ -1,0 +1,41 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/security" class="text-decoration-none">Security Dashboard</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Enable 2FA</span>
+</nav>
+
+<div class="admin-card" style="max-width:520px;">
+  <h5 class="mb-3"><i class="bi bi-shield-lock"></i> Enable Two-Factor Authentication</h5>
+
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger">
+      <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+    </div>
+  <% } %>
+
+  <p class="small text-muted">This app has no QR-code library installed, so there's no scannable QR code here — type the secret below into any standard authenticator app (Google Authenticator, Authy, etc.) as a "manual entry" / "time-based" key, then enter the 6-digit code it shows to confirm.</p>
+
+  <div class="mb-3">
+    <label class="form-label">Secret Key</label>
+    <div class="input-group">
+      <input type="text" class="form-control" value="<%= secret %>" readonly id="totpSecretInput" style="font-family:monospace;letter-spacing:1px;">
+      <button class="btn btn-outline-secondary" type="button" onclick="document.getElementById('totpSecretInput').select(); document.execCommand('copy');"><i class="bi bi-clipboard"></i> Copy</button>
+    </div>
+  </div>
+
+  <form method="post" action="/admin/security/2fa/enable">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+    <div class="mb-3">
+      <label class="form-label">Enter the 6-digit code to confirm</label>
+      <input type="text" name="code" class="form-control text-center" style="letter-spacing:6px;font-size:20px;max-width:220px;" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required autofocus>
+    </div>
+    <button type="submit" class="btn btn-brand">Confirm & Enable 2FA</button>
+    <a href="/admin/security" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

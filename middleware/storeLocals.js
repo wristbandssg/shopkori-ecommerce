@@ -1,6 +1,7 @@
 const Category = require('../models/Category');
 const Customer = require('../models/Customer');
 const Admin = require('../models/Admin');
+const Announcement = require('../models/Announcement');
 const { getSettings } = require('../models/Setting');
 const { getMarketingSettings } = require('../models/MarketingSetting');
 const { getThemeCustomizer } = require('../models/ThemeCustomizer');
@@ -15,12 +16,19 @@ const { cartCount } = require('./cart');
  */
 async function storeLocals(req, res, next) {
   try {
-    const [settings, allCategories, marketing, themeCustomizer, offerSettings] = await Promise.all([
+    const [settings, allCategories, marketing, themeCustomizer, offerSettings, storeAnnouncements] = await Promise.all([
       getSettings(),
       Category.find({ status: true }).sort({ sortOrder: 1, name: 1 }).lean(),
       getMarketingSettings(),
       getThemeCustomizer(),
       getOfferSetting(),
+      // Admin > Announcement System (audience: 'customers') — a real
+      // dismissible banner on the storefront, see views/partials/header.ejs.
+      Announcement.find({
+        audience: 'customers',
+        active: true,
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+      }).sort({ createdAt: -1 }).limit(5).lean(),
     ]);
 
     // Build a 2-level tree (parent -> children) so the header can render a
@@ -58,6 +66,7 @@ async function storeLocals(req, res, next) {
     // separately for the canonical <link> tag (header.ejs).
     res.locals.currentUrl = req.originalUrl;
     res.locals.navCategories = navCategories;
+    res.locals.storeAnnouncements = storeAnnouncements;
     res.locals.cartCount = cartCount(req);
     res.locals.productImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/product-placeholder.svg');
     res.locals.categoryImageUrl = (filename) => (filename ? (filename.startsWith('product_') ? `/uploads/${filename}` : `/images/${filename}`) : '/images/category-placeholder.svg');

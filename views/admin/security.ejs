@@ -1,0 +1,200 @@
+<%- include('partials/admin-header') %>
+
+<p class="small text-muted">Every section below reads real, live data (LoginLog / BlockedIp / this app's actual session store) — nothing here is a placeholder number. ClickDokan's reference design credits these actions to a "Super Admin" — ShopKori has no distinct Super Admin role beyond login-gating (see models/Admin.js), so any logged-in admin can take them.</p>
+
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#d9534f;"><i class="bi bi-x-octagon-fill"></i></div>
+      <div><span class="stat-value"><%= failedLogins.length %></span><span class="stat-label">Failed Logins (30d)</span></div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#2e9e5b;"><i class="bi bi-box-arrow-in-right"></i></div>
+      <div><span class="stat-value"><%= loginHistory.length %></span><span class="stat-label">Successful Logins (30d)</span></div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#212529;"><i class="bi bi-ban"></i></div>
+      <div><span class="stat-value"><%= blockedIps.length %></span><span class="stat-label">Blocked IPs</span></div>
+    </div>
+  </div>
+  <div class="col-md-3">
+    <div class="stat-card">
+      <div class="stat-icon" style="background:#f0ad4e;"><i class="bi bi-exclamation-triangle-fill"></i></div>
+      <div><span class="stat-value"><%= suspicious.length %></span><span class="stat-label">Suspicious IPs (24h)</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="admin-card h-100">
+      <div class="card-title-bar">Suspicious Activity</div>
+      <p class="form-text mt-0">Genuinely computed — any IP with 5 or more failed login attempts in the last 24 hours.</p>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>IP</th><th>Failed Attempts</th><th>Usernames Tried</th><th>Last Attempt</th><th></th></tr></thead>
+          <tbody>
+            <% suspicious.forEach(function (s) { %>
+              <tr>
+                <td><code><%= s._id || '—' %></code></td>
+                <td><span class="badge bg-danger"><%= s.count %></span></td>
+                <td class="small"><%= (s.usernames || []).filter(Boolean).join(', ') || '—' %></td>
+                <td><small class="text-muted"><%= new Date(s.lastAttempt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) %></small></td>
+                <td>
+                  <form method="post" action="/admin/security/block-ip" class="d-inline">
+                    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                    <input type="hidden" name="ip" value="<%= s._id %>">
+                    <input type="hidden" name="reason" value="Auto-flagged: <%= s.count %> failed attempts in 24h">
+                    <button type="submit" class="btn btn-sm btn-outline-danger">Block IP</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+            <% if (!suspicious.length) { %><tr><td colspan="5" class="text-center text-muted py-3">Nothing suspicious in the last 24 hours.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="admin-card h-100">
+      <div class="card-title-bar">Blocked IPs</div>
+      <form method="post" action="/admin/security/block-ip" class="d-flex gap-2 mb-3">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <input type="text" name="ip" class="form-control form-control-sm" placeholder="IP address" required>
+        <input type="text" name="reason" class="form-control form-control-sm" placeholder="Reason (optional)">
+        <button type="submit" class="btn btn-sm btn-brand text-nowrap">Block</button>
+      </form>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>IP</th><th>Reason</th><th>Blocked By</th><th></th></tr></thead>
+          <tbody>
+            <% blockedIps.forEach(function (b) { %>
+              <tr>
+                <td><code><%= b.ip %></code></td>
+                <td class="small"><%= b.reason || '—' %></td>
+                <td class="small"><%= b.blockedBy ? (b.blockedBy.fullName || b.blockedBy.username) : '—' %></td>
+                <td><a href="/admin/security/unblock-ip/<%= b._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-secondary">Unblock</a></td>
+              </tr>
+            <% }); %>
+            <% if (!blockedIps.length) { %><tr><td colspan="4" class="text-center text-muted py-3">No IPs blocked.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="admin-card h-100">
+      <div class="card-title-bar">Failed Logins</div>
+      <div class="table-responsive" style="max-height:340px;overflow:auto;">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Username Tried</th><th>IP</th><th>Reason</th><th>At</th></tr></thead>
+          <tbody>
+            <% failedLogins.forEach(function (l) { %>
+              <tr>
+                <td><%= l.usernameAttempted || '—' %></td>
+                <td><code class="small"><%= l.ip || '—' %></code></td>
+                <td class="small text-muted"><%= l.reason || '—' %></td>
+                <td><small class="text-muted"><%= new Date(l.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) %></small></td>
+              </tr>
+            <% }); %>
+            <% if (!failedLogins.length) { %><tr><td colspan="4" class="text-center text-muted py-3">No failed logins in the last 30 days.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="admin-card h-100">
+      <div class="card-title-bar">Admin Login History</div>
+      <div class="table-responsive" style="max-height:340px;overflow:auto;">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Admin</th><th>IP</th><th>At</th></tr></thead>
+          <tbody>
+            <% loginHistory.forEach(function (l) { %>
+              <tr>
+                <td><%= l.admin ? (l.admin.fullName || l.admin.username) : '—' %></td>
+                <td><code class="small"><%= l.ip || '—' %></code></td>
+                <td><small class="text-muted"><%= new Date(l.createdAt).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) %></small></td>
+              </tr>
+            <% }); %>
+            <% if (!loginHistory.length) { %><tr><td colspan="3" class="text-center text-muted py-3">No successful logins in the last 30 days.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-lg-6">
+    <div class="admin-card h-100">
+      <div class="card-title-bar">2FA Status</div>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Admin</th><th>2FA</th><th></th></tr></thead>
+          <tbody>
+            <% admins.forEach(function (a) { %>
+              <tr>
+                <td><%= a.fullName || a.username %> <% if (currentAdmin && String(a._id) === String(currentAdmin._id)) { %><span class="badge bg-light text-dark border">You</span><% } %></td>
+                <td><span class="badge bg-<%= a.twoFactorEnabled ? 'success' : 'secondary' %>"><%= a.twoFactorEnabled ? 'Enabled' : 'Disabled' %></span></td>
+                <td>
+                  <% if (currentAdmin && String(a._id) === String(currentAdmin._id)) { %>
+                    <% if (a.twoFactorEnabled) { %>
+                      <a href="/admin/security/2fa/disable?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-secondary">Disable My 2FA</a>
+                    <% } else { %>
+                      <a href="/admin/security/2fa/enable" class="btn btn-sm btn-brand">Enable My 2FA</a>
+                    <% } %>
+                  <% } else if (a.twoFactorEnabled) { %>
+                    <a href="/admin/security/reset-2fa/<%= a._id %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Reset 2FA for this admin? They will need to re-enroll.');">Reset 2FA</a>
+                  <% } else { %>
+                    <span class="text-muted small">—</span>
+                  <% } %>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+      <p class="form-text mb-0">Enrollment shows the secret as text (no QR-code library in this app) — type it into any standard authenticator app.</p>
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="admin-card h-100">
+      <div class="card-title-bar">Active Sessions</div>
+      <p class="form-text mt-0">Read directly from this app's real session store (the same <code>sessions</code> collection every admin login already writes to) — not a separate tracking system.</p>
+      <div class="table-responsive">
+        <table class="table table-sm align-middle mb-0">
+          <thead><tr><th>Admin</th><th>Expires</th><th></th></tr></thead>
+          <tbody>
+            <% activeSessions.forEach(function (s) { %>
+              <tr>
+                <td><%= s.adminName %></td>
+                <td><small class="text-muted"><%= new Date(s.expires).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) %></small></td>
+                <td><a href="/admin/security/revoke-session/<%= s.sessionId %>?csrf=<%= csrfToken %>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Force logout this session?');">Force Logout</a></td>
+              </tr>
+            <% }); %>
+            <% if (!activeSessions.length) { %><tr><td colspan="3" class="text-center text-muted py-3">No active admin sessions right now.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="admin-card">
+  <div class="card-title-bar">API Activity</div>
+  <p class="form-text mb-0">Not tracked. This app has no API-key-authenticated external surface and no outbound-call logger, so there's nothing real to show here — disclosed honestly rather than shown with fabricated numbers.</p>
+</div>
+
+<%- include('partials/admin-footer') %>

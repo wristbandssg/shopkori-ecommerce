@@ -57,13 +57,17 @@
                       <div class="mb-3"><label class="form-label">Name*</label><input type="text" name="name" class="form-control" value="<%= s.fullName || s.username %>" placeholder="Enter Name" required></div>
                       <div class="mb-3"><label class="form-label">Email*</label><input type="email" name="email" class="form-control" value="<%= s.email %>" placeholder="Enter Email" required></div>
                       <div class="mb-3">
-                        <label class="form-label">User Role*</label>
+                        <div class="d-flex justify-content-between align-items-center">
+                          <label class="form-label mb-1">Rules (Role)*</label>
+                          <a href="/admin/staff/roles" target="_blank" class="small">Manage Rules</a>
+                        </div>
                         <select name="roleId" class="form-select">
-                          <option value="">— Select Role —</option>
+                          <option value="">— Select Rule —</option>
                           <% roles.forEach(function (r) { %>
                             <option value="<%= r._id %>" <%= s.roleId && String(s.roleId._id) === String(r._id) ? 'selected' : '' %>><%= r.name %></option>
                           <% }); %>
                         </select>
+                        <div class="form-text">This decides what this staff account is allowed to do. Create or edit rules any time under Staff &gt; Roles.</div>
                       </div>
                       <div class="mb-3"><label class="form-label">Password</label><input type="password" name="password" class="form-control" placeholder="Leave blank to keep current password"></div>
                       <div class="form-check form-switch">
@@ -97,11 +101,21 @@
           <div class="mb-3"><label class="form-label">Name*</label><input type="text" name="name" class="form-control" placeholder="Enter Name" required></div>
           <div class="mb-3"><label class="form-label">Email*</label><input type="email" name="email" class="form-control" placeholder="Enter Email" required></div>
           <div class="mb-3">
-            <label class="form-label">User Role*</label>
-            <select name="roleId" class="form-select">
-              <option value="">— Select Role —</option>
-              <% roles.forEach(function (r) { %><option value="<%= r._id %>"><%= r.name %></option><% }); %>
-            </select>
+            <div class="d-flex justify-content-between align-items-center">
+              <label class="form-label mb-1">Rules (Role)*</label>
+              <a href="/admin/staff/roles" target="_blank" class="small">Manage Rules</a>
+            </div>
+            <% if (roles.length) { %>
+              <select name="roleId" class="form-select">
+                <option value="">— Select Rule —</option>
+                <% roles.forEach(function (r) { %><option value="<%= r._id %>"><%= r.name %></option><% }); %>
+              </select>
+              <div class="form-text">This decides what this staff account is allowed to do. Create or edit rules any time under Staff &gt; Roles.</div>
+            <% } else { %>
+              <div class="alert alert-warning small mb-0">
+                No rules created yet. <a href="/admin/staff/roles/new" target="_blank">Create your first rule</a> (a name + what it's allowed to do), then come back here to assign it. You can still save this user without one for now.
+              </div>
+            <% } %>
           </div>
           <div class="mb-3"><label class="form-label">Password*</label><input type="password" name="password" class="form-control" placeholder="Enter Password" required></div>
           <div class="form-check form-switch">

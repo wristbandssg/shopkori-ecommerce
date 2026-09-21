@@ -129,6 +129,9 @@
       <a href="/admin/referral-program" class="<%= currentPage === 'referral-program' ? 'active' : '' %>"><i class="bi bi-share"></i> Referral Program</a>
       <a href="/admin/our-service" class="<%= currentPage === 'our-service' ? 'active' : '' %>"><i class="bi bi-award"></i> Our Service</a>
       <a href="/admin/help-support" class="<%= currentPage === 'help-support' ? 'active' : '' %>"><i class="bi bi-question-circle"></i> Help & Support</a>
+      <a href="/admin/announcements" class="<%= currentPage === 'announcements' ? 'active' : '' %>"><i class="bi bi-megaphone-fill"></i> Announcements</a>
+      <a href="/admin/security" class="<%= currentPage === 'security' ? 'active' : '' %>"><i class="bi bi-shield-lock"></i> Security Dashboard</a>
+      <a href="/admin/integrations" class="<%= currentPage === 'integrations' ? 'active' : '' %>"><i class="bi bi-plug"></i> API & Integrations</a>
       <a href="/admin/reports" class="<%= currentPage === 'reports' ? 'active' : '' %>"><i class="bi bi-graph-up-arrow"></i> Sales Report</a>
 
       <hr>
@@ -151,5 +154,16 @@
         <div class="alert alert-<%= f.type %> alert-dismissible fade show" role="alert">
           <%= f.message %>
           <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+      <% }); %>
+
+      <!-- Admin > Announcement System (audience: Admin Staff). Dismissed
+           per-browser via localStorage so it doesn't reappear on every
+           page nav once closed, but comes back for anyone who hasn't seen
+           it yet (see the inline script at the bottom of this partial). -->
+      <% (adminAnnouncements || []).forEach(function (a) { %>
+        <div class="alert alert-warning alert-dismissible fade show admin-announcement" data-announcement-id="<%= a._id %>" role="alert">
+          <strong><i class="bi bi-megaphone-fill"></i> <%= a.title %>:</strong> <%= a.message %>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" onclick="try { var seen = JSON.parse(localStorage.getItem('shopkori_dismissed_announcements') || '[]'); seen.push('<%= a._id %>'); localStorage.setItem('shopkori_dismissed_announcements', JSON.stringify(seen)); } catch (e) {}"></button>
         </div>
       <% }); %>

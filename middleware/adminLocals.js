@@ -1,5 +1,6 @@
 const Admin = require('../models/Admin');
 const Order = require('../models/Order');
+const Announcement = require('../models/Announcement');
 const { getSettings } = require('../models/Setting');
 const { currencyFormatter } = require('./helpers');
 const {
@@ -43,8 +44,17 @@ async function adminLocals(req, res, next) {
     // the right status link inside an already-expanded Orders submenu.
     res.locals.currentQueryStatus = req.query.status || '';
     res.locals.orderCounts = { all: 0, incomplete: 0, delivered: 0, returned: 0, deliveryIssue: 0, deleted: 0 };
+    // Admin > Announcement System — a real, dismissible banner for this
+    // panel's own users (audience: 'admin_staff'), see
+    // views/admin/partials/admin-header.ejs. Only shown once logged in.
+    res.locals.adminAnnouncements = [];
     if (req.session.adminId) {
       res.locals.currentAdmin = await Admin.findById(req.session.adminId).lean();
+      res.locals.adminAnnouncements = await Announcement.find({
+        audience: 'admin_staff',
+        active: true,
+        $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }],
+      }).sort({ createdAt: -1 }).limit(5).lean();
 
       // Sidebar badge counts for the Orders submenu (single cheap $facet
       // query so this doesn't add N round-trips per page load).

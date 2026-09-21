@@ -25,6 +25,12 @@ const adminSchema = new mongoose.Schema(
     // this admin opens Referral Program (see ensureAdminReferralCode() in
     // routes/admin.js), not set at account creation.
     referralCode: { type: String, default: null },
+    // Admin > Security Dashboard > 2FA — a hand-built RFC 6238 TOTP secret
+    // (see lib/totp.js; no speakeasy/otplib dependency exists in this app).
+    // Only self-service "Enable 2FA" (routes/admin.js) ever sets both of
+    // these together; "Reset 2FA" clears them back to null/false.
+    twoFactorSecret: { type: String, default: null },
+    twoFactorEnabled: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

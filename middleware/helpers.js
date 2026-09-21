@@ -55,4 +55,17 @@ function nl2br(str) {
   return escapeHtml(str).replace(/\n/g, '<br>');
 }
 
-module.exports = { slugify, generateOrderNumber, currencyFormatter, ensureUniqueSlug, escapeHtml, nl2br };
+// Admin > API & Integration Management — "Sensitive API secrets should not
+// be shown in full in the UI" (e.g. sk_live_****************8921). Display
+// only; never touches the stored value itself.
+function maskSecret(value) {
+  const str = String(value || '');
+  if (!str) return '';
+  if (str.length <= 8) return '*'.repeat(str.length);
+  const start = str.slice(0, 4);
+  const end = str.slice(-4);
+  const middle = '*'.repeat(Math.min(str.length - 8, 16));
+  return `${start}${middle}${end}`;
+}
+
+module.exports = { slugify, generateOrderNumber, currencyFormatter, ensureUniqueSlug, escapeHtml, nl2br, maskSecret };

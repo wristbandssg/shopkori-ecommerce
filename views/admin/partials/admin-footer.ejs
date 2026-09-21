@@ -5,5 +5,15 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="/js/admin.js"></script>
+<script>
+  // Admin > Announcement System — hide any banner this browser already
+  // dismissed (see the dismiss button's onclick above).
+  try {
+    var dismissed = JSON.parse(localStorage.getItem('shopkori_dismissed_announcements') || '[]');
+    document.querySelectorAll('.admin-announcement').forEach(function (el) {
+      if (dismissed.indexOf(el.getAttribute('data-announcement-id')) !== -1) el.remove();
+    });
+  } catch (e) {}
+</script>
 </body>
 </html>

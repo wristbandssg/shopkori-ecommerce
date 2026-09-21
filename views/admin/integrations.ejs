@@ -1,0 +1,116 @@
+<%- include('partials/admin-header') %>
+
+<p class="small text-muted">Every real integration surface this app has, in one place. Secrets are masked here (never shown in full) — open a card's own settings page to change it. Payment Gateways and Courier APIs are the same Settings pages you already use; Google Analytics, Meta Pixel and SMS Gateway are the same Marketing cards.</p>
+
+<div class="row g-3">
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100">
+      <div class="d-flex justify-content-between align-items-start mb-2">
+        <h6 class="mb-0"><i class="bi bi-credit-card-2-front-fill"></i> Payment Gateways</h6>
+      </div>
+      <ul class="list-unstyled small mb-3">
+        <li class="d-flex justify-content-between border-bottom py-1">
+          <span>bKash</span>
+          <span>
+            <span class="badge bg-<%= payment.bkash.status ? 'success' : 'secondary' %>"><%= payment.bkash.status ? 'ON' : 'OFF' %></span>
+            <code class="ms-1"><%= payment.bkash.appSecret ? maskSecret(payment.bkash.appSecret) : '—' %></code>
+          </span>
+        </li>
+        <li class="d-flex justify-content-between border-bottom py-1">
+          <span>Manual (bKash/Nagad/Rocket)</span>
+          <span class="badge bg-<%= payment.manual.status ? 'success' : 'secondary' %>"><%= payment.manual.status ? 'ON' : 'OFF' %></span>
+        </li>
+        <li class="d-flex justify-content-between py-1">
+          <span>SSLCommerz</span>
+          <span>
+            <span class="badge bg-<%= payment.sslcommerz.status ? 'success' : 'secondary' %>"><%= payment.sslcommerz.status ? 'ON' : 'OFF' %></span>
+            <code class="ms-1"><%= payment.sslcommerz.appSecret ? maskSecret(payment.sslcommerz.appSecret) : '—' %></code>
+          </span>
+        </li>
+      </ul>
+      <p class="form-text">Only SSLCommerz is wired into live checkout right now — see <a href="/admin/settings/payment">Settings &gt; Payment</a> for the full breakdown.</p>
+      <a href="/admin/settings/payment" class="btn btn-sm btn-outline-primary w-100">Manage</a>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100">
+      <h6><i class="bi bi-truck"></i> Courier APIs</h6>
+      <ul class="list-unstyled small mb-3">
+        <% courierSetups.forEach(function (c) { %>
+          <li class="d-flex justify-content-between border-bottom py-1">
+            <span><%= c.courier %></span>
+            <span>
+              <span class="badge bg-<%= c.status ? 'success' : 'secondary' %>"><%= c.status ? 'ON' : 'OFF' %></span>
+              <code class="ms-1"><%= c.apiKey ? maskSecret(c.apiKey) : '—' %></code>
+            </span>
+          </li>
+        <% }); %>
+        <% if (!courierSetups.length) { %><li class="text-muted py-1">No couriers configured yet.</li><% } %>
+      </ul>
+      <a href="/admin/settings/courier" class="btn btn-sm btn-outline-primary w-100">Manage</a>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100">
+      <h6><i class="bi bi-graph-up"></i> Google Analytics</h6>
+      <p class="small mb-1">Status: <span class="badge bg-<%= marketing.googleAnalytics.status ? 'success' : 'secondary' %>"><%= marketing.googleAnalytics.status ? 'ON' : 'OFF' %></span></p>
+      <p class="small text-muted mb-3">Measurement ID: <code><%= marketing.googleAnalytics.measurementId || '—' %></code></p>
+      <a href="/admin/marketing/googleAnalytics" class="btn btn-sm btn-outline-primary w-100">Manage</a>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100">
+      <h6><i class="bi bi-facebook"></i> Meta Pixel</h6>
+      <p class="small mb-1">Status: <span class="badge bg-<%= marketing.facebookPixel.status ? 'success' : 'secondary' %>"><%= marketing.facebookPixel.status ? 'ON' : 'OFF' %></span></p>
+      <p class="small text-muted mb-3">Pixel ID: <code><%= marketing.facebookPixel.pixelId || '—' %></code>, Access Token: <code><%= marketing.facebookPixel.accessToken ? maskSecret(marketing.facebookPixel.accessToken) : '—' %></code></p>
+      <a href="/admin/marketing/facebookPixel" class="btn btn-sm btn-outline-primary w-100">Manage</a>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100">
+      <h6><i class="bi bi-chat-dots-fill"></i> SMS Gateway</h6>
+      <p class="small mb-1">Status: <span class="badge bg-<%= marketing.sms.status ? 'success' : 'secondary' %>"><%= marketing.sms.status ? 'ON' : 'OFF' %></span></p>
+      <p class="small text-muted mb-3">API Key: <code><%= marketing.sms.apiKey ? maskSecret(marketing.sms.apiKey) : '—' %></code></p>
+      <a href="/admin/marketing/sms" class="btn btn-sm btn-outline-primary w-100">Manage</a>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100">
+      <h6><i class="bi bi-envelope-fill"></i> Email Provider</h6>
+      <p class="small mb-1">Status: <span class="badge bg-<%= email.status ? 'success' : 'secondary' %>"><%= email.status ? 'ON' : 'OFF' %></span></p>
+      <p class="small text-muted mb-3">SMTP: <code><%= email.smtpHost || '—' %></code></p>
+      <a href="/admin/integrations/email" class="btn btn-sm btn-outline-primary w-100">Manage</a>
+    </div>
+  </div>
+
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100 text-muted">
+      <h6><i class="bi bi-fire"></i> Firebase</h6>
+      <p class="small mb-3">Not Connected</p>
+      <span class="badge bg-secondary">Not Connected</span>
+    </div>
+  </div>
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100 text-muted">
+      <h6><i class="bi bi-cloud-fill"></i> Cloud Storage</h6>
+      <p class="small mb-3">Not Connected</p>
+      <span class="badge bg-secondary">Not Connected</span>
+    </div>
+  </div>
+  <div class="col-md-6 col-lg-4">
+    <div class="admin-card h-100 text-muted">
+      <h6><i class="bi bi-search"></i> Search Engine</h6>
+      <p class="small mb-3">Not Connected</p>
+      <span class="badge bg-secondary">Not Connected</span>
+    </div>
+  </div>
+</div>
+
+<p class="form-text mt-3">Firebase, Cloud Storage and Search Engine have no integration point anywhere in this app yet, so they're shown honestly as Not Connected rather than a settings form that wouldn't actually do anything.</p>
+
+<%- include('partials/admin-footer') %>

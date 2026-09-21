@@ -1,0 +1,57 @@
+<%- include('partials/admin-header') %>
+
+<nav class="small mb-3">
+  <a href="/admin" class="text-decoration-none">Home</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <a href="/admin/integrations" class="text-decoration-none">API & Integration Management</a>
+  <span class="text-muted mx-1">&gt;</span>
+  <span class="text-muted">Email Provider</span>
+</nav>
+
+<div class="alert alert-warning">
+  <strong>Saved only, not wired into a send path.</strong> This app has no email-sending library installed, so nothing here is actually used to send an email yet — these fields are stored for when that's added.
+</div>
+
+<div class="admin-card" style="max-width:560px;">
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger">
+      <ul class="mb-0"><% errors.forEach(function (e) { %><li><%= e %></li><% }); %></ul>
+    </div>
+  <% } %>
+  <form method="post" action="/admin/integrations/email">
+    <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+    <div class="mb-3">
+      <label class="form-label">SMTP Host</label>
+      <input type="text" name="smtpHost" class="form-control" placeholder="smtp.example.com" value="<%= email.smtpHost || '' %>">
+    </div>
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label">SMTP Port</label>
+        <input type="text" name="smtpPort" class="form-control" placeholder="587" value="<%= email.smtpPort || '' %>">
+      </div>
+      <div class="col-md-6 mb-3">
+        <label class="form-label">From Address</label>
+        <input type="email" name="fromAddress" class="form-control" placeholder="no-reply@yourstore.com" value="<%= email.fromAddress || '' %>">
+      </div>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">SMTP Username</label>
+      <input type="text" name="smtpUsername" class="form-control" value="<%= email.smtpUsername || '' %>">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">SMTP Password</label>
+      <input type="password" name="smtpPassword" class="form-control" value="<%= email.smtpPassword || '' %>">
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Status</label>
+      <select name="status" class="form-select">
+        <option value="on" <%= email.status ? 'selected' : '' %>>ON</option>
+        <option value="off" <%= !email.status ? 'selected' : '' %>>OFF</option>
+      </select>
+    </div>
+    <button type="submit" class="btn btn-brand">Save Changes</button>
+    <a href="/admin/integrations" class="btn btn-outline-secondary">Back</a>
+  </form>
+</div>
+
+<%- include('partials/admin-footer') %>

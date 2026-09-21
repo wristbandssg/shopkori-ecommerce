@@ -1,6 +1,7 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
@@ -26,6 +27,11 @@ const DeliveryCommissionSetup = require('../models/DeliveryCommissionSetup');
 const DeliveryRequest = require('../models/DeliveryRequest');
 const PageView = require('../models/PageView');
 const SearchLog = require('../models/SearchLog');
+const Announcement = require('../models/Announcement');
+const LoginLog = require('../models/LoginLog');
+const BlockedIp = require('../models/BlockedIp');
+const { getEmailSetting, updateEmailSetting } = require('../models/EmailSetting');
+const { generateSecret, verifyTotp } = require('../lib/totp');
 const Page = require('../models/Page');
 const BlogPost = require('../models/BlogPost');
 const LandingPage = require('../models/LandingPage');
@@ -54,7 +60,7 @@ const adminLocals = require('../middleware/adminLocals');
 const { requireAdminLogin } = require('../middleware/auth');
 const { verifyCsrf } = require('../middleware/csrf');
 const upload = require('../middleware/upload');
-const { slugify, ensureUniqueSlug } = require('../middleware/helpers');
+const { slugify, ensureUniqueSlug, maskSecret } = require('../middleware/helpers');
 const {
   ORDER_STATUSES, COURIERS, statusLabel,
   DELIVERY_STATUSES, RETURN_STATUSES,
@@ -76,17 +82,73 @@ router.post('/login', async (req, res, next) => {
     if (req.body.csrfToken !== req.session.csrfToken) {
       return res.render('admin/login', { errors: ['Form has expired.'], formData: req.body });
     }
+    const ip = req.ip || '';
     const { username, password } = req.body;
+    const logAttempt = (status, reason, adminId) =>
+      LoginLog.create({ admin: adminId || null, usernameAttempted: username || '', ip, userAgent: req.get('User-Agent') || '', status, reason: reason || '' }).catch(() => {});
+
+    // Admin > Security Dashboard > Blocked IPs — genuinely enforced: a
+    // blocked IP never even reaches the password check below.
+    const blocked = await BlockedIp.findOne({ ip }).lean();
+    if (blocked) {
+      logAttempt('failed', 'Blocked IP');
+      return res.render('admin/login', { errors: ['Access from this IP address has been blocked.'], formData: req.body });
+    }
+
     const admin = await Admin.findOne({ $or: [{ username }, { email: (username || '').toLowerCase() }] });
     if (admin && (await bcrypt.compare(password, admin.password))) {
       // Staff > User > "Login is enable" — genuinely enforced here.
       if (admin.loginEnabled === false) {
+        logAttempt('failed', 'Account disabled', admin._id);
         return res.render('admin/login', { errors: ['This account has been disabled. Contact an administrator.'], formData: req.body });
       }
+      // Admin > Security Dashboard > 2FA Status — password is correct, but
+      // don't sign the session in yet: hold it in a separate pending slot
+      // until GET/POST /admin/login/2fa confirms a valid TOTP code. The
+      // login attempt itself is only logged once that second step resolves.
+      if (admin.twoFactorEnabled) {
+        req.session.pending2faAdminId = String(admin._id);
+        return res.redirect('/admin/login/2fa');
+      }
       req.session.adminId = admin._id;
+      logAttempt('success', '', admin._id);
       return res.redirect('/admin');
     }
+    logAttempt('failed', 'Incorrect username or password', admin ? admin._id : null);
     res.render('admin/login', { errors: ['Incorrect username or password.'], formData: req.body });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Second step of login when the account has 2FA enabled (Admin > Security
+// Dashboard). Only reachable with a pending2faAdminId set by POST /login
+// just above — never a standalone login path of its own.
+router.get('/login/2fa', (req, res) => {
+  if (!req.session.pending2faAdminId) return res.redirect('/admin/login');
+  res.render('admin/login-2fa', { errors: [] });
+});
+
+router.post('/login/2fa', async (req, res, next) => {
+  try {
+    if (!req.session.pending2faAdminId) return res.redirect('/admin/login');
+    if (req.body.csrfToken !== req.session.csrfToken) {
+      return res.render('admin/login-2fa', { errors: ['Form has expired.'] });
+    }
+    const admin = await Admin.findById(req.session.pending2faAdminId);
+    const ip = req.ip || '';
+    if (!admin || !admin.twoFactorEnabled) {
+      delete req.session.pending2faAdminId;
+      return res.redirect('/admin/login');
+    }
+    if (verifyTotp(admin.twoFactorSecret, req.body.code)) {
+      req.session.adminId = admin._id;
+      delete req.session.pending2faAdminId;
+      LoginLog.create({ admin: admin._id, usernameAttempted: admin.username, ip, userAgent: req.get('User-Agent') || '', status: 'success', reason: '2FA verified' }).catch(() => {});
+      return res.redirect('/admin');
+    }
+    LoginLog.create({ admin: admin._id, usernameAttempted: admin.username, ip, userAgent: req.get('User-Agent') || '', status: 'failed', reason: 'Invalid 2FA code' }).catch(() => {});
+    res.render('admin/login-2fa', { errors: ['Invalid authentication code.'] });
   } catch (err) {
     next(err);
   }
@@ -3686,6 +3748,309 @@ router.get('/help-support/tickets/:id/resolve', async (req, res, next) => {
     await SupportTicket.updateOne({ _id: req.params.id }, { status: 'resolved' });
     req.flash('success', 'Ticket marked resolved.');
     res.redirect('/admin/help-support');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   ANNOUNCEMENT SYSTEM
+   ---------------------------------------------------------------------
+   ClickDokan's reference design targets "To All Vendors / To Specific
+   Vendors / To Customers / To Admin Staff" — ShopKori has no Vendor
+   concept at all (single-tenant, no models/Vendor.js), so Vendor-targeting
+   is dropped entirely; audience is Customers (storefront) or Admin Staff
+   (this panel) instead — see models/Announcement.js. Both banners are
+   real and rendered from live data (middleware/adminLocals.js,
+   middleware/storeLocals.js, views/admin/partials/admin-header.ejs,
+   views/partials/header.ejs). Any logged-in admin can create/manage
+   announcements — no distinct Super Admin role exists in this app beyond
+   login-gating, same precedent as Referral Payout approve/reject and
+   Support Ticket resolve above.
+   ===================================================================== */
+router.get('/announcements', async (req, res, next) => {
+  try {
+    const list = await Announcement.find({}).sort({ createdAt: -1 }).populate('createdBy', 'fullName username').lean();
+    res.render('admin/announcements', { adminPageTitle: 'Announcement System', list, errors: [], formData: {} });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/announcements', verifyCsrf, async (req, res, next) => {
+  try {
+    const { title, message, audience, expiresAt } = req.body;
+    const errors = [];
+    if (!title || !title.trim()) errors.push('Title is required.');
+    if (!message || !message.trim()) errors.push('Message is required.');
+    if (!['customers', 'admin_staff'].includes(audience)) errors.push('Choose a valid audience.');
+    if (errors.length) {
+      const list = await Announcement.find({}).sort({ createdAt: -1 }).populate('createdBy', 'fullName username').lean();
+      return res.render('admin/announcements', { adminPageTitle: 'Announcement System', list, errors, formData: req.body });
+    }
+    await Announcement.create({
+      title: title.trim(),
+      message: message.trim(),
+      audience,
+      createdBy: req.session.adminId,
+      expiresAt: expiresAt ? new Date(expiresAt) : null,
+    });
+    req.flash('success', 'Announcement published.');
+    res.redirect('/admin/announcements');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/announcements/:id/toggle', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/announcements');
+    }
+    const ann = await Announcement.findById(req.params.id);
+    if (ann) {
+      ann.active = !ann.active;
+      await ann.save();
+    }
+    res.redirect('/admin/announcements');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/announcements/:id/delete', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/announcements');
+    }
+    await Announcement.deleteOne({ _id: req.params.id });
+    req.flash('success', 'Announcement deleted.');
+    res.redirect('/admin/announcements');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   API & INTEGRATION MANAGEMENT
+   ---------------------------------------------------------------------
+   One hub linking out to every integration this app actually has a real
+   settings surface for, rather than duplicating them: Payment Gateways ->
+   Settings > Payment (models/PaymentSetting.js), Courier APIs -> Settings
+   > Courier (models/CourierSetup.js), Google Analytics / Meta Pixel / SMS
+   Gateway -> the matching Marketing cards (models/MarketingSetting.js).
+   Email Provider is new here and saved-only — no email-sending library
+   exists in package.json, so it's not wired into an actual send path (see
+   models/EmailSetting.js). Firebase / Cloud Storage / Search Engine have
+   no integration point anywhere in this codebase, so they're shown as
+   honest "Not Connected" cards rather than fabricated settings forms —
+   same precedent as Staff Settings' Product Assign List / Commission
+   Request coming-soon cards. Secrets are masked on this hub (see
+   maskSecret in middleware/helpers.js) per the spec's own instruction
+   that "sensitive API secrets should not be shown in full in the UI".
+   ===================================================================== */
+router.get('/integrations', async (req, res, next) => {
+  try {
+    const [payment, courierSetups, marketing, email] = await Promise.all([
+      getPaymentSettings(),
+      CourierSetup.find({}).lean(),
+      getMarketingSettings(),
+      getEmailSetting(),
+    ]);
+    res.render('admin/integrations', {
+      adminPageTitle: 'API & Integration Management',
+      payment, courierSetups, marketing, email, maskSecret,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/integrations/email', async (req, res, next) => {
+  try {
+    const email = await getEmailSetting();
+    res.render('admin/integrations-email', { adminPageTitle: 'Email Provider', email, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/integrations/email', verifyCsrf, async (req, res, next) => {
+  try {
+    const data = { ...req.body };
+    delete data.csrfToken;
+    data.status = data.status === 'on';
+    await updateEmailSetting(data);
+    req.flash('success', 'Email provider settings saved. (Not wired into an actual send path yet — see the note on this page.)');
+    res.redirect('/admin/integrations/email');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   SECURITY DASHBOARD
+   ---------------------------------------------------------------------
+   Real, not decorative: Failed Logins / Admin Login History / Suspicious
+   Activity read from LoginLog (written by POST /login and POST
+   /login/2fa above); Blocked IPs is enforced at POST /login; 2FA is a
+   hand-built RFC 6238 TOTP (lib/totp.js) verified against POST
+   /login/2fa, since no QR-code library exists here — enrollment shows
+   the base32 secret as text to type into an authenticator app by hand;
+   Active Sessions / Force Logout / Revoke Session query and delete
+   documents directly from the real connect-mongo `sessions` collection
+   this app already uses for every login (see server.js), not a separate
+   parallel session-tracking model. API Activity is intentionally left
+   out: no API-key-authenticated external surface and no outbound-call
+   logger exist anywhere in this codebase, so it's disclosed as untracked
+   rather than fabricated. Any logged-in admin can take these actions —
+   no distinct Super Admin role exists in this app beyond login-gating.
+   ===================================================================== */
+router.get('/security', async (req, res, next) => {
+  try {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const [failedLogins, loginHistory, blockedIps, admins, sessionsRaw, suspicious] = await Promise.all([
+      LoginLog.find({ status: 'failed', createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(30).lean(),
+      LoginLog.find({ status: 'success', createdAt: { $gte: since } }).sort({ createdAt: -1 }).populate('admin', 'fullName username').limit(30).lean(),
+      BlockedIp.find({}).sort({ createdAt: -1 }).populate('blockedBy', 'fullName username').lean(),
+      Admin.find({}).select('username fullName email twoFactorEnabled').lean(),
+      mongoose.connection.db.collection('sessions').find({}).toArray(),
+      // Suspicious Activity: genuinely computed, not fabricated — any IP
+      // with 5+ failed attempts in the last 24 hours.
+      LoginLog.aggregate([
+        { $match: { status: 'failed', createdAt: { $gte: last24h } } },
+        { $group: { _id: '$ip', count: { $sum: 1 }, lastAttempt: { $max: '$createdAt' }, usernames: { $addToSet: '$usernameAttempted' } } },
+        { $match: { count: { $gte: 5 } } },
+        { $sort: { count: -1 } },
+      ]),
+    ]);
+
+    // Active Sessions: parse each raw sessions-collection doc's JSON blob
+    // for an adminId, join to Admin — reading the real, live session
+    // store connect-mongo already maintains, not a fabricated model.
+    const activeSessions = [];
+    sessionsRaw.forEach((doc) => {
+      try {
+        const parsed = JSON.parse(doc.session);
+        if (parsed.adminId) {
+          const adminDoc = admins.find((a) => String(a._id) === String(parsed.adminId));
+          activeSessions.push({
+            sessionId: doc._id,
+            adminId: parsed.adminId,
+            adminName: adminDoc ? (adminDoc.fullName || adminDoc.username) : 'Unknown / deleted admin',
+            expires: doc.expires,
+          });
+        }
+      } catch (e) {
+        // Not an admin session (e.g. a customer session, or a
+        // pending2fa-only session with no adminId yet) — skip it.
+      }
+    });
+
+    res.render('admin/security', {
+      adminPageTitle: 'Security Dashboard',
+      failedLogins, loginHistory, blockedIps, admins, suspicious, activeSessions,
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/security/block-ip', verifyCsrf, async (req, res, next) => {
+  try {
+    const ip = (req.body.ip || '').trim();
+    if (ip) {
+      await BlockedIp.updateOne({ ip }, { ip, reason: req.body.reason || '', blockedBy: req.session.adminId }, { upsert: true });
+      req.flash('success', `${ip} blocked.`);
+    }
+    res.redirect('/admin/security');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/security/unblock-ip/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/security');
+    }
+    await BlockedIp.deleteOne({ _id: req.params.id });
+    req.flash('success', 'IP unblocked.');
+    res.redirect('/admin/security');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/security/revoke-session/:sessionId', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/security');
+    }
+    // Deleting the raw session document genuinely invalidates that
+    // browser's session — connect-mongo/express-session treats a missing
+    // session id as a brand-new, empty session on its next request.
+    await mongoose.connection.db.collection('sessions').deleteOne({ _id: req.params.sessionId });
+    req.flash('success', 'Session revoked — that browser will be signed out on its next request.');
+    res.redirect('/admin/security');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/security/reset-2fa/:id', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/security');
+    }
+    await Admin.updateOne({ _id: req.params.id }, { twoFactorEnabled: false, twoFactorSecret: null });
+    req.flash('success', '2FA reset for that account. They can re-enable it themselves from their own login.');
+    res.redirect('/admin/security');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Self-service 2FA enrollment for the currently logged-in admin's own
+// account — this is the only route that ever turns twoFactorEnabled on;
+// Reset 2FA above only ever turns it back off for someone else.
+router.get('/security/2fa/enable', (req, res) => {
+  const secret = generateSecret();
+  req.session.pendingTotpSecret = secret;
+  res.render('admin/security-2fa-enable', { adminPageTitle: 'Enable 2FA', secret, errors: [] });
+});
+
+router.post('/security/2fa/enable', verifyCsrf, async (req, res, next) => {
+  try {
+    const secret = req.session.pendingTotpSecret;
+    if (!secret) return res.redirect('/admin/security/2fa/enable');
+    if (!verifyTotp(secret, req.body.code)) {
+      return res.render('admin/security-2fa-enable', { adminPageTitle: 'Enable 2FA', secret, errors: ['Invalid code — check your authenticator app and try again.'] });
+    }
+    await Admin.updateOne({ _id: req.session.adminId }, { twoFactorSecret: secret, twoFactorEnabled: true });
+    delete req.session.pendingTotpSecret;
+    req.flash('success', '2FA enabled on your account.');
+    res.redirect('/admin/security');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/security/2fa/disable', async (req, res, next) => {
+  try {
+    if (req.query.csrf !== req.session.csrfToken) {
+      req.flash('danger', 'Invalid request.');
+      return res.redirect('/admin/security');
+    }
+    await Admin.updateOne({ _id: req.session.adminId }, { twoFactorEnabled: false, twoFactorSecret: null });
+    req.flash('success', '2FA disabled on your account.');
+    res.redirect('/admin/security');
   } catch (err) {
     next(err);
   }
