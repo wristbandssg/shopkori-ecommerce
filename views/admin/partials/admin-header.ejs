@@ -66,21 +66,27 @@
         <a href="/admin/delivery/commission-request" class="<%= currentSubPath === '/delivery/commission-request' ? 'active' : '' %>">Commission Request</a>
       </div>
 
-      <a href="/admin/marketing" class="<%= currentPage === 'marketing' ? 'active' : '' %>"><i class="bi bi-megaphone"></i> Marketing</a>
-      <a href="/admin/analytics" class="<%= currentPage === 'analytics' ? 'active' : '' %>"><i class="bi bi-graph-up"></i> Analytics</a>
-
-      <button class="admin-nav-toggle <%= currentPage === 'landing-page' ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navLanding" aria-expanded="<%= currentPage === 'landing-page' ? 'true' : 'false' %>">
-        <i class="bi bi-globe2"></i> Landing Page <i class="bi bi-chevron-down chevron"></i>
+      <button class="admin-nav-toggle <%= ['marketing', 'analytics', 'reports', 'referral-program'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navMarketing" aria-expanded="<%= ['marketing', 'analytics', 'reports', 'referral-program'].includes(currentPage) ? 'true' : 'false' %>">
+        <i class="bi bi-megaphone"></i> Marketing & Reports <i class="bi bi-chevron-down chevron"></i>
       </button>
-      <div class="collapse admin-submenu <%= currentPage === 'landing-page' ? 'show' : '' %>" id="navLanding">
+      <div class="collapse admin-submenu <%= ['marketing', 'analytics', 'reports', 'referral-program'].includes(currentPage) ? 'show' : '' %>" id="navMarketing">
+        <a href="/admin/marketing" class="<%= currentPage === 'marketing' ? 'active' : '' %>">Marketing</a>
+        <a href="/admin/analytics" class="<%= currentPage === 'analytics' ? 'active' : '' %>">Analytics</a>
+        <a href="/admin/reports" class="<%= currentPage === 'reports' ? 'active' : '' %>">Sales Report</a>
+        <a href="/admin/referral-program" class="<%= currentPage === 'referral-program' ? 'active' : '' %>">Referral Program</a>
+      </div>
+
+      <button class="admin-nav-toggle <%= ['blog', 'pages', 'landing-page'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navContent" aria-expanded="<%= ['blog', 'pages', 'landing-page'].includes(currentPage) ? 'true' : 'false' %>">
+        <i class="bi bi-file-earmark-richtext"></i> Content <i class="bi bi-chevron-down chevron"></i>
+      </button>
+      <div class="collapse admin-submenu <%= ['blog', 'pages', 'landing-page'].includes(currentPage) ? 'show' : '' %>" id="navContent">
+        <a href="/admin/blog" class="<%= currentPage === 'blog' ? 'active' : '' %>">Blog</a>
+        <a href="/admin/pages" class="<%= currentPage === 'pages' ? 'active' : '' %>">Pages</a>
         <a href="/admin/landing-page/main" class="<%= currentSubPath === '/landing-page/main' ? 'active' : '' %>">Main Landing</a>
         <a href="/admin/landing-page/short" class="<%= currentSubPath === '/landing-page/short' ? 'active' : '' %>">Short Landing</a>
         <a href="/admin/landing-page/checkout" class="<%= currentSubPath === '/landing-page/checkout' ? 'active' : '' %>">Landing Checkout</a>
         <a href="/admin/landing-page/advance" class="<%= currentSubPath === '/landing-page/advance' ? 'active' : '' %>">Advance Landing</a>
       </div>
-
-      <a href="/admin/blog" class="<%= currentPage === 'blog' ? 'active' : '' %>"><i class="bi bi-journal-richtext"></i> Blog</a>
-      <a href="/admin/pages" class="<%= currentPage === 'pages' ? 'active' : '' %>"><i class="bi bi-file-earmark-text"></i> Pages</a>
 
       <a href="/admin/settings" class="<%= currentPage === 'settings' ? 'active' : '' %>"><i class="bi bi-gear"></i> Setting</a>
       <a href="/admin/customization" class="<%= currentPage === 'customization' ? 'active' : '' %>"><i class="bi bi-sliders"></i> Customization</a>
@@ -108,31 +114,18 @@
       </div>
 
       <a href="/admin/staff" class="<%= currentPage === 'staff' ? 'active' : '' %>"><i class="bi bi-people"></i> Staff</a>
-
-      <button class="admin-nav-toggle <%= currentPage === 'accounting' ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navAccounting" aria-expanded="<%= currentPage === 'accounting' ? 'true' : 'false' %>">
-        <i class="bi bi-calculator"></i> Accounting <i class="bi bi-chevron-down chevron"></i>
-      </button>
-      <div class="collapse admin-submenu <%= currentPage === 'accounting' ? 'show' : '' %>" id="navAccounting">
-        <a href="/admin/accounting/income" class="<%= currentSubPath === '/accounting/income' ? 'active' : '' %>">Income</a>
-        <a href="/admin/accounting/expenses" class="<%= currentSubPath === '/accounting/expenses' ? 'active' : '' %>">Expenses</a>
-        <a href="/admin/accounting/expense-list" class="<%= currentSubPath === '/accounting/expense-list' ? 'active' : '' %>">Expense List</a>
-        <a href="/admin/accounting/due-payment" class="<%= currentSubPath === '/accounting/due-payment' ? 'active' : '' %>">Due Payment</a>
-        <a href="/admin/accounting/employee-salary" class="<%= currentSubPath === '/accounting/employee-salary' ? 'active' : '' %>">Employee Salary</a>
-        <a href="/admin/accounting/bill-statements" class="<%= currentSubPath === '/accounting/bill-statements' ? 'active' : '' %>">Bill Statements</a>
-        <a href="/admin/accounting/balance-transfer" class="<%= currentSubPath === '/accounting/balance-transfer' ? 'active' : '' %>">Balance Transfer</a>
-        <a href="/admin/accounting/balance-overview" class="<%= currentSubPath === '/accounting/balance-overview' ? 'active' : '' %>">Balance Overview</a>
-      </div>
-
       <a href="/admin/task-management" class="<%= currentPage === 'task-management' ? 'active' : '' %>"><i class="bi bi-list-task"></i> Task Management</a>
-      <a href="/admin/pos" class="<%= currentPage === 'pos' ? 'active' : '' %>"><i class="bi bi-shop"></i> POS</a>
       <a href="/admin/customers" class="<%= currentPage === 'customers' ? 'active' : '' %>"><i class="bi bi-person-lines-fill"></i> Customers</a>
-      <a href="/admin/referral-program" class="<%= currentPage === 'referral-program' ? 'active' : '' %>"><i class="bi bi-share"></i> Referral Program</a>
-      <a href="/admin/our-service" class="<%= currentPage === 'our-service' ? 'active' : '' %>"><i class="bi bi-award"></i> Our Service</a>
-      <a href="/admin/help-support" class="<%= currentPage === 'help-support' ? 'active' : '' %>"><i class="bi bi-question-circle"></i> Help & Support</a>
-      <a href="/admin/announcements" class="<%= currentPage === 'announcements' ? 'active' : '' %>"><i class="bi bi-megaphone-fill"></i> Announcements</a>
-      <a href="/admin/security" class="<%= currentPage === 'security' ? 'active' : '' %>"><i class="bi bi-shield-lock"></i> Security Dashboard</a>
-      <a href="/admin/integrations" class="<%= currentPage === 'integrations' ? 'active' : '' %>"><i class="bi bi-plug"></i> API & Integrations</a>
-      <a href="/admin/reports" class="<%= currentPage === 'reports' ? 'active' : '' %>"><i class="bi bi-graph-up-arrow"></i> Sales Report</a>
+
+      <button class="admin-nav-toggle <%= ['announcements', 'security', 'integrations', 'help-support'].includes(currentPage) ? 'active' : '' %>" data-bs-toggle="collapse" data-bs-target="#navAdminTools" aria-expanded="<%= ['announcements', 'security', 'integrations', 'help-support'].includes(currentPage) ? 'true' : 'false' %>">
+        <i class="bi bi-tools"></i> Admin Tools <i class="bi bi-chevron-down chevron"></i>
+      </button>
+      <div class="collapse admin-submenu <%= ['announcements', 'security', 'integrations', 'help-support'].includes(currentPage) ? 'show' : '' %>" id="navAdminTools">
+        <a href="/admin/announcements" class="<%= currentPage === 'announcements' ? 'active' : '' %>">Announcements</a>
+        <a href="/admin/security" class="<%= currentPage === 'security' ? 'active' : '' %>">Security Dashboard</a>
+        <a href="/admin/integrations" class="<%= currentPage === 'integrations' ? 'active' : '' %>">API & Integrations</a>
+        <a href="/admin/help-support" class="<%= currentPage === 'help-support' ? 'active' : '' %>">Help & Support</a>
+      </div>
 
       <hr>
       <a href="/" target="_blank"><i class="bi bi-eye"></i> View Store</a>

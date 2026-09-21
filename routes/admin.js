@@ -191,18 +191,14 @@ const COMING_SOON_PAGES = {
   '/staff/product-assign': 'Product Assign List',
   '/staff/commission-request': 'Staff Commission Request',
 
-  '/accounting/income': 'Income',
-  '/accounting/expenses': 'Expenses',
-  '/accounting/expense-list': 'Expense List',
-  '/accounting/due-payment': 'Due Payment',
-  '/accounting/employee-salary': 'Employee Salary',
-  '/accounting/bill-statements': 'Bill Statements',
-  '/accounting/balance-transfer': 'Balance Transfer',
-  '/accounting/balance-overview': 'Balance Overview',
+  // Accounting was removed from the sidebar entirely per the owner's
+  // request (not needed) — these coming-soon stubs go with it rather
+  // than staying reachable by direct URL with no nav link to find them.
 
   // '/task-management' is now real (see the TASK MANAGEMENT section below).
 
-  '/pos': 'POS',
+  // '/pos' was removed from the sidebar entirely per the owner's request
+  // (not needed).
 
   // Still coming soon — no distinct UI/spec provided for these yet.
   '/orders/follow-up': 'Follow Up',
@@ -213,7 +209,8 @@ const COMING_SOON_PAGES = {
 
   // '/referral-program' is now real (see the REFERRAL PROGRAM section below).
 
-  '/our-service': 'Our Service',
+  // '/our-service' was removed from the sidebar entirely per the owner's
+  // request (not needed).
   // '/help-support' is now real (see the HELP & SUPPORT section below).
 };
 
