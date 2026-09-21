@@ -1,0 +1,67 @@
+<%- include('partials/header') %>
+<%
+  const accountBadge = { pending: ['secondary', 'পর্যালোচনাধীন'], active: ['success', 'লাইভ'], suspended: ['danger', 'স্থগিত'], rejected: ['danger', 'বাতিল'] }[vendor.accountStatus];
+  const kycBadge = { pending: ['secondary', 'পর্যালোচনাধীন'], approved: ['success', 'অনুমোদিত'], rejected: ['danger', 'বাতিল'] }[vendor.kycStatus];
+%>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h2 class="section-heading mb-0"><i class="bi bi-shop"></i> <%= vendor.storeName %></h2>
+    <nav class="d-flex gap-2 flex-wrap">
+      <a href="/vendor/dashboard" class="btn btn-sm btn-outline-secondary">ড্যাশবোর্ড</a>
+      <a href="/vendor/kyc" class="btn btn-sm btn-outline-secondary">KYC</a>
+      <a href="/vendor/profile" class="btn btn-sm btn-outline-secondary">দোকানের তথ্য</a>
+      <a href="/vendor/orders" class="btn btn-sm btn-outline-secondary">অর্ডার</a>
+      <a href="/vendor/wallet" class="btn btn-sm btn-outline-secondary">ওয়ালেট</a>
+      <% if (vendor.accountStatus === 'active') { %><a href="/store/<%= vendor.slug %>" target="_blank" class="btn btn-sm btn-outline-secondary">দোকান দেখুন</a><% } %>
+      <a href="/vendor/logout" class="btn btn-sm btn-outline-danger">লগআউট</a>
+    </nav>
+  </div>
+
+  <% if (vendor.accountStatus === 'pending') { %>
+    <div class="alert alert-warning">আপনার অ্যাকাউন্টটি এখনো অ্যাডমিন অনুমোদনের অপেক্ষায় আছে। অনুমোদন হলেই আপনার দোকান সাইটে লাইভ হবে।</div>
+  <% } else if (vendor.accountStatus === 'suspended') { %>
+    <div class="alert alert-danger">আপনার অ্যাকাউন্ট স্থগিত করা হয়েছে। বিস্তারিত জানতে অ্যাডমিনের সাথে যোগাযোগ করুন।</div>
+  <% } else if (vendor.accountStatus === 'rejected') { %>
+    <div class="alert alert-danger">আপনার অ্যাকাউন্ট অনুমোদিত হয়নি<% if (vendor.rejectionReason) { %>: <%= vendor.rejectionReason %><% } %></div>
+  <% } %>
+
+  <div class="row g-3">
+    <div class="col-md-3 col-6">
+      <div class="admin-card text-center p-3">
+        <div class="text-muted small">অ্যাকাউন্ট স্ট্যাটাস</div>
+        <span class="badge bg-<%= accountBadge[0] %> mt-2"><%= accountBadge[1] %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="admin-card text-center p-3">
+        <div class="text-muted small">KYC স্ট্যাটাস</div>
+        <span class="badge bg-<%= kycBadge[0] %> mt-2"><%= kycBadge[1] %></span>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="admin-card text-center p-3">
+        <div class="text-muted small">মোট প্রোডাক্ট</div>
+        <div class="fs-4 fw-bold"><%= productCount %></div>
+      </div>
+    </div>
+    <div class="col-md-3 col-6">
+      <div class="admin-card text-center p-3">
+        <div class="text-muted small">ওয়ালেট ব্যালেন্স</div>
+        <div class="fs-4 fw-bold"><%= currency(vendor.walletBalance) %></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-card mt-3">
+    <h5>কমিশন হার</h5>
+    <p class="mb-0">প্রতিটি অর্ডারের <strong><%= vendor.commissionPercent %>%</strong> প্ল্যাটফর্ম কমিশন হিসেবে কাটা হয়। এই হার অ্যাডমিন প্রয়োজনে পরিবর্তন করতে পারেন।</p>
+  </div>
+
+  <% if (!productCount) { %>
+    <div class="admin-card mt-3">
+      <h5><i class="bi bi-info-circle"></i> প্রোডাক্ট যোগ করা</h5>
+      <p class="mb-0 text-muted">এই মুহূর্তে ভেন্ডর নিজে সরাসরি প্রোডাক্ট যোগ করার অপশন এখনো তৈরি হয়নি — অ্যাডমিন প্যানেল থেকে অ্যাডমিন আপনার দোকানে প্রোডাক্ট এসাইন করতে পারবেন। এই ফিচারটি শীঘ্রই আসছে।</p>
+    </div>
+  <% } %>
+</div>
+<%- include('partials/footer') %>

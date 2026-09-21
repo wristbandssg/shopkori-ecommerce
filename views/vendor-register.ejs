@@ -1,0 +1,46 @@
+<%- include('partials/header') %>
+<div class="container py-5">
+  <div class="static-page mx-auto" style="max-width:560px;">
+    <h2 class="section-heading mb-4"><i class="bi bi-shop"></i> ভেন্ডর হিসেবে যুক্ত হন</h2>
+    <p class="text-muted">নিজের দোকান খুলে <%= settings.site_name %>-এ প্রোডাক্ট বিক্রি শুরু করুন। রেজিস্ট্রেশনের পর KYC তথ্য জমা দিতে হবে — অ্যাডমিন অনুমোদন করলে আপনার দোকান লাইভ হবে।</p>
+
+    <% if (errors && errors.length) { %>
+      <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+    <% } %>
+
+    <% const fd = (typeof formData !== 'undefined' && formData) ? formData : {}; %>
+    <form method="post" action="/vendor/register">
+      <div class="mb-3">
+        <label class="form-label">আপনার নাম *</label>
+        <input type="text" name="ownerName" class="form-control" required value="<%= fd.ownerName || '' %>">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">দোকানের নাম *</label>
+        <input type="text" name="storeName" class="form-control" required value="<%= fd.storeName || '' %>">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">ইমেইল *</label>
+        <input type="email" name="email" class="form-control" required value="<%= fd.email || '' %>">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">ফোন নম্বর</label>
+        <input type="text" name="phone" class="form-control" value="<%= fd.phone || '' %>">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">ঠিকানা</label>
+        <input type="text" name="address" class="form-control" value="<%= fd.address || '' %>">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">পাসওয়ার্ড *</label>
+        <input type="password" name="password" class="form-control" required minlength="6">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">পাসওয়ার্ড আবার লিখুন *</label>
+        <input type="password" name="confirmPassword" class="form-control" required minlength="6">
+      </div>
+      <button type="submit" class="btn btn-add-cart px-4 py-2 w-100">রেজিস্টার করুন</button>
+    </form>
+    <p class="text-center mt-3 mb-0">আগে থেকেই ভেন্ডর অ্যাকাউন্ট আছে? <a href="/vendor/login">লগইন করুন</a></p>
+  </div>
+</div>
+<%- include('partials/footer') %>

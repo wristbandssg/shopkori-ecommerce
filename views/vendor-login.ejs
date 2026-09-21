@@ -1,0 +1,20 @@
+<%- include('partials/header') %>
+<div class="container py-5">
+  <div class="static-page mx-auto" style="max-width:420px;">
+    <h2 class="section-heading mb-4"><i class="bi bi-shop"></i> ভেন্ডর লগইন</h2>
+    <% if (error) { %><div class="alert alert-danger"><%= error %></div><% } %>
+    <form method="post" action="/vendor/login">
+      <div class="mb-3">
+        <label class="form-label">ইমেইল</label>
+        <input type="email" name="email" class="form-control" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">পাসওয়ার্ড</label>
+        <input type="password" name="password" class="form-control" required>
+      </div>
+      <button type="submit" class="btn btn-add-cart px-4 py-2 w-100">লগইন</button>
+    </form>
+    <p class="text-center mt-3 mb-0">ভেন্ডর অ্যাকাউন্ট নেই? <a href="/vendor/register">রেজিস্টার করুন</a></p>
+  </div>
+</div>
+<%- include('partials/footer') %>

@@ -43,6 +43,10 @@
             <label class="form-label">Category Name *</label>
             <input type="text" name="name" class="form-control" required value="<%= d.name || '' %>">
           </div>
+          <div class="col-12">
+            <label class="form-label">Slug <small class="text-muted">(auto if blank)</small></label>
+            <input type="text" name="slug" class="form-control" value="<%= d.slug || '' %>">
+          </div>
         </div>
       </div>
 
@@ -52,11 +56,11 @@
         <div class="row g-3">
           <div class="col-12">
             <label class="form-label">Page Title</label>
-            <input type="text" name="pageTitle" class="form-control" placeholder="e.g. Recipe Ideas &amp; Cooking Tips | <%= settings.site_name %> Blog" value="<%= d.pageTitle || '' %>">
+            <input type="text" name="pageTitle" class="form-control" value="<%= d.pageTitle || '' %>">
           </div>
           <div class="col-12">
             <label class="form-label">Short Intro</label>
-            <textarea name="shortDescription" class="form-control" rows="3" placeholder="e.g. Recipes, kitchen tips and gifting ideas from the ShopKori team..."><%= d.shortDescription || '' %></textarea>
+            <textarea name="shortDescription" class="form-control" rows="3"><%= d.shortDescription || '' %></textarea>
           </div>
           <div class="col-12">
             <label class="form-label">Content Below Posts</label>

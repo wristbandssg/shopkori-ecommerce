@@ -36,6 +36,7 @@ const PERMISSION_MODULES = [
   { key: 'customPage', label: 'Custom Page', actions: ['manage', 'create', 'edit', 'delete'] },
   { key: 'blog', label: 'Blog', actions: ['manage', 'create', 'edit', 'delete'] },
   { key: 'customers', label: 'Customers', actions: ['manage', 'show'] },
+  { key: 'vendors', label: 'Vendors', actions: ['manage', 'approve', 'suspend'] },
   { key: 'plans', label: 'Plans', actions: ['manage'] },
   { key: 'settings', label: 'Settings', actions: ['manage'] },
   { key: 'themes', label: 'Themes', actions: ['manage', 'edit'] },

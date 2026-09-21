@@ -1,0 +1,100 @@
+<%- include('partials/header') %>
+<%
+  const typeLabel = { order_earning: 'অর্ডার আয়', commission_deduction: 'কমিশন কর্তন', withdrawal: 'উত্তোলন', refund_deduction: 'রিফান্ড কর্তন', adjustment: 'অ্যাডজাস্টমেন্ট' };
+  const wStatusLabel = { pending: ['secondary', 'পর্যালোচনাধীন'], approved: ['success', 'অনুমোদিত'], rejected: ['danger', 'বাতিল'] };
+%>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h2 class="section-heading mb-0"><i class="bi bi-wallet2"></i> ওয়ালেট</h2>
+    <nav class="d-flex gap-2 flex-wrap">
+      <a href="/vendor/dashboard" class="btn btn-sm btn-outline-secondary">ড্যাশবোর্ড</a>
+      <a href="/vendor/kyc" class="btn btn-sm btn-outline-secondary">KYC</a>
+      <a href="/vendor/profile" class="btn btn-sm btn-outline-secondary">দোকানের তথ্য</a>
+      <a href="/vendor/orders" class="btn btn-sm btn-outline-secondary">অর্ডার</a>
+      <a href="/vendor/wallet" class="btn btn-sm btn-outline-secondary active">ওয়ালেট</a>
+      <a href="/vendor/logout" class="btn btn-sm btn-outline-danger">লগআউট</a>
+    </nav>
+  </div>
+
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+  <% } %>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-4">
+      <div class="admin-card text-center p-3">
+        <div class="text-muted small">বর্তমান ব্যালেন্স</div>
+        <div class="fs-3 fw-bold"><%= currency(vendor.walletBalance) %></div>
+      </div>
+    </div>
+    <div class="col-md-8">
+      <div class="admin-card">
+        <h5>উত্তোলনের অনুরোধ করুন</h5>
+        <form method="post" action="/vendor/wallet/withdraw">
+          <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+          <div class="row g-2">
+            <div class="col-md-3">
+              <input type="number" name="amount" class="form-control" placeholder="পরিমাণ" min="1" step="0.01" required>
+            </div>
+            <div class="col-md-3">
+              <select name="method" class="form-select" required>
+                <option value="">মেথড</option>
+                <option value="bkash">বিকাশ</option>
+                <option value="nagad">নগদ</option>
+                <option value="bank">ব্যাংক</option>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <input type="text" name="methodDetails" class="form-control" placeholder="নম্বর / অ্যাকাউন্ট">
+            </div>
+            <div class="col-md-3">
+              <button type="submit" class="btn btn-add-cart w-100">অনুরোধ পাঠান</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-card mb-3">
+    <h5>উত্তোলনের ইতিহাস</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>তারিখ</th><th>পরিমাণ</th><th>মেথড</th><th>স্ট্যাটাস</th></tr></thead>
+        <tbody>
+          <% withdrawals.forEach(function (w) { %>
+            <tr>
+              <td><%= new Date(w.createdAt).toLocaleDateString('bn-BD') %></td>
+              <td><%= currency(w.amount) %></td>
+              <td><%= w.method %></td>
+              <td><span class="badge bg-<%= wStatusLabel[w.status][0] %>"><%= wStatusLabel[w.status][1] %></span></td>
+            </tr>
+          <% }); %>
+          <% if (!withdrawals.length) { %><tr><td colspan="4" class="text-center text-muted">কোনো উত্তোলনের অনুরোধ নেই।</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="admin-card">
+    <h5>লেনদেনের ইতিহাস</h5>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>তারিখ</th><th>ধরন</th><th>পরিমাণ</th><th>ব্যালেন্স</th><th>নোট</th></tr></thead>
+        <tbody>
+          <% transactions.forEach(function (t) { %>
+            <tr>
+              <td><%= new Date(t.createdAt).toLocaleDateString('bn-BD') %></td>
+              <td><%= typeLabel[t.type] || t.type %></td>
+              <td class="<%= t.amount < 0 ? 'text-danger' : 'text-success' %>"><%= t.amount < 0 ? '-' : '+' %><%= currency(Math.abs(t.amount)) %></td>
+              <td><%= currency(t.balanceAfter) %></td>
+              <td><small class="text-muted"><%= t.note %></small></td>
+            </tr>
+          <% }); %>
+          <% if (!transactions.length) { %><tr><td colspan="5" class="text-center text-muted">এখনো কোনো লেনদেন নেই।</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>

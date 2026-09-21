@@ -35,6 +35,11 @@ const { generateSecret, verifyTotp } = require('../lib/totp');
 const Page = require('../models/Page');
 const BlogPost = require('../models/BlogPost');
 const BlogCategory = require('../models/BlogCategory');
+const Vendor = require('../models/Vendor');
+const VendorWalletTransaction = require('../models/VendorWalletTransaction');
+const VendorWithdrawal = require('../models/VendorWithdrawal');
+const VendorSubOrder = require('../models/VendorSubOrder');
+const AuditLog = require('../models/AuditLog');
 const LandingPage = require('../models/LandingPage');
 const ShortLandingPage = require('../models/ShortLandingPage');
 const LandingCheckout = require('../models/LandingCheckout');
@@ -193,6 +198,7 @@ router.use('/products', requireModule('products'));
 router.use('/categories', requireModule('productCategory'));
 router.use('/blog', requireModule('blog'));
 router.use('/customers', requireModule('customers'));
+router.use('/vendors', requireModule('vendors'));
 router.use('/customization', requireModule('themes'));
 router.use('/settings', requireModule('settings'));
 
@@ -262,9 +268,81 @@ function pushActivity(order, message) {
   order.activityLog.push({ message, at: new Date() });
 }
 
+// Multivendor Phase 2 — Settlement System (item 9) and Return/Refund
+// (item 10), built on top of Parent Order + Vendor Sub-order (item 5, see
+// models/VendorSubOrder.js and its creation in routes/store.js's checkout
+// route). Both are called from applyStatusChange() below, which is the one
+// place both the single-order (POST /orders/:id) and bulk (POST
+// /orders/bulk-status) status-change routes already go through — so every
+// way an Admin can change an order's status gets this for free, with no
+// second place to keep in sync.
+//
+// `req`/`res` are optional and only used to attribute the resulting
+// AuditLog entries to the admin who made the change; passed by both call
+// sites below since they always have both in scope.
+async function settleVendorSubOrders(order, req, res) {
+  const subOrders = await VendorSubOrder.find({ parentOrder: order._id, settlementStatus: 'pending' });
+  for (const so of subOrders) {
+    // Atomic $inc rather than read-balance-then-write-balance: POST
+    // /orders/bulk-status can settle several orders for the SAME vendor in
+    // one request (Promise.all over the selected orders), so a read-then-
+    // write here would lose an update whenever two of them land on that
+    // vendor. findOneAndUpdate({$inc}) can't race with itself.
+    const vendor = await Vendor.findOneAndUpdate(
+      { _id: so.vendor },
+      { $inc: { walletBalance: so.vendorEarning } },
+      { new: true }
+    );
+    if (!vendor) continue; // vendor deleted after the order was placed — nothing safe to credit
+    await VendorWalletTransaction.create({
+      vendor: vendor._id, type: 'order_earning', amount: so.vendorEarning, balanceAfter: vendor.walletBalance,
+      order: order._id, note: `Order ${order.orderNumber} delivered`, createdBy: null,
+    });
+    so.settlementStatus = 'settled';
+    so.settledAt = new Date();
+    await so.save();
+    if (req && res) {
+      await logAudit(req, res, 'vendor.suborder.settled', 'VendorSubOrder', so._id, `Order ${order.orderNumber} delivered — credited ${so.vendorEarning} to ${vendor.storeName}`);
+    }
+  }
+}
+
+async function reverseVendorSubOrders(order, req, res) {
+  const subOrders = await VendorSubOrder.find({ parentOrder: order._id, settlementStatus: { $in: ['pending', 'settled'] } });
+  for (const so of subOrders) {
+    if (so.settlementStatus === 'pending') {
+      // Never settled — no money ever moved, so there's nothing to reverse.
+      so.settlementStatus = 'cancelled';
+      await so.save();
+      continue;
+    }
+    // Same atomic-$inc reasoning as settleVendorSubOrders() above. Unlike
+    // the manual Wallet Adjustment form (Admin > Vendors > (vendor) >
+    // Wallet), this reversal is allowed to take walletBalance negative:
+    // the vendor may have already withdrawn the earning being clawed back,
+    // and the balance needs to honestly reflect that they now owe it.
+    const vendor = await Vendor.findOneAndUpdate(
+      { _id: so.vendor },
+      { $inc: { walletBalance: -so.vendorEarning } },
+      { new: true }
+    );
+    if (!vendor) continue;
+    await VendorWalletTransaction.create({
+      vendor: vendor._id, type: 'refund_deduction', amount: -so.vendorEarning, balanceAfter: vendor.walletBalance,
+      order: order._id, note: `Order ${order.orderNumber} returned/cancelled`, createdBy: null,
+    });
+    so.settlementStatus = 'reversed';
+    so.refundedAmount = so.vendorEarning;
+    await so.save();
+    if (req && res) {
+      await logAudit(req, res, 'vendor.suborder.reversed', 'VendorSubOrder', so._id, `Order ${order.orderNumber} returned/cancelled — reversed ${so.vendorEarning} from ${vendor.storeName}`);
+    }
+  }
+}
+
 // Applies a status change, and keeps confirmedAt / wasMissed in sync so
 // Missed Orders + After Confirm Order can report on it later.
-async function applyStatusChange(order, newStatus) {
+async function applyStatusChange(order, newStatus, req, res) {
   const oldStatus = order.status;
   if (oldStatus === newStatus) return;
   if (oldStatus === 'pending' && Date.now() - order.createdAt.getTime() > 24 * 60 * 60 * 1000) {
@@ -288,6 +366,19 @@ async function applyStatusChange(order, newStatus) {
   }
   order.status = newStatus;
   pushActivity(order, `Status changed: ${statusLabel(oldStatus)} -> ${statusLabel(newStatus)}`);
+
+  // Multivendor settlement / reversal — see the two functions above for the
+  // full scope notes. Never let a problem here block the order status
+  // change itself from going through.
+  try {
+    if (newStatus === 'delivered') {
+      await settleVendorSubOrders(order, req, res);
+    } else if (newStatus === 'returned' || newStatus === 'cancelled') {
+      await reverseVendorSubOrders(order, req, res);
+    }
+  } catch (subOrderErr) {
+    console.error('[vendor-sub-order] settle/reverse failed for order', order.orderNumber, subOrderErr);
+  }
 }
 
 function parseIds(body) {
@@ -384,7 +475,7 @@ router.post('/orders/bulk-status', verifyCsrf, async (req, res, next) => {
     const status = req.body.status;
     if (ids.length && status) {
       const orders = await Order.find({ _id: { $in: ids } });
-      await Promise.all(orders.map(async (o) => { await applyStatusChange(o, status); await o.save(); }));
+      await Promise.all(orders.map(async (o) => { await applyStatusChange(o, status, req, res); await o.save(); }));
       req.flash('success', `Updated ${ids.length} order(s) to ${statusLabel(status)}.`);
     }
     res.redirect(req.get('Referer') || '/admin/orders');
@@ -1087,6 +1178,7 @@ router.get('/products', async (req, res, next) => {
       Product.find(filter)
         .populate('category')
         .populate('brand')
+        .populate('vendor')
         .sort({ createdAt: -1 })
         .skip((page - 1) * perPage)
         .limit(perPage),
@@ -1198,14 +1290,15 @@ router.get('/products/duplicate/:id', async (req, res, next) => {
 async function loadProductFormLookups(excludeId) {
   const productFilter = { status: true };
   if (excludeId) productFilter._id = { $ne: excludeId };
-  const [categories, brands, suppliers, allProducts, variantAttributes] = await Promise.all([
+  const [categories, brands, suppliers, allProducts, variantAttributes, vendors] = await Promise.all([
     Category.find().sort({ name: 1 }),
     Brand.find({ status: true }).sort({ name: 1 }),
     Supplier.find({ status: true }).sort({ name: 1 }),
     Product.find(productFilter).select('name image').sort({ name: 1 }),
     VariantAttribute.find({ status: true }).sort({ name: 1 }),
+    Vendor.find({ accountStatus: 'active' }).select('storeName').sort({ storeName: 1 }),
   ]);
-  return { categories, brands, suppliers, allProducts, variantAttributes };
+  return { categories, brands, suppliers, allProducts, variantAttributes, vendors };
 }
 
 router.get('/products/new', async (req, res, next) => {
@@ -1255,7 +1348,7 @@ async function saveProduct(req, res, next, existingId) {
     const existing = existingId ? await Product.findById(existingId) : null;
 
     const {
-      name, categoryId, brandId, supplierId, sku, slug: slugInput, tags: tagsInput,
+      name, categoryId, brandId, supplierId, vendorId, approvalStatus, sku, slug: slugInput, tags: tagsInput,
       videoEmbed, videoPosition,
       shortDescription, description,
       condition, availability, buyingPrice, weight,
@@ -1409,6 +1502,8 @@ async function saveProduct(req, res, next, existingId) {
       categories: additionalCategoryIds,
       brand: brandId || null,
       supplier: supplierId || null,
+      vendor: vendorId || null,
+      approvalStatus: ['approved', 'pending', 'rejected'].includes(approvalStatus) ? approvalStatus : 'approved',
       name: name.trim(),
       slug,
       sku: (sku || '').trim(),
@@ -2222,6 +2317,10 @@ router.get('/orders/:id', async (req, res, next) => {
       req.flash('danger', 'Order not found.');
       return res.redirect('/admin/orders');
     }
+    // Multivendor — which vendor(s), if any, had products in this order
+    // (see models/VendorSubOrder.js). An order with no vendor-owned items
+    // has none, and the Vendor Split card on the view just doesn't render.
+    const subOrders = await VendorSubOrder.find({ parentOrder: order._id }).populate('vendor', 'storeName');
     res.render('admin/order-view', {
       adminPageTitle: `Order #${order.orderNumber}`,
       order,
@@ -2230,6 +2329,7 @@ router.get('/orders/:id', async (req, res, next) => {
       COURIERS,
       DELIVERY_STATUSES,
       RETURN_STATUSES,
+      subOrders,
     });
   } catch (err) {
     next(err);
@@ -2246,7 +2346,7 @@ router.post('/orders/:id', verifyCsrf, async (req, res, next) => {
     const { status, paymentStatus, courier, courierTrackingId, assignedEmployee, adminNote } = req.body;
 
     if (status && status !== order.status) {
-      await applyStatusChange(order, status);
+      await applyStatusChange(order, status, req, res);
     }
     if (paymentStatus) order.paymentStatus = paymentStatus;
     order.courier = COURIERS.some((c) => c.value === courier) ? courier : '';
@@ -3946,7 +4046,7 @@ router.get('/security', async (req, res, next) => {
   try {
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const [failedLogins, loginHistory, blockedIps, admins, sessionsRaw, suspicious] = await Promise.all([
+    const [failedLogins, loginHistory, blockedIps, admins, sessionsRaw, suspicious, auditLogs] = await Promise.all([
       LoginLog.find({ status: 'failed', createdAt: { $gte: since } }).sort({ createdAt: -1 }).limit(30).lean(),
       LoginLog.find({ status: 'success', createdAt: { $gte: since } }).sort({ createdAt: -1 }).populate('admin', 'fullName username').limit(30).lean(),
       BlockedIp.find({}).sort({ createdAt: -1 }).populate('blockedBy', 'fullName username').lean(),
@@ -3960,6 +4060,10 @@ router.get('/security', async (req, res, next) => {
         { $match: { count: { $gte: 5 } } },
         { $sort: { count: -1 } },
       ]),
+      // Audit Log — HONEST SCOPE: only written from the new Vendor
+      // Management actions so far (models/AuditLog.js), not every admin
+      // route in this app.
+      AuditLog.find({}).sort({ createdAt: -1 }).limit(50).lean(),
     ]);
 
     // Active Sessions: parse each raw sessions-collection doc's JSON blob
@@ -3986,7 +4090,7 @@ router.get('/security', async (req, res, next) => {
 
     res.render('admin/security', {
       adminPageTitle: 'Security Dashboard',
-      failedLogins, loginHistory, blockedIps, admins, suspicious, activeSessions,
+      failedLogins, loginHistory, blockedIps, admins, suspicious, activeSessions, auditLogs,
     });
   } catch (err) {
     next(err);
@@ -5832,7 +5936,7 @@ async function saveBlogCategory(req, res, next, existingId) {
       return res.redirect('/admin/blog/categories');
     }
     const {
-      name, sortOrder, imageAlt,
+      name, slug: slugInput, sortOrder, imageAlt,
       pageTitle, shortDescription, description,
       metaTitle, metaKeywords, metaDescription,
       publishStatus, publishAt,
@@ -5900,12 +6004,13 @@ async function saveBlogCategory(req, res, next, existingId) {
       metaDescription: (metaDescription || '').trim(),
     };
 
+    const baseSlug = slugify((slugInput && slugInput.trim()) || name);
     if (existing) {
-      data.slug = await ensureUniqueSlug(BlogCategory, slugify(name), existingId);
+      data.slug = await ensureUniqueSlug(BlogCategory, baseSlug, existingId);
       await BlogCategory.updateOne({ _id: existingId }, data);
       req.flash('success', 'Blog category updated successfully.');
     } else {
-      data.slug = await ensureUniqueSlug(BlogCategory, slugify(name), null);
+      data.slug = await ensureUniqueSlug(BlogCategory, baseSlug, null);
       await BlogCategory.create(data);
       req.flash('success', 'New blog category added successfully.');
     }
@@ -5933,6 +6038,298 @@ router.get('/blog/categories/delete/:id', async (req, res, next) => {
     await BlogCategory.deleteOne({ _id: req.params.id });
     req.flash('success', 'Blog category deleted successfully.');
     res.redirect('/admin/blog/categories');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
+   VENDOR MANAGEMENT (Admin > Vendors) — multivendor marketplace layer.
+   See models/Vendor.js / VendorWalletTransaction.js / VendorWithdrawal.js
+   for the data shape and honest scope notes (no automatic order-earning
+   crediting yet — that needs Parent Order + Vendor Sub-order splitting,
+   which is deliberately not part of this pass since it touches the live
+   checkout flow).
+   ===================================================================== */
+
+// Small helper so every sensitive vendor action leaves a trace at
+// Admin > Security > Audit Log (models/AuditLog.js). Never lets a logging
+// failure break the actual action it's recording.
+async function logAudit(req, res, action, targetType, targetId, details) {
+  try {
+    const admin = res.locals.currentAdmin;
+    await AuditLog.create({
+      admin: admin ? admin._id : null,
+      adminName: admin ? (admin.fullName || admin.username) : '',
+      action,
+      targetType,
+      targetId,
+      details,
+      ip: req.ip,
+    });
+  } catch (err) {
+    console.error('[audit-log]', err);
+  }
+}
+
+router.get('/vendors', async (req, res, next) => {
+  try {
+    const { status, kyc, q } = req.query;
+    const filter = {};
+    if (status && ['pending', 'active', 'suspended', 'rejected'].includes(status)) filter.accountStatus = status;
+    if (kyc && ['pending', 'approved', 'rejected'].includes(kyc)) filter.kycStatus = kyc;
+    if (q && q.trim()) {
+      const re = new RegExp(q.trim(), 'i');
+      filter.$or = [{ storeName: re }, { ownerName: re }, { email: re }];
+    }
+    const vendors = await Vendor.find(filter).sort({ createdAt: -1 });
+    const pendingWithdrawalCount = await VendorWithdrawal.countDocuments({ status: 'pending' });
+    res.render('admin/vendors', {
+      adminPageTitle: 'Vendors', vendors, pendingWithdrawalCount,
+      filterStatus: status || '', filterKyc: kyc || '', q: q || '',
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/vendors/withdrawals', async (req, res, next) => {
+  try {
+    const { status } = req.query;
+    const filter = {};
+    if (status && ['pending', 'approved', 'rejected'].includes(status)) filter.status = status;
+    const withdrawals = await VendorWithdrawal.find(filter).populate('vendor').sort({ createdAt: -1 });
+    res.render('admin/vendor-withdrawals', { adminPageTitle: 'Vendor Withdrawal Requests', withdrawals, filterStatus: status || '' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/withdrawals/:id/approve', verifyCsrf, async (req, res, next) => {
+  try {
+    const wd = await VendorWithdrawal.findById(req.params.id);
+    if (!wd || wd.status !== 'pending') {
+      req.flash('danger', 'Request not found or already processed.');
+      return res.redirect('/admin/vendors/withdrawals');
+    }
+    const vendor = await Vendor.findById(wd.vendor);
+    if (!vendor || wd.amount > vendor.walletBalance) {
+      req.flash('danger', "Vendor's wallet balance is no longer enough to cover this withdrawal.");
+      return res.redirect('/admin/vendors/withdrawals');
+    }
+    const newBalance = vendor.walletBalance - wd.amount;
+    await VendorWalletTransaction.create({
+      vendor: vendor._id, type: 'withdrawal', amount: -wd.amount, balanceAfter: newBalance,
+      withdrawal: wd._id, note: `Withdrawal via ${wd.method}`, createdBy: req.session.adminId,
+    });
+    await Vendor.updateOne({ _id: vendor._id }, { walletBalance: newBalance });
+    wd.status = 'approved';
+    wd.processedAt = new Date();
+    wd.processedBy = req.session.adminId;
+    await wd.save();
+    await logAudit(req, res, 'vendor.withdrawal_approved', 'VendorWithdrawal', wd._id, `Approved ${wd.amount} for ${vendor.storeName}`);
+    req.flash('success', 'Withdrawal approved and wallet updated.');
+    res.redirect('/admin/vendors/withdrawals');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/withdrawals/:id/reject', verifyCsrf, async (req, res, next) => {
+  try {
+    const wd = await VendorWithdrawal.findById(req.params.id);
+    if (!wd || wd.status !== 'pending') {
+      req.flash('danger', 'Request not found or already processed.');
+      return res.redirect('/admin/vendors/withdrawals');
+    }
+    wd.status = 'rejected';
+    wd.rejectionReason = (req.body.reason || '').trim();
+    wd.processedAt = new Date();
+    wd.processedBy = req.session.adminId;
+    await wd.save();
+    await logAudit(req, res, 'vendor.withdrawal_rejected', 'VendorWithdrawal', wd._id, wd.rejectionReason);
+    req.flash('success', 'Withdrawal request rejected.');
+    res.redirect('/admin/vendors/withdrawals');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/vendors/:id', async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) {
+      req.flash('danger', 'Vendor not found.');
+      return res.redirect('/admin/vendors');
+    }
+    const [productCount, transactions, withdrawals, subOrders] = await Promise.all([
+      Product.countDocuments({ vendor: vendor._id }),
+      VendorWalletTransaction.find({ vendor: vendor._id }).sort({ createdAt: -1 }).limit(50),
+      VendorWithdrawal.find({ vendor: vendor._id }).sort({ createdAt: -1 }).limit(50),
+      VendorSubOrder.find({ vendor: vendor._id }).sort({ createdAt: -1 }).limit(50),
+    ]);
+    res.render('admin/vendor-view', { adminPageTitle: vendor.storeName, vendor, productCount, transactions, withdrawals, subOrders });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/:id/kyc-approve', verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) { req.flash('danger', 'Vendor not found.'); return res.redirect('/admin/vendors'); }
+    vendor.kycStatus = 'approved';
+    vendor.kycRejectionReason = '';
+    await vendor.save();
+    await logAudit(req, res, 'vendor.kyc_approved', 'Vendor', vendor._id, `KYC approved for ${vendor.storeName}`);
+    req.flash('success', 'KYC approved.');
+    res.redirect(`/admin/vendors/${vendor._id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/:id/kyc-reject', verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) { req.flash('danger', 'Vendor not found.'); return res.redirect('/admin/vendors'); }
+    vendor.kycStatus = 'rejected';
+    vendor.kycRejectionReason = (req.body.reason || '').trim();
+    await vendor.save();
+    await logAudit(req, res, 'vendor.kyc_rejected', 'Vendor', vendor._id, vendor.kycRejectionReason);
+    req.flash('success', 'KYC rejected.');
+    res.redirect(`/admin/vendors/${vendor._id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/:id/approve', verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) { req.flash('danger', 'Vendor not found.'); return res.redirect('/admin/vendors'); }
+    vendor.accountStatus = 'active';
+    vendor.rejectionReason = '';
+    vendor.approvedAt = new Date();
+    await vendor.save();
+    await logAudit(req, res, 'vendor.approved', 'Vendor', vendor._id, `Store approved and made live: ${vendor.storeName}`);
+    req.flash('success', 'Vendor approved — their store is now live.');
+    res.redirect(`/admin/vendors/${vendor._id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/:id/reject', verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) { req.flash('danger', 'Vendor not found.'); return res.redirect('/admin/vendors'); }
+    vendor.accountStatus = 'rejected';
+    vendor.rejectionReason = (req.body.reason || '').trim();
+    await vendor.save();
+    await logAudit(req, res, 'vendor.rejected', 'Vendor', vendor._id, vendor.rejectionReason);
+    req.flash('success', 'Vendor rejected.');
+    res.redirect(`/admin/vendors/${vendor._id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/:id/suspend', verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) { req.flash('danger', 'Vendor not found.'); return res.redirect('/admin/vendors'); }
+    vendor.accountStatus = 'suspended';
+    vendor.suspendedAt = new Date();
+    await vendor.save();
+    await logAudit(req, res, 'vendor.suspended', 'Vendor', vendor._id, `Suspended: ${vendor.storeName}`);
+    req.flash('success', 'Vendor suspended — their store is no longer visible on the site.');
+    res.redirect(`/admin/vendors/${vendor._id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/:id/reactivate', verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) { req.flash('danger', 'Vendor not found.'); return res.redirect('/admin/vendors'); }
+    vendor.accountStatus = 'active';
+    vendor.suspendedAt = null;
+    await vendor.save();
+    await logAudit(req, res, 'vendor.reactivated', 'Vendor', vendor._id, `Reactivated: ${vendor.storeName}`);
+    req.flash('success', 'Vendor reactivated.');
+    res.redirect(`/admin/vendors/${vendor._id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/:id/commission', verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) { req.flash('danger', 'Vendor not found.'); return res.redirect('/admin/vendors'); }
+    const pct = parseFloat(req.body.commissionPercent);
+    if (Number.isNaN(pct) || pct < 0 || pct > 100) {
+      req.flash('danger', 'Commission must be a number between 0 and 100.');
+      return res.redirect(`/admin/vendors/${vendor._id}`);
+    }
+    const oldPct = vendor.commissionPercent;
+    vendor.commissionPercent = pct;
+    await vendor.save();
+    await logAudit(req, res, 'vendor.commission_changed', 'Vendor', vendor._id, `Commission changed from ${oldPct}% to ${pct}% for ${vendor.storeName}`);
+    req.flash('success', 'Commission rate updated.');
+    res.redirect(`/admin/vendors/${vendor._id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendors/:id/wallet-adjustment', verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) { req.flash('danger', 'Vendor not found.'); return res.redirect('/admin/vendors'); }
+    const { direction, amount, note } = req.body;
+    const amountNum = parseFloat(amount);
+    if (!amountNum || amountNum <= 0) {
+      req.flash('danger', 'Enter a valid amount.');
+      return res.redirect(`/admin/vendors/${vendor._id}`);
+    }
+    const signedAmount = direction === 'debit' ? -amountNum : amountNum;
+    const newBalance = vendor.walletBalance + signedAmount;
+    if (newBalance < 0) {
+      req.flash('danger', "This debit would take the vendor's wallet balance below zero.");
+      return res.redirect(`/admin/vendors/${vendor._id}`);
+    }
+    await VendorWalletTransaction.create({
+      vendor: vendor._id, type: 'adjustment', amount: signedAmount, balanceAfter: newBalance,
+      note: (note || '').trim(), createdBy: req.session.adminId,
+    });
+    await Vendor.updateOne({ _id: vendor._id }, { walletBalance: newBalance });
+    await logAudit(req, res, 'vendor.wallet_adjustment', 'Vendor', vendor._id, `${direction === 'debit' ? 'Debited' : 'Credited'} ${amountNum} — ${(note || '').trim()}`);
+    req.flash('success', 'Wallet adjusted.');
+    res.redirect(`/admin/vendors/${vendor._id}`);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Resolve a vendor's dispute over a reversed sub-order (see
+// models/VendorSubOrder.js and /vendor/orders/:id/dispute in
+// routes/store.js). This only closes the dispute with a note — it does
+// NOT automatically re-credit the vendor. If the dispute turns out to be
+// valid, use the existing Wallet Adjustment form above for that, same as
+// any other manual correction.
+router.post('/vendors/sub-orders/:id/resolve-dispute', verifyCsrf, async (req, res, next) => {
+  try {
+    const subOrder = await VendorSubOrder.findById(req.params.id).populate('vendor', 'storeName');
+    if (!subOrder) { req.flash('danger', 'Sub-order not found.'); return res.redirect('/admin/vendors'); }
+    subOrder.disputeStatus = 'resolved';
+    subOrder.disputeResolutionNote = (req.body.resolutionNote || '').trim();
+    await subOrder.save();
+    await logAudit(req, res, 'vendor.suborder.dispute_resolved', 'VendorSubOrder', subOrder._id, `Order ${subOrder.orderNumber} — ${subOrder.disputeResolutionNote}`);
+    req.flash('success', 'Dispute marked resolved.');
+    res.redirect(`/admin/vendors/${subOrder.vendor._id}`);
   } catch (err) {
     next(err);
   }

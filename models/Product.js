@@ -30,6 +30,20 @@ const productSchema = new mongoose.Schema(
     categories: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Category' }],
     brand: { type: mongoose.Schema.Types.ObjectId, ref: 'Brand', default: null },
     supplier: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier', default: null },
+    // Multivendor ownership — null (the default, and every product that
+    // existed before this field was added) means the product is the
+    // platform's own, exactly as before. A non-null value means an Admin
+    // has assigned this product to that Vendor (models/Vendor.js) from
+    // Admin > Products > (product) > Vendor. HONEST SCOPE: there is not
+    // yet a vendor-facing "add my own product" form — only an Admin can
+    // make this assignment today. `approvalStatus` IS genuinely enforced
+    // on the storefront's general listing pages (see PRODUCT_VISIBLE_OR
+    // in routes/store.js — merged into the home/category/search product
+    // queries) and on the vendor's own /store/:slug page, but NOT on
+    // cart/buy-now/checkout product lookups, which act on a product the
+    // customer already added by its known _id.
+    vendor: { type: mongoose.Schema.Types.ObjectId, ref: 'Vendor', default: null },
+    approvalStatus: { type: String, enum: ['approved', 'pending', 'rejected'], default: 'approved' },
 
     name: { type: String, required: true, trim: true },
     slug: { type: String, required: true, unique: true, index: true },

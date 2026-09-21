@@ -1,0 +1,62 @@
+<%
+  const ogImage = vendor.storeBanner ? (baseUrl + productImageUrl(vendor.storeBanner)) : '';
+%>
+<%- include('partials/header', { ogImage }) %>
+
+<% if (vendor.storeBanner) { %>
+  <img src="<%= productImageUrl(vendor.storeBanner) %>" alt="<%= vendor.storeName %>" style="width:100%;max-height:260px;object-fit:cover;">
+<% } %>
+
+<div class="container py-4">
+  <nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">হোম</a></li>
+      <li class="breadcrumb-item active"><%= vendor.storeName %></li>
+    </ol>
+  </nav>
+
+  <div class="d-flex align-items-center gap-3 mb-3">
+    <% if (vendor.storeLogo) { %>
+      <img src="<%= productImageUrl(vendor.storeLogo) %>" alt="<%= vendor.storeName %>" style="width:64px;height:64px;object-fit:cover;border-radius:50%;">
+    <% } %>
+    <div>
+      <h2 class="mb-0"><%= vendor.storeName %></h2>
+      <% if (vendor.storeDescription) { %><p class="text-muted mb-0"><%= vendor.storeDescription %></p><% } %>
+    </div>
+  </div>
+
+  <% if (!products.length) { %>
+    <div class="alert alert-info">এই দোকানে এখনো কোনো প্রোডাক্ট নেই।</div>
+  <% } else { %>
+    <div class="row g-4">
+      <% products.forEach(function (p) { %>
+        <div class="col-6 col-md-4 col-lg-3">
+          <a href="/product/<%= p.slug %>" class="text-decoration-none">
+            <div class="product-card h-100">
+              <div class="product-card-img">
+                <img src="<%= p.image ? productImageUrl(p.image) : '/images/product-placeholder.svg' %>" alt="<%= p.imageAlt || p.name %>">
+              </div>
+              <div class="product-card-body">
+                <div class="product-title"><%= p.name %></div>
+                <div class="price-now"><%= currency(p.salePrice || p.price) %></div>
+              </div>
+            </div>
+          </a>
+        </div>
+      <% }); %>
+    </div>
+
+    <% if (totalPages > 1) { %>
+      <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+          <% for (let i = 1; i <= totalPages; i++) { %>
+            <li class="page-item <%= i === page ? 'active' : '' %>">
+              <a class="page-link" href="/store/<%= vendor.slug %>?page=<%= i %>"><%= i %></a>
+            </li>
+          <% } %>
+        </ul>
+      </nav>
+    <% } %>
+  <% } %>
+</div>
+<%- include('partials/footer') %>

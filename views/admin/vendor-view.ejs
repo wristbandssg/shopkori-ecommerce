@@ -1,0 +1,216 @@
+<%- include('partials/admin-header') %>
+<%
+  const accountBadge = { pending: ['secondary', 'Pending'], active: ['success', 'Active'], suspended: ['danger', 'Suspended'], rejected: ['dark', 'Rejected'] };
+  const kycBadge = { pending: ['secondary', 'Pending'], approved: ['success', 'Approved'], rejected: ['danger', 'Rejected'] };
+  const typeLabel = { order_earning: 'Order Earning', commission_deduction: 'Commission Deduction', withdrawal: 'Withdrawal', refund_deduction: 'Refund Deduction', adjustment: 'Adjustment' };
+  const wStatusBadge = { pending: ['secondary', 'Pending'], approved: ['success', 'Approved'], rejected: ['danger', 'Rejected'] };
+%>
+
+<div class="admin-card mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h4 class="mb-1"><i class="bi bi-shop text-brand"></i> <%= vendor.storeName %></h4>
+      <span class="badge bg-<%= accountBadge[vendor.accountStatus][0] %>">Account: <%= accountBadge[vendor.accountStatus][1] %></span>
+      <span class="badge bg-<%= kycBadge[vendor.kycStatus][0] %>">KYC: <%= kycBadge[vendor.kycStatus][1] %></span>
+    </div>
+    <a href="/admin/vendors" class="btn btn-outline-secondary">Back to Vendors</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="admin-card mb-3">
+      <h5>Profile</h5>
+      <table class="table table-sm">
+        <tr><th style="width:180px;">Owner</th><td><%= vendor.ownerName %></td></tr>
+        <tr><th>Email</th><td><%= vendor.email %></td></tr>
+        <tr><th>Phone</th><td><%= vendor.phone || '—' %></td></tr>
+        <tr><th>Address</th><td><%= vendor.address || '—' %></td></tr>
+        <tr><th>Store URL</th><td><a href="/store/<%= vendor.slug %>" target="_blank">/store/<%= vendor.slug %></a></td></tr>
+        <tr><th>Products</th><td><%= productCount %></td></tr>
+        <tr><th>Registered</th><td><%= new Date(vendor.createdAt).toLocaleDateString('en-GB') %></td></tr>
+      </table>
+    </div>
+
+    <div class="admin-card mb-3">
+      <h5>KYC Documents</h5>
+      <table class="table table-sm">
+        <tr><th style="width:180px;">NID Number</th><td><%= vendor.kyc.nidNumber || '—' %></td></tr>
+        <tr><th>NID Document</th><td><% if (vendor.kyc.nidDocument) { %><a href="<%= productImageUrl(vendor.kyc.nidDocument) %>" target="_blank"><img src="<%= productImageUrl(vendor.kyc.nidDocument) %>" class="admin-thumb"></a><% } else { %>Not submitted<% } %></td></tr>
+        <tr><th>Trade License Number</th><td><%= vendor.kyc.tradeLicenseNumber || '—' %></td></tr>
+        <tr><th>Trade License Document</th><td><% if (vendor.kyc.tradeLicenseDocument) { %><a href="<%= productImageUrl(vendor.kyc.tradeLicenseDocument) %>" target="_blank"><img src="<%= productImageUrl(vendor.kyc.tradeLicenseDocument) %>" class="admin-thumb"></a><% } else { %>Not submitted<% } %></td></tr>
+        <tr><th>Bank Account</th><td><%= vendor.kyc.bankAccountName || '—' %> <% if (vendor.kyc.bankAccountNumber) { %>(<%= vendor.kyc.bankAccountNumber %>, <%= vendor.kyc.bankName %>)<% } %></td></tr>
+        <tr><th>Submitted</th><td><%= vendor.kyc.submittedAt ? new Date(vendor.kyc.submittedAt).toLocaleString('en-GB') : '—' %></td></tr>
+      </table>
+
+      <% if (vendor.kycStatus !== 'approved') { %>
+        <form method="post" action="/admin/vendors/<%= vendor._id %>/kyc-approve" class="d-inline">
+          <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+          <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check2"></i> Approve KYC</button>
+        </form>
+      <% } %>
+      <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#kycRejectModal"><i class="bi bi-x"></i> Reject KYC</button>
+      <div class="modal fade" id="kycRejectModal" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content">
+          <form method="post" action="/admin/vendors/<%= vendor._id %>/kyc-reject">
+            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+            <div class="modal-header"><h5 class="modal-title">Reject KYC</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body"><label class="form-label">Reason</label><textarea name="reason" class="form-control" rows="3" required></textarea></div>
+            <div class="modal-footer"><button type="submit" class="btn btn-danger">Reject</button></div>
+          </form>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="admin-card mb-3">
+      <h5>Recent Wallet Transactions</h5>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Balance After</th><th>Note</th></tr></thead>
+          <tbody>
+            <% transactions.forEach(function (t) { %>
+              <tr>
+                <td><%= new Date(t.createdAt).toLocaleDateString('en-GB') %></td>
+                <td><%= typeLabel[t.type] || t.type %></td>
+                <td class="<%= t.amount < 0 ? 'text-danger' : 'text-success' %>"><%= t.amount < 0 ? '-' : '+' %><%= currency(Math.abs(t.amount)) %></td>
+                <td><%= currency(t.balanceAfter) %></td>
+                <td><small class="text-muted"><%= t.note %></small></td>
+              </tr>
+            <% }); %>
+            <% if (!transactions.length) { %><tr><td colspan="5" class="text-center text-muted">No transactions yet.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="admin-card">
+      <h5>Withdrawal Requests</h5>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Status</th></tr></thead>
+          <tbody>
+            <% withdrawals.forEach(function (w) { %>
+              <tr>
+                <td><%= new Date(w.createdAt).toLocaleDateString('en-GB') %></td>
+                <td><%= currency(w.amount) %></td>
+                <td><%= w.method %></td>
+                <td><span class="badge bg-<%= wStatusBadge[w.status][0] %>"><%= wStatusBadge[w.status][1] %></span></td>
+              </tr>
+            <% }); %>
+            <% if (!withdrawals.length) { %><tr><td colspan="4" class="text-center text-muted">No withdrawal requests.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+      <a href="/admin/vendors/withdrawals" class="btn btn-sm btn-outline-secondary">Manage all withdrawal requests &rarr;</a>
+    </div>
+
+    <% if (typeof subOrders !== 'undefined') { %>
+      <%
+        const settleBadge = { pending: ['secondary', 'Pending'], settled: ['success', 'Settled'], reversed: ['danger', 'Reversed'], cancelled: ['dark', 'Cancelled'] };
+      %>
+      <div class="admin-card mt-3">
+        <h5>Sub-orders</h5>
+        <p class="form-text mt-0">Orders that included this vendor's products (Parent Order + Vendor Sub-order). Earning settles to the wallet on delivery, and reverses if the order is later returned/cancelled.</p>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead><tr><th>Order</th><th>Subtotal</th><th>Earning</th><th>Status</th><th>Dispute</th></tr></thead>
+            <tbody>
+              <% subOrders.forEach(function (so) { %>
+                <tr>
+                  <td><a href="/admin/orders/<%= so.parentOrder %>"><%= so.orderNumber %></a></td>
+                  <td><%= currency(so.subtotal) %></td>
+                  <td><%= currency(so.vendorEarning) %></td>
+                  <td><span class="badge bg-<%= settleBadge[so.settlementStatus][0] %>"><%= settleBadge[so.settlementStatus][1] %></span></td>
+                  <td>
+                    <% if (so.disputeStatus === 'vendor_disputed') { %>
+                      <div class="small mb-1">"<%= so.disputeNote %>"</div>
+                      <form method="post" action="/admin/vendors/sub-orders/<%= so._id %>/resolve-dispute" class="d-flex gap-1">
+                        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                        <input type="text" name="resolutionNote" class="form-control form-control-sm" placeholder="Resolution note">
+                        <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">Resolve</button>
+                      </form>
+                    <% } else if (so.disputeStatus === 'resolved') { %>
+                      <span class="badge bg-light text-dark border">Resolved</span>
+                      <% if (so.disputeResolutionNote) { %><div class="small text-muted">"<%= so.disputeResolutionNote %>"</div><% } %>
+                    <% } else { %>
+                      <span class="text-muted small">—</span>
+                    <% } %>
+                  </td>
+                </tr>
+              <% }); %>
+              <% if (!subOrders.length) { %><tr><td colspan="5" class="text-center text-muted">No sub-orders yet.</td></tr><% } %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="admin-card mb-3">
+      <h5>Account Actions</h5>
+      <div class="d-grid gap-2">
+        <% if (vendor.accountStatus === 'pending') { %>
+          <form method="post" action="/admin/vendors/<%= vendor._id %>/approve">
+            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-success w-100"><i class="bi bi-check2-circle"></i> Approve — make store live</button>
+          </form>
+          <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#acctRejectModal">Reject</button>
+        <% } else if (vendor.accountStatus === 'active') { %>
+          <form method="post" action="/admin/vendors/<%= vendor._id %>/suspend" class="js-confirm" data-confirm="Suspend this vendor? Their store page will stop showing on the site.">
+            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-pause-circle"></i> Suspend</button>
+          </form>
+        <% } else if (vendor.accountStatus === 'suspended') { %>
+          <form method="post" action="/admin/vendors/<%= vendor._id %>/reactivate">
+            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-success w-100"><i class="bi bi-play-circle"></i> Reactivate</button>
+          </form>
+        <% } else if (vendor.accountStatus === 'rejected') { %>
+          <form method="post" action="/admin/vendors/<%= vendor._id %>/approve">
+            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+            <button type="submit" class="btn btn-success w-100"><i class="bi bi-check2-circle"></i> Approve anyway</button>
+          </form>
+          <p class="text-muted small mb-0">Rejection reason: <%= vendor.rejectionReason || '—' %></p>
+        <% } %>
+      </div>
+      <div class="modal fade" id="acctRejectModal" tabindex="-1">
+        <div class="modal-dialog"><div class="modal-content">
+          <form method="post" action="/admin/vendors/<%= vendor._id %>/reject">
+            <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+            <div class="modal-header"><h5 class="modal-title">Reject Vendor</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-body"><label class="form-label">Reason</label><textarea name="reason" class="form-control" rows="3" required></textarea></div>
+            <div class="modal-footer"><button type="submit" class="btn btn-danger">Reject</button></div>
+          </form>
+        </div></div>
+      </div>
+    </div>
+
+    <div class="admin-card mb-3">
+      <h5>Commission Rate</h5>
+      <form method="post" action="/admin/vendors/<%= vendor._id %>/commission" class="row g-2">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="col-8"><input type="number" name="commissionPercent" class="form-control" min="0" max="100" step="0.01" value="<%= vendor.commissionPercent %>"></div>
+        <div class="col-4"><button type="submit" class="btn btn-brand w-100">Save</button></div>
+      </form>
+    </div>
+
+    <div class="admin-card">
+      <h5>Wallet — <%= currency(vendor.walletBalance) %></h5>
+      <form method="post" action="/admin/vendors/<%= vendor._id %>/wallet-adjustment">
+        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+        <div class="mb-2">
+          <select name="direction" class="form-select">
+            <option value="credit">Credit (add to wallet)</option>
+            <option value="debit">Debit (deduct from wallet)</option>
+          </select>
+        </div>
+        <div class="mb-2"><input type="number" name="amount" class="form-control" placeholder="Amount" min="0.01" step="0.01" required></div>
+        <div class="mb-2"><input type="text" name="note" class="form-control" placeholder="Note (why this adjustment)" required></div>
+        <button type="submit" class="btn btn-outline-secondary w-100">Apply Adjustment</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

@@ -1,0 +1,67 @@
+<%- include('partials/admin-header') %>
+<%
+  const accountBadge = { pending: ['secondary', 'Pending'], active: ['success', 'Active'], suspended: ['danger', 'Suspended'], rejected: ['dark', 'Rejected'] };
+  const kycBadge = { pending: ['secondary', 'Pending'], approved: ['success', 'Approved'], rejected: ['danger', 'Rejected'] };
+%>
+
+<div class="admin-card mb-3">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <h4 class="mb-0"><i class="bi bi-shop text-brand"></i> Vendors</h4>
+    <a href="/admin/vendors/withdrawals" class="btn btn-outline-secondary">
+      Withdrawal Requests <% if (pendingWithdrawalCount) { %><span class="badge bg-warning text-dark"><%= pendingWithdrawalCount %></span><% } %>
+    </a>
+  </div>
+</div>
+
+<div class="admin-card mb-3">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-md-4">
+      <label class="form-label mb-1">Search</label>
+      <input type="text" name="q" class="form-control" value="<%= q %>" placeholder="Store name, owner, email">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label mb-1">Account Status</label>
+      <select name="status" class="form-select">
+        <option value="">-- All --</option>
+        <% ['pending', 'active', 'suspended', 'rejected'].forEach(function (s) { %>
+          <option value="<%= s %>" <%= filterStatus === s ? 'selected' : '' %>><%= s %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label mb-1">KYC Status</label>
+      <select name="kyc" class="form-select">
+        <option value="">-- All --</option>
+        <% ['pending', 'approved', 'rejected'].forEach(function (s) { %>
+          <option value="<%= s %>" <%= filterKyc === s ? 'selected' : '' %>><%= s %></option>
+        <% }); %>
+      </select>
+    </div>
+    <div class="col-md-2"><button type="submit" class="btn btn-brand w-100">Filter</button></div>
+  </form>
+</div>
+
+<div class="admin-card">
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Store</th><th>Owner</th><th>Email</th><th>Commission</th><th>Wallet</th><th>KYC</th><th>Account</th><th>Action</th></tr></thead>
+      <tbody>
+        <% vendors.forEach(function (v) { %>
+          <tr>
+            <td><%= v.storeName %></td>
+            <td><%= v.ownerName %></td>
+            <td><%= v.email %></td>
+            <td><%= v.commissionPercent %>%</td>
+            <td><%= currency(v.walletBalance) %></td>
+            <td><span class="badge bg-<%= kycBadge[v.kycStatus][0] %>"><%= kycBadge[v.kycStatus][1] %></span></td>
+            <td><span class="badge bg-<%= accountBadge[v.accountStatus][0] %>"><%= accountBadge[v.accountStatus][1] %></span></td>
+            <td><a href="/admin/vendors/<%= v._id %>" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i> View</a></td>
+          </tr>
+        <% }); %>
+        <% if (!vendors.length) { %><tr><td colspan="8" class="text-center text-muted">No vendors yet.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<%- include('partials/admin-footer') %>

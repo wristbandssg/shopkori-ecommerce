@@ -13,19 +13,37 @@ const Page = require('../models/Page');
 const CustomPage = require('../models/CustomPage');
 const BlogPost = require('../models/BlogPost');
 const BlogCategory = require('../models/BlogCategory');
+const Vendor = require('../models/Vendor');
+const VendorWalletTransaction = require('../models/VendorWalletTransaction');
+const VendorWithdrawal = require('../models/VendorWithdrawal');
+const VendorSubOrder = require('../models/VendorSubOrder');
 const { getSettings, setSetting: setSiteSetting } = require('../models/Setting');
 const { getOrderSettings } = require('../models/OrderSetting');
 
 const storeLocals = require('../middleware/storeLocals');
 const trackPageView = require('../middleware/trackPageView');
-const { requireCustomerLogin } = require('../middleware/auth');
+const { requireCustomerLogin, requireVendorLogin } = require('../middleware/auth');
 const { verifyCsrf } = require('../middleware/csrf');
 const cart = require('../middleware/cart');
-const { generateOrderNumber } = require('../middleware/helpers');
+const upload = require('../middleware/upload');
+const { generateOrderNumber, slugify, ensureUniqueSlug } = require('../middleware/helpers');
 const sslcommerz = require('../lib/sslcommerz');
 
 router.use(storeLocals);
 router.use(trackPageView);
+
+// A product is publicly visible either because it's the platform's own
+// (vendor: null — every product that existed before Vendor Ownership was
+// added, and any product an Admin hasn't assigned to a vendor) or because
+// it's vendor-owned AND an Admin has approved it (Product.approvalStatus
+// === 'approved'). Merge this into a product `$or` visibility check
+// wherever real storefront traffic browses a general listing (home,
+// category, search) — see models/Product.js's `vendor`/`approvalStatus`
+// fields for the full multivendor scope notes. Not retrofitted onto
+// cart/checkout/buy-now product lookups (those act on a product the
+// customer already added by its known _id, and touching checkout code
+// for this is a separate, higher-risk change).
+const PRODUCT_VISIBLE_OR = [{ vendor: null }, { approvalStatus: 'approved' }];
 
 /* =====================================================================
    ORDER SETTING enforcement (Admin > Orders > Order Setting)
@@ -253,10 +271,13 @@ router.get('/robots.txt', (req, res) => {
    ===================================================================== */
 router.get('/', async (req, res, next) => {
   try {
+    // A vendor-owned product only shows here once approved (see
+    // PRODUCT_VISIBLE_OR, top of this file) — a platform product
+    // (vendor: null) is unaffected, exactly as before this field existed.
     const [featured, flashSale, newArrivals, categories] = await Promise.all([
-      Product.find({ status: true, isFeatured: true }).sort({ createdAt: -1 }).limit(8),
-      Product.find({ status: true, isFlashSale: true }).sort({ createdAt: -1 }).limit(8),
-      Product.find({ status: true }).sort({ createdAt: -1 }).limit(8),
+      Product.find({ status: true, isFeatured: true, $or: PRODUCT_VISIBLE_OR }).sort({ createdAt: -1 }).limit(8),
+      Product.find({ status: true, isFlashSale: true, $or: PRODUCT_VISIBLE_OR }).sort({ createdAt: -1 }).limit(8),
+      Product.find({ status: true, $or: PRODUCT_VISIBLE_OR }).sort({ createdAt: -1 }).limit(8),
       Category.find({ status: true }).sort({ sortOrder: 1 }).limit(12),
     ]);
     res.render('index', { pageTitle: 'হোম', featured, flashSale, newArrivals, categories });
@@ -289,8 +310,18 @@ router.get(['/category', '/category/:slug'], async (req, res, next) => {
 
     const filter = { status: true };
     // Match a product listed under this category either as its primary
-    // category, or as one of its additional/secondary categories.
-    if (category) filter.$or = [{ category: category._id }, { categories: category._id }];
+    // category, or as one of its additional/secondary categories — combined
+    // with PRODUCT_VISIBLE_OR via $and rather than a second top-level $or
+    // key, since Mongo would otherwise just let the second $or overwrite
+    // the first.
+    if (category) {
+      filter.$and = [
+        { $or: [{ category: category._id }, { categories: category._id }] },
+        { $or: PRODUCT_VISIBLE_OR },
+      ];
+    } else {
+      filter.$or = PRODUCT_VISIBLE_OR;
+    }
 
     const [total, products, allCategories] = await Promise.all([
       Product.countDocuments(filter),
@@ -668,6 +699,54 @@ router.post('/checkout', async (req, res, next) => {
       trackToken,
     });
 
+    // Parent Order + Vendor Sub-order (multivendor Phase 2): split this
+    // order's items by product.vendor into one VendorSubOrder per vendor
+    // involved. Nothing is credited to any wallet yet — that only happens
+    // once an Admin marks the order 'delivered' (see applyStatusChange() /
+    // settleVendorSubOrders() in routes/admin.js). Wrapped so a problem
+    // here never breaks checkout itself — the order the customer sees has
+    // already been created and stock already reserved by this point.
+    try {
+      const byVendor = new Map();
+      items.forEach((item) => {
+        const vendorId = item.product.vendor ? String(item.product.vendor) : null;
+        if (!vendorId) return;
+        if (!byVendor.has(vendorId)) byVendor.set(vendorId, []);
+        byVendor.get(vendorId).push(item);
+      });
+      if (byVendor.size) {
+        const vendorDocs = await Vendor.find({ _id: { $in: [...byVendor.keys()] } }).select('commissionPercent');
+        const vendorMap = new Map(vendorDocs.map((v) => [String(v._id), v]));
+        await Promise.all(
+          [...byVendor.entries()].map(([vendorId, vItems]) => {
+            const vendor = vendorMap.get(vendorId);
+            if (!vendor) return null; // vendor was deleted between product-assignment and checkout — skip rather than crash
+            const vSubtotal = vItems.reduce((sum, i) => sum + i.lineTotal, 0);
+            const commissionPercent = vendor.commissionPercent || 0;
+            const commissionAmount = Math.round(vSubtotal * (commissionPercent / 100) * 100) / 100;
+            const vendorEarning = Math.round((vSubtotal - commissionAmount) * 100) / 100;
+            return VendorSubOrder.create({
+              parentOrder: order._id,
+              orderNumber: order.orderNumber,
+              vendor: vendorId,
+              items: vItems.map((i) => ({
+                product: i.product._id,
+                productName: i.variantLabel ? `${i.product.name} (${i.variantLabel})` : i.product.name,
+                qty: i.qty,
+                lineTotal: i.lineTotal,
+              })),
+              subtotal: vSubtotal,
+              commissionPercent,
+              commissionAmount,
+              vendorEarning,
+            });
+          })
+        );
+      }
+    } catch (subOrderErr) {
+      console.error('[vendor-sub-order] failed to create sub-order(s) for order', order.orderNumber, subOrderErr);
+    }
+
     // Decrement stock — the variant's own stock when one was picked,
     // otherwise the product's base stock. When overselling is on for that
     // product, skip the clamp-to-zero step so it can legitimately go
@@ -920,6 +999,304 @@ router.post('/account', requireCustomerLogin, verifyCsrf, async (req, res, next)
 });
 
 /* =====================================================================
+   VENDOR — self-registration, KYC, login, dashboard, wallet, store page.
+   Session-based auth, same convention as Customer above (req.session.
+   vendorId instead of customerId). See models/Vendor.js for the account
+   shape and honest scope notes.
+   ===================================================================== */
+router.get('/vendor/register', (req, res) => {
+  if (req.session.vendorId) return res.redirect('/vendor/dashboard');
+  res.render('vendor-register', { pageTitle: 'ভেন্ডর হিসেবে যুক্ত হন', errors: [] });
+});
+
+router.post('/vendor/register', async (req, res, next) => {
+  try {
+    const { ownerName, storeName, email, phone, password, confirmPassword, address } = req.body;
+    const errors = [];
+    if (!ownerName || !ownerName.trim()) errors.push('আপনার নাম দিন।');
+    if (!storeName || !storeName.trim()) errors.push('দোকানের নাম দিন।');
+    if (!email || !email.trim()) errors.push('ইমেইল দিন।');
+    if (!password || password.length < 6) errors.push('পাসওয়ার্ড কমপক্ষে ৬ ক্যারেক্টার হতে হবে।');
+    if (password !== confirmPassword) errors.push('পাসওয়ার্ড দুটি মিলছে না।');
+
+    if (!errors.length) {
+      const existing = await Vendor.findOne({ email: (email || '').trim().toLowerCase() });
+      if (existing) errors.push('এই ইমেইল দিয়ে আগে থেকেই একটি ভেন্ডর অ্যাকাউন্ট আছে।');
+    }
+
+    if (errors.length) {
+      return res.render('vendor-register', { pageTitle: 'ভেন্ডর হিসেবে যুক্ত হন', errors, formData: req.body });
+    }
+
+    const settings = await getSettings();
+    const hashed = await bcrypt.hash(password, 10);
+    const slug = await ensureUniqueSlug(Vendor, slugify(storeName), null);
+    const vendor = await Vendor.create({
+      ownerName: ownerName.trim(),
+      storeName: storeName.trim(),
+      slug,
+      email: email.trim().toLowerCase(),
+      phone: (phone || '').trim(),
+      address: (address || '').trim(),
+      password: hashed,
+      commissionPercent: Number(settings.vendor_default_commission_percent) || 10,
+    });
+    req.session.vendorId = vendor._id;
+    req.flash('success', 'আপনার ভেন্ডর অ্যাকাউন্ট তৈরি হয়েছে। এখন আপনার KYC ডকুমেন্ট জমা দিন — অ্যাডমিন অনুমোদন করলে আপনার দোকান লাইভ হবে।');
+    res.redirect('/vendor/kyc');
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/vendor/login', (req, res) => {
+  if (req.session.vendorId) return res.redirect('/vendor/dashboard');
+  res.render('vendor-login', { pageTitle: 'ভেন্ডর লগইন', error: null });
+});
+
+router.post('/vendor/login', async (req, res, next) => {
+  try {
+    const { email, password } = req.body;
+    const vendor = await Vendor.findOne({ email: (email || '').trim().toLowerCase() });
+    if (vendor && (await bcrypt.compare(password || '', vendor.password))) {
+      req.session.vendorId = vendor._id;
+      return res.redirect('/vendor/dashboard');
+    }
+    res.render('vendor-login', { pageTitle: 'ভেন্ডর লগইন', error: 'ইমেইল অথবা পাসওয়ার্ড ভুল।' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/vendor/logout', (req, res) => {
+  delete req.session.vendorId;
+  res.redirect('/vendor/login');
+});
+
+router.get('/vendor/dashboard', requireVendorLogin, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.session.vendorId);
+    if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+    const productCount = await Product.countDocuments({ vendor: vendor._id });
+    res.render('vendor-dashboard', { pageTitle: 'ভেন্ডর ড্যাশবোর্ড', vendor, productCount });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.get('/vendor/kyc', requireVendorLogin, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.session.vendorId);
+    if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+    res.render('vendor-kyc', { pageTitle: 'KYC ভেরিফিকেশন', vendor, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/vendor/kyc',
+  requireVendorLogin,
+  upload.fields([{ name: 'nidDocument', maxCount: 1 }, { name: 'tradeLicenseDocument', maxCount: 1 }]),
+  verifyCsrf,
+  async (req, res, next) => {
+    try {
+      const vendor = await Vendor.findById(req.session.vendorId);
+      if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+
+      const {
+        nidNumber, tradeLicenseNumber,
+        bankAccountName, bankAccountNumber, bankName,
+      } = req.body;
+      const errors = [];
+      if (!nidNumber || !nidNumber.trim()) errors.push('NID নম্বর দিন।');
+      const files = req.files || {};
+      const nidFile = files.nidDocument && files.nidDocument[0];
+      const tradeFile = files.tradeLicenseDocument && files.tradeLicenseDocument[0];
+      if (!nidFile && !vendor.kyc.nidDocument) errors.push('NID-এর ছবি আপলোড করুন।');
+
+      if (errors.length) {
+        return res.render('vendor-kyc', { pageTitle: 'KYC ভেরিফিকেশন', vendor, errors });
+      }
+
+      vendor.kyc = {
+        nidNumber: (nidNumber || '').trim(),
+        nidDocument: nidFile ? nidFile.filename : vendor.kyc.nidDocument,
+        tradeLicenseNumber: (tradeLicenseNumber || '').trim(),
+        tradeLicenseDocument: tradeFile ? tradeFile.filename : vendor.kyc.tradeLicenseDocument,
+        bankAccountName: (bankAccountName || '').trim(),
+        bankAccountNumber: (bankAccountNumber || '').trim(),
+        bankName: (bankName || '').trim(),
+        submittedAt: new Date(),
+      };
+      // Re-submitting after a rejection puts it back in the review queue.
+      vendor.kycStatus = 'pending';
+      vendor.kycRejectionReason = '';
+      await vendor.save();
+      req.flash('success', 'আপনার KYC তথ্য জমা হয়েছে। অ্যাডমিন যাচাই করার পর জানানো হবে।');
+      res.redirect('/vendor/dashboard');
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get('/vendor/profile', requireVendorLogin, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.session.vendorId);
+    if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+    res.render('vendor-profile', { pageTitle: 'দোকানের তথ্য', vendor, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post(
+  '/vendor/profile',
+  requireVendorLogin,
+  upload.fields([{ name: 'storeLogo', maxCount: 1 }, { name: 'storeBanner', maxCount: 1 }]),
+  verifyCsrf,
+  async (req, res, next) => {
+    try {
+      const vendor = await Vendor.findById(req.session.vendorId);
+      if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+      const { ownerName, storeName, phone, address, storeDescription } = req.body;
+      if (!storeName || !storeName.trim()) {
+        return res.render('vendor-profile', { pageTitle: 'দোকানের তথ্য', vendor, errors: ['দোকানের নাম দিন।'] });
+      }
+      const files = req.files || {};
+      vendor.ownerName = (ownerName || vendor.ownerName).trim();
+      vendor.storeName = storeName.trim();
+      vendor.phone = (phone || '').trim();
+      vendor.address = (address || '').trim();
+      vendor.storeDescription = (storeDescription || '').trim();
+      if (files.storeLogo && files.storeLogo[0]) vendor.storeLogo = files.storeLogo[0].filename;
+      if (files.storeBanner && files.storeBanner[0]) vendor.storeBanner = files.storeBanner[0].filename;
+      await vendor.save();
+      req.flash('success', 'দোকানের তথ্য আপডেট হয়েছে।');
+      res.redirect('/vendor/profile');
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.get('/vendor/wallet', requireVendorLogin, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.session.vendorId);
+    if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+    const [transactions, withdrawals] = await Promise.all([
+      VendorWalletTransaction.find({ vendor: vendor._id }).sort({ createdAt: -1 }).limit(100),
+      VendorWithdrawal.find({ vendor: vendor._id }).sort({ createdAt: -1 }).limit(50),
+    ]);
+    res.render('vendor-wallet', { pageTitle: 'ওয়ালেট', vendor, transactions, withdrawals, errors: [] });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendor/wallet/withdraw', requireVendorLogin, verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.session.vendorId);
+    if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+    const { amount, method, methodDetails, note } = req.body;
+    const amountNum = parseFloat(amount);
+    const errors = [];
+    if (!amountNum || amountNum <= 0) errors.push('সঠিক পরিমাণ দিন।');
+    else if (amountNum > vendor.walletBalance) errors.push('আপনার ওয়ালেট ব্যালেন্সের চেয়ে বেশি টাকা উত্তোলন করা যাবে না।');
+    if (!['bkash', 'nagad', 'bank'].includes(method)) errors.push('পেমেন্ট মেথড নির্বাচন করুন।');
+
+    if (errors.length) {
+      const [transactions, withdrawals] = await Promise.all([
+        VendorWalletTransaction.find({ vendor: vendor._id }).sort({ createdAt: -1 }).limit(100),
+        VendorWithdrawal.find({ vendor: vendor._id }).sort({ createdAt: -1 }).limit(50),
+      ]);
+      return res.render('vendor-wallet', { pageTitle: 'ওয়ালেট', vendor, transactions, withdrawals, errors });
+    }
+
+    await VendorWithdrawal.create({
+      vendor: vendor._id,
+      amount: amountNum,
+      method,
+      methodDetails: (methodDetails || '').trim(),
+      note: (note || '').trim(),
+    });
+    req.flash('success', 'উত্তোলনের অনুরোধ পাঠানো হয়েছে। অ্যাডমিন অনুমোদন করলে টাকা কেটে নেওয়া হবে।');
+    res.redirect('/vendor/wallet');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Vendor Sub-orders (multivendor Phase 2) — a vendor's own view of which
+// orders included their products, and each one's settlement status. See
+// models/VendorSubOrder.js for the full settlement/return scope notes.
+router.get('/vendor/orders', requireVendorLogin, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.session.vendorId);
+    if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+    const subOrders = await VendorSubOrder.find({ vendor: vendor._id }).sort({ createdAt: -1 }).limit(100);
+    res.render('vendor-orders', { pageTitle: 'অর্ডার', vendor, subOrders });
+  } catch (err) {
+    next(err);
+  }
+});
+
+router.post('/vendor/orders/:id/dispute', requireVendorLogin, verifyCsrf, async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findById(req.session.vendorId);
+    if (!vendor) { delete req.session.vendorId; return res.redirect('/vendor/login'); }
+    const subOrder = await VendorSubOrder.findOne({ _id: req.params.id, vendor: vendor._id });
+    if (!subOrder) {
+      req.flash('danger', 'অর্ডার পাওয়া যায়নি।');
+      return res.redirect('/vendor/orders');
+    }
+    // Only a reversed (refunded/returned) sub-order can be disputed — a
+    // pending or settled one has nothing to contest yet.
+    if (subOrder.settlementStatus === 'reversed' && subOrder.disputeStatus === 'none') {
+      const note = (req.body.disputeNote || '').trim();
+      if (note) {
+        subOrder.disputeStatus = 'vendor_disputed';
+        subOrder.disputeNote = note;
+        await subOrder.save();
+        req.flash('success', 'আপনার আপত্তি অ্যাডমিনের কাছে পাঠানো হয়েছে।');
+      } else {
+        req.flash('danger', 'কারণ লিখুন।');
+      }
+    }
+    res.redirect('/vendor/orders');
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* Public vendor store page — only an 'active' vendor's page resolves;
+   a pending/suspended/rejected vendor's slug 404s, same convention as
+   an unpublished product/category/blog post elsewhere in this file. */
+router.get('/store/:slug', async (req, res, next) => {
+  try {
+    const vendor = await Vendor.findOne({ slug: req.params.slug, accountStatus: 'active' });
+    if (!vendor) return res.status(404).render('404', { pageTitle: 'দোকান পাওয়া যায়নি' });
+
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const perPage = 12;
+    const filter = { vendor: vendor._id, status: true, approvalStatus: 'approved' };
+    const [total, products] = await Promise.all([
+      Product.countDocuments(filter),
+      Product.find(filter).sort({ createdAt: -1 }).skip((page - 1) * perPage).limit(perPage),
+    ]);
+
+    res.render('vendor-store', {
+      pageTitle: vendor.storeName,
+      vendor, products, total, page, perPage,
+      totalPages: Math.max(1, Math.ceil(total / perPage)),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* =====================================================================
    SEARCH
    ===================================================================== */
 router.get('/search', async (req, res, next) => {
@@ -929,7 +1306,10 @@ router.get('/search', async (req, res, next) => {
     if (q) {
       products = await Product.find({
         status: true,
-        $or: [{ name: new RegExp(q, 'i') }, { shortDescription: new RegExp(q, 'i') }, { tags: new RegExp(q, 'i') }],
+        $and: [
+          { $or: [{ name: new RegExp(q, 'i') }, { shortDescription: new RegExp(q, 'i') }, { tags: new RegExp(q, 'i') }] },
+          { $or: PRODUCT_VISIBLE_OR },
+        ],
       })
         .sort({ createdAt: -1 })
         .limit(40);

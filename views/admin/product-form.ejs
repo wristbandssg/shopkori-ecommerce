@@ -5,6 +5,8 @@
   const selectedCategoryId = d.categoryId || (d.category ? String(d.category._id || d.category) : '');
   const selectedBrandId = d.brandId || (d.brand ? String(d.brand._id || d.brand) : '');
   const selectedSupplierId = d.supplierId || (d.supplier ? String(d.supplier._id || d.supplier) : '');
+  const selectedVendorId = d.vendorId || (d.vendor ? String(d.vendor._id || d.vendor) : '');
+  const approvalStatusValue = ['approved', 'pending', 'rejected'].includes(d.approvalStatus) ? d.approvalStatus : 'approved';
   const skuValue = d.sku || formData.sku || '';
   const variantsInitial = d.variants || [];
   const hasVariantsChecked = !!d.hasVariants;
@@ -386,6 +388,25 @@
               <% }); %>
             </select>
           </div>
+          <div class="col-12">
+            <label class="form-label">Vendor <small class="text-muted">(leave blank for a platform/own product)</small></label>
+            <select name="vendorId" class="form-select">
+              <option value="">-- No Vendor (platform product) --</option>
+              <% (typeof vendors !== 'undefined' ? vendors : []).forEach(function (v) { %>
+                <option value="<%= v._id %>" <%= selectedVendorId === String(v._id) ? 'selected' : '' %>><%= v.storeName %></option>
+              <% }); %>
+            </select>
+          </div>
+          <% if (selectedVendorId) { %>
+            <div class="col-12">
+              <label class="form-label">Approval Status <small class="text-muted">(only applies to a vendor-owned product — a platform product is always Approved)</small></label>
+              <select name="approvalStatus" class="form-select">
+                <option value="approved" <%= approvalStatusValue === 'approved' ? 'selected' : '' %>>Approved (live on site)</option>
+                <option value="pending" <%= approvalStatusValue === 'pending' ? 'selected' : '' %>>Pending Review</option>
+                <option value="rejected" <%= approvalStatusValue === 'rejected' ? 'selected' : '' %>>Rejected</option>
+              </select>
+            </div>
+          <% } %>
 
           <div class="col-12 advanced-block" style="display:<%= advDisplay %>">
             <label class="form-label">Tags</label>

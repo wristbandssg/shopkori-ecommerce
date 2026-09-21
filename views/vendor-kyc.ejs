@@ -1,0 +1,65 @@
+<%- include('partials/header') %>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h2 class="section-heading mb-0"><i class="bi bi-patch-check"></i> KYC ভেরিফিকেশন</h2>
+    <nav class="d-flex gap-2 flex-wrap">
+      <a href="/vendor/dashboard" class="btn btn-sm btn-outline-secondary">ড্যাশবোর্ড</a>
+      <a href="/vendor/kyc" class="btn btn-sm btn-outline-secondary active">KYC</a>
+      <a href="/vendor/profile" class="btn btn-sm btn-outline-secondary">দোকানের তথ্য</a>
+      <a href="/vendor/orders" class="btn btn-sm btn-outline-secondary">অর্ডার</a>
+      <a href="/vendor/wallet" class="btn btn-sm btn-outline-secondary">ওয়ালেট</a>
+      <a href="/vendor/logout" class="btn btn-sm btn-outline-danger">লগআউট</a>
+    </nav>
+  </div>
+
+  <% if (vendor.kycStatus === 'approved') { %>
+    <div class="alert alert-success">আপনার KYC অনুমোদিত হয়েছে।</div>
+  <% } else if (vendor.kycStatus === 'rejected') { %>
+    <div class="alert alert-danger">আপনার KYC বাতিল হয়েছে<% if (vendor.kycRejectionReason) { %>: <%= vendor.kycRejectionReason %><% } %> — তথ্য ঠিক করে আবার জমা দিন।</div>
+  <% } else { %>
+    <div class="alert alert-warning">আপনার KYC অ্যাডমিনের পর্যালোচনার অপেক্ষায় আছে।</div>
+  <% } %>
+
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+  <% } %>
+
+  <div class="admin-card">
+    <form method="post" action="/vendor/kyc" enctype="multipart/form-data">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">NID নম্বর *</label>
+          <input type="text" name="nidNumber" class="form-control" required value="<%= vendor.kyc.nidNumber || '' %>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">NID-এর ছবি <% if (vendor.kyc.nidDocument) { %><small class="text-success">(আগে জমা দেওয়া আছে)</small><% } %></label>
+          <input type="file" name="nidDocument" class="form-control" accept="image/*">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">ট্রেড লাইসেন্স নম্বর</label>
+          <input type="text" name="tradeLicenseNumber" class="form-control" value="<%= vendor.kyc.tradeLicenseNumber || '' %>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">ট্রেড লাইসেন্সের ছবি <% if (vendor.kyc.tradeLicenseDocument) { %><small class="text-success">(আগে জমা দেওয়া আছে)</small><% } %></label>
+          <input type="file" name="tradeLicenseDocument" class="form-control" accept="image/*">
+        </div>
+        <div class="col-12"><hr></div>
+        <div class="col-md-4">
+          <label class="form-label">ব্যাংক অ্যাকাউন্টের নাম</label>
+          <input type="text" name="bankAccountName" class="form-control" value="<%= vendor.kyc.bankAccountName || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">ব্যাংক অ্যাকাউন্ট নম্বর</label>
+          <input type="text" name="bankAccountNumber" class="form-control" value="<%= vendor.kyc.bankAccountNumber || '' %>">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">ব্যাংকের নাম</label>
+          <input type="text" name="bankName" class="form-control" value="<%= vendor.kyc.bankName || '' %>">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-add-cart px-4 py-2 mt-4">জমা দিন</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

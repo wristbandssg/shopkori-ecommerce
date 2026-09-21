@@ -192,6 +192,28 @@
   </div>
 </div>
 
+<div class="admin-card mb-3">
+  <div class="card-title-bar">Audit Log</div>
+  <p class="form-text">HONEST SCOPE: only records vendor-related actions so far — Admin &gt; Vendors actions (KYC approve/reject, account approve/suspend/reject, commission changes, wallet adjustments, withdrawal approve/reject, dispute resolution) plus the automatic vendor sub-order settle/reverse that happens when an order's status is changed to Delivered/Returned/Cancelled — not retrofitted across this app's other ~150 admin routes yet.</p>
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead><tr><th>Date</th><th>Admin</th><th>Action</th><th>Target</th><th>Details</th></tr></thead>
+      <tbody>
+        <% (typeof auditLogs !== 'undefined' ? auditLogs : []).forEach(function (a) { %>
+          <tr>
+            <td><small><%= new Date(a.createdAt).toLocaleString('en-GB') %></small></td>
+            <td><%= a.adminName || '—' %></td>
+            <td><code><%= a.action %></code></td>
+            <td><small class="text-muted"><%= a.targetType %></small></td>
+            <td><small><%= a.details %></small></td>
+          </tr>
+        <% }); %>
+        <% if (!(typeof auditLogs !== 'undefined' && auditLogs.length)) { %><tr><td colspan="5" class="text-center text-muted">No audit log entries yet.</td></tr><% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <div class="admin-card">
   <div class="card-title-bar">API Activity</div>
   <p class="form-text mb-0">Not tracked. This app has no API-key-authenticated external surface and no outbound-call logger, so there's nothing real to show here — disclosed honestly rather than shown with fabricated numbers.</p>

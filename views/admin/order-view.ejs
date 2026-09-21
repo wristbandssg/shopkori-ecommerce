@@ -29,6 +29,33 @@
       </div>
     </div>
 
+    <% if (typeof subOrders !== 'undefined' && subOrders.length) { %>
+      <%
+        const settleBadge = { pending: ['secondary', 'Pending (settles on delivery)'], settled: ['success', 'Settled'], reversed: ['danger', 'Reversed'], cancelled: ['dark', 'Cancelled'] };
+      %>
+      <div class="admin-card mt-4">
+        <h5>Vendor Split</h5>
+        <p class="form-text mt-0">This order includes vendor-owned products — split into a sub-order per vendor. Each vendor's earning is credited to their wallet automatically once this order's status is set to Delivered, and reversed if it's later Returned/Cancelled.</p>
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead><tr><th>Vendor</th><th>Items</th><th>Subtotal</th><th>Commission</th><th>Vendor Earning</th><th>Settlement</th></tr></thead>
+            <tbody>
+              <% subOrders.forEach(function (so) { %>
+                <tr>
+                  <td><a href="/admin/vendors/<%= so.vendor._id %>"><%= so.vendor.storeName %></a></td>
+                  <td class="small"><%= so.items.map(function (i) { return i.productName + ' x' + i.qty; }).join(', ') %></td>
+                  <td><%= currency(so.subtotal) %></td>
+                  <td><%= currency(so.commissionAmount) %> (<%= so.commissionPercent %>%)</td>
+                  <td><%= currency(so.vendorEarning) %></td>
+                  <td><span class="badge bg-<%= settleBadge[so.settlementStatus][0] %>"><%= settleBadge[so.settlementStatus][1] %></span></td>
+                </tr>
+              <% }); %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    <% } %>
+
     <div class="admin-card mt-4">
       <h5>Activity Log</h5>
       <% if (order.activityLog && order.activityLog.length) { %>

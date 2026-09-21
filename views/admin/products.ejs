@@ -44,6 +44,12 @@
                 <div>
                   <div><%= p.name %></div>
                   <small class="text-muted">SKU: <%= p.sku || '—' %></small>
+                  <% if (p.vendor) { %>
+                    <div>
+                      <span class="badge bg-light text-dark border"><i class="bi bi-shop"></i> <%= p.vendor.storeName %></span>
+                      <% if (p.approvalStatus === 'pending') { %><span class="badge bg-warning text-dark">Pending Approval</span><% } else if (p.approvalStatus === 'rejected') { %><span class="badge bg-danger">Rejected</span><% } %>
+                    </div>
+                  <% } %>
                 </div>
               </td>
               <td>

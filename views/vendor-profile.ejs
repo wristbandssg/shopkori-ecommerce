@@ -1,0 +1,58 @@
+<%- include('partials/header') %>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h2 class="section-heading mb-0"><i class="bi bi-shop-window"></i> দোকানের তথ্য</h2>
+    <nav class="d-flex gap-2 flex-wrap">
+      <a href="/vendor/dashboard" class="btn btn-sm btn-outline-secondary">ড্যাশবোর্ড</a>
+      <a href="/vendor/kyc" class="btn btn-sm btn-outline-secondary">KYC</a>
+      <a href="/vendor/profile" class="btn btn-sm btn-outline-secondary active">দোকানের তথ্য</a>
+      <a href="/vendor/orders" class="btn btn-sm btn-outline-secondary">অর্ডার</a>
+      <a href="/vendor/wallet" class="btn btn-sm btn-outline-secondary">ওয়ালেট</a>
+      <a href="/vendor/logout" class="btn btn-sm btn-outline-danger">লগআউট</a>
+    </nav>
+  </div>
+
+  <% if (errors && errors.length) { %>
+    <div class="alert alert-danger"><ul class="mb-0"><% errors.forEach(function (err) { %><li><%= err %></li><% }); %></ul></div>
+  <% } %>
+
+  <div class="admin-card">
+    <form method="post" action="/vendor/profile" enctype="multipart/form-data">
+      <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">আপনার নাম</label>
+          <input type="text" name="ownerName" class="form-control" value="<%= vendor.ownerName %>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">দোকানের নাম *</label>
+          <input type="text" name="storeName" class="form-control" required value="<%= vendor.storeName %>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">ফোন নম্বর</label>
+          <input type="text" name="phone" class="form-control" value="<%= vendor.phone || '' %>">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">ঠিকানা</label>
+          <input type="text" name="address" class="form-control" value="<%= vendor.address || '' %>">
+        </div>
+        <div class="col-12">
+          <label class="form-label">দোকানের বিবরণ</label>
+          <textarea name="storeDescription" class="form-control" rows="3"><%= vendor.storeDescription || '' %></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">লোগো</label>
+          <input type="file" name="storeLogo" class="form-control" accept="image/*">
+          <% if (vendor.storeLogo) { %><img src="<%= productImageUrl(vendor.storeLogo) %>" class="admin-thumb mt-2"><% } %>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">ব্যানার</label>
+          <input type="file" name="storeBanner" class="form-control" accept="image/*">
+          <% if (vendor.storeBanner) { %><img src="<%= productImageUrl(vendor.storeBanner) %>" class="admin-thumb mt-2"><% } %>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-add-cart px-4 py-2 mt-4">সংরক্ষণ করুন</button>
+    </form>
+  </div>
+</div>
+<%- include('partials/footer') %>

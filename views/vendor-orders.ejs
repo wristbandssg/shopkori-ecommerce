@@ -1,0 +1,72 @@
+<%- include('partials/header') %>
+<%
+  const settlementLabel = {
+    pending: ['secondary', 'পর্যালোচনাধীন (ডেলিভারি হলে টাকা যোগ হবে)'],
+    settled: ['success', 'পরিশোধ হয়েছে'],
+    reversed: ['danger', 'ফেরত নেওয়া হয়েছে'],
+    cancelled: ['dark', 'বাতিল হয়েছে (টাকা কখনো যোগ হয়নি)'],
+  };
+%>
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <h2 class="section-heading mb-0"><i class="bi bi-receipt"></i> অর্ডার</h2>
+    <nav class="d-flex gap-2 flex-wrap">
+      <a href="/vendor/dashboard" class="btn btn-sm btn-outline-secondary">ড্যাশবোর্ড</a>
+      <a href="/vendor/kyc" class="btn btn-sm btn-outline-secondary">KYC</a>
+      <a href="/vendor/profile" class="btn btn-sm btn-outline-secondary">দোকানের তথ্য</a>
+      <a href="/vendor/orders" class="btn btn-sm btn-outline-secondary active">অর্ডার</a>
+      <a href="/vendor/wallet" class="btn btn-sm btn-outline-secondary">ওয়ালেট</a>
+      <a href="/vendor/logout" class="btn btn-sm btn-outline-danger">লগআউট</a>
+    </nav>
+  </div>
+
+  <p class="text-muted small">যে অর্ডারগুলোতে আপনার প্রোডাক্ট আছে, সেগুলোর তালিকা। অর্ডার ডেলিভার হলে সাথে সাথে আপনার প্রাপ্য টাকা ওয়ালেটে যোগ হয় — অর্ডার বাতিল বা রিটার্ন হলে সেটা কেটে নেওয়া হয়।</p>
+
+  <div class="admin-card">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>অর্ডার নং</th><th>তারিখ</th><th>প্রোডাক্ট</th><th>সাবটোটাল</th><th>কমিশন</th><th>আপনার প্রাপ্য</th><th>অবস্থা</th><th></th></tr></thead>
+        <tbody>
+          <% subOrders.forEach(function (so) { %>
+            <tr>
+              <td><%= so.orderNumber %></td>
+              <td><%= new Date(so.createdAt).toLocaleDateString('bn-BD') %></td>
+              <td class="small"><%= so.items.map(function (i) { return i.productName + ' x' + i.qty; }).join(', ') %></td>
+              <td><%= currency(so.subtotal) %></td>
+              <td><%= currency(so.commissionAmount) %> (<%= so.commissionPercent %>%)</td>
+              <td><strong><%= currency(so.vendorEarning) %></strong></td>
+              <td>
+                <span class="badge bg-<%= settlementLabel[so.settlementStatus][0] %>"><%= settlementLabel[so.settlementStatus][1] %></span>
+                <% if (so.disputeStatus === 'vendor_disputed') { %><br><span class="badge bg-warning text-dark mt-1">আপত্তি পর্যালোচনাধীন</span><% } %>
+                <% if (so.disputeStatus === 'resolved') { %><br><span class="badge bg-light text-dark border mt-1">আপত্তি সমাধান হয়েছে</span><% } %>
+              </td>
+              <td>
+                <% if (so.settlementStatus === 'reversed' && so.disputeStatus === 'none') { %>
+                  <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#disputeModal<%= so._id %>">আপত্তি জানান</button>
+                  <div class="modal fade" id="disputeModal<%= so._id %>" tabindex="-1">
+                    <div class="modal-dialog"><div class="modal-content">
+                      <form method="post" action="/vendor/orders/<%= so._id %>/dispute">
+                        <input type="hidden" name="csrfToken" value="<%= csrfToken %>">
+                        <div class="modal-header"><h5 class="modal-title">আপত্তি জানান — অর্ডার <%= so.orderNumber %></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                        <div class="modal-body">
+                          <label class="form-label">কারণ লিখুন</label>
+                          <textarea name="disputeNote" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <div class="modal-footer"><button type="submit" class="btn btn-brand">পাঠান</button></div>
+                      </form>
+                    </div></div>
+                  </div>
+                <% } else if (so.disputeStatus !== 'none' && so.disputeNote) { %>
+                  <small class="text-muted">"<%= so.disputeNote %>"</small>
+                  <% if (so.disputeStatus === 'resolved' && so.disputeResolutionNote) { %><br><small class="text-success">অ্যাডমিন: <%= so.disputeResolutionNote %></small><% } %>
+                <% } %>
+              </td>
+            </tr>
+          <% }); %>
+          <% if (!subOrders.length) { %><tr><td colspan="8" class="text-center text-muted">এখনো কোনো অর্ডার নেই।</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<%- include('partials/footer') %>

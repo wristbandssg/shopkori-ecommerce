@@ -12,4 +12,11 @@ function requireAdminLogin(req, res, next) {
   next();
 }
 
-module.exports = { requireCustomerLogin, requireAdminLogin };
+function requireVendorLogin(req, res, next) {
+  if (!req.session.vendorId) {
+    return res.redirect('/vendor/login');
+  }
+  next();
+}
+
+module.exports = { requireCustomerLogin, requireAdminLogin, requireVendorLogin };
